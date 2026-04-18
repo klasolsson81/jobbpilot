@@ -1,0 +1,12 @@
+{
+  "name": "jobbpilot",
+  "version": "0.0.0",
+  "private": true,
+  "description": "JobbPilot monorepo root — Husky anchor. Web app scaffolded later under web/jobbpilot-web/.",
+  "scripts": {
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7"
+  }
+}

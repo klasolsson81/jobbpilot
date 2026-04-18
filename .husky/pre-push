@@ -1,0 +1,44 @@
+#!/usr/bin/env sh
+
+set -e
+
+echo "[pre-push] Kör gates..."
+
+# Gitleaks: scaffold-agnostisk, alltid aktiv
+if command -v gitleaks >/dev/null 2>&1; then
+    echo "[pre-push] Gitleaks scan..."
+    gitleaks detect --source . --no-banner --redact || {
+        echo "✗ Gitleaks fann potentiella secrets. Granska innan push." >&2
+        echo "  Om false positive: lägg till i .gitleaksignore med kommentar." >&2
+        exit 1
+    }
+else
+    echo "⚠ gitleaks saknas — installera via 'winget install gitleaks.gitleaks'. Pushen tillåts men secret-scan skedde inte." >&2
+fi
+
+# Scaffold-gate för tester
+SLN=$(find . -maxdepth 2 -name "*.sln" 2>/dev/null | head -1)
+WEB_DIR="web/jobbpilot-web"
+
+if [ -z "$SLN" ] && [ ! -d "$WEB_DIR" ]; then
+    echo "[pre-push] Inget scaffold än — hoppar över full test-suite."
+    echo "[pre-push] När Fas 0/1 lägger till projekt: uppdatera .husky/pre-push per SESSION-2-PLAN §4.9."
+    exit 0
+fi
+
+# .NET full suite (aktiveras i Fas 0/1)
+if [ -n "$SLN" ]; then
+    echo "[pre-push] .NET full suite + integration..."
+    # dotnet test --no-build --verbosity minimal || exit 1
+    echo "[pre-push] (.NET test-raderna är kommenterade tills test-projekt finns — se §4.9)"
+fi
+
+# Web full suite (aktiveras i Fas 0/1)
+if [ -d "$WEB_DIR" ]; then
+    echo "[pre-push] Web full suite..."
+    # (cd "$WEB_DIR" && pnpm test) || exit 1
+    echo "[pre-push] (Web test-raderna är kommenterade tills test-projekt finns)"
+fi
+
+echo "[pre-push] ✓ Alla pre-push-gates passerade."
+exit 0
