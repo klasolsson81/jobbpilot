@@ -7,7 +7,13 @@
 
 ## Aktivt nu
 
-Inget aktivt — session-break efter STEG 7.
+**PAUS efter STEG 7-avslut.** Hooks-blocket helt levande och pushat till origin/main (senaste commit: `44c7592`). Nästa session startar med STEG 8 (GitHub-integration).
+
+**När du startar nästa session:**
+1. Läs `docs/decisions/0006-claude-code-hooks-known-limitations.md` för kända hook-begränsningar.
+2. Verifiera att `git log --oneline -5` matchar tabellen nedan — om inte har något hänt sedan paus.
+3. STEG 8 per SESSION-2-PLAN §15 rad 16: PR/Issue-templates, CODEOWNERS (`@klasolsson81`), branch protection för `main`.
+4. Beräknad tid: 1-2 commits, ~30-45 min. Lättare än STEG 7.
 
 ## Klart senaste session
 
@@ -33,15 +39,16 @@ Inget aktivt — session-break efter STEG 7.
 | `c36c26d` | feat(claude): 5 design skills (principles, tokens, components, copy, a11y) — 3 100 insertions |
 | `cae7ccb` | docs(design): DESIGN.md → index-format + .claude/README.md skill-lista |
 | `584f048` | feat(claude): STEG 7.1-7.3 hooks infrastructure |
-| `46e5feb` | feat(claude): STEG 7.4 code-reviewer auto-trigger |
-| `4d96a00` | feat(claude): STEG 7.5 Husky + test-gates |
+| `46e5feb` | feat(claude): STEG 7.4 code-reviewer auto-trigger (post-todo-review) |
+| `4d96a00` | feat(claude): STEG 7.5 Husky + test-gates (pre-commit, pre-push) |
+| `44c7592` | docs: STEG 7.6 smoke-test results + ADR 0006 |
 
 ## Nästa
 
-- **STEG 8**: GitHub-integration (PR-templates, CODEOWNERS, branch protection)
-- STEG 9: Docs-struktur + fler ADRs
-- STEG 10: CLAUDE.md-uppdateringar
-- STEG 11: End-to-end smoke test (hela feature-flödet)
+- **STEG 8**: GitHub-integration (PR-templates, CODEOWNERS, branch protection) — SESSION-2-PLAN §15 rad 16
+- STEG 9: Docs-struktur + fler ADRs (§15 rad 17-18)
+- STEG 10: CLAUDE.md-uppdateringar (§15 rad 20)
+- STEG 11: End-to-end smoke test hela feature-flödet (§15 rad 21)
 - STEG 12: Final push + handover
 
 ---
