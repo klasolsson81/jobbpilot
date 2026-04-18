@@ -1,0 +1,37 @@
+#!/usr/bin/env sh
+
+set -e
+
+echo "[pre-commit] Kör gates..."
+
+# Scaffold-gate: om inget .NET- eller web-projekt finns, hoppa över kod-gates
+SLN=$(find . -maxdepth 2 -name "*.sln" 2>/dev/null | head -1)
+WEB_DIR="web/jobbpilot-web"
+
+if [ -z "$SLN" ] && [ ! -d "$WEB_DIR" ]; then
+    echo "[pre-commit] Inget scaffold än (.sln + $WEB_DIR saknas) — hoppar över format/test-gates."
+    echo "[pre-commit] När Fas 0/1 lägger till projekt: uppdatera .husky/pre-commit per SESSION-2-PLAN §4.8."
+    exit 0
+fi
+
+# .NET-gates (aktiveras när .sln finns)
+if [ -n "$SLN" ]; then
+    echo "[pre-commit] .NET format + snabba tester..."
+    dotnet format --verify-no-changes || {
+        echo "✗ dotnet format fel. Kör 'dotnet format' och stega in igen." >&2
+        exit 1
+    }
+    # Tests aktiveras när test-projekt finns (Fas 0/1)
+    # dotnet test tests/JobbPilot.Domain.UnitTests --no-build --verbosity minimal || exit 1
+    # dotnet test tests/JobbPilot.Application.UnitTests --no-build --verbosity minimal || exit 1
+    # dotnet test tests/JobbPilot.Architecture.Tests --no-build --verbosity minimal || exit 1
+fi
+
+# Web-gates (aktiveras när web/jobbpilot-web/ finns)
+if [ -d "$WEB_DIR" ]; then
+    echo "[pre-commit] Web lint + typecheck..."
+    (cd "$WEB_DIR" && pnpm lint && pnpm tsc --noEmit) || exit 1
+fi
+
+echo "[pre-commit] ✓ Alla pre-commit-gates passerade."
+exit 0

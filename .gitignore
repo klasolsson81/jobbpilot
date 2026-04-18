@@ -23,6 +23,7 @@ coverage/
 
 # Node / Next.js
 node_modules/
+.husky/_/
 .next/
 out/
 .turbo/
