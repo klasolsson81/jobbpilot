@@ -1,13 +1,13 @@
 # Current work — JobbPilot
 
-**Status:** Session 3 pågår. STEG 1–6 klara. Nästa: STEG 7 (slash commands / hooks).
+**Status:** STEG 7 klar. Nästa: STEG 8 (GitHub-integration).
 **Datum:** 2026-04-18
 
 ---
 
 ## Aktivt nu
 
-Inget aktivt — session-break efter STEG 6.
+Inget aktivt — session-break efter STEG 7.
 
 ## Klart senaste session
 
@@ -20,8 +20,10 @@ Inget aktivt — session-break efter STEG 6.
 - Session 3 steg 4: `.claude/`-struktur committad (settings.json, README, runbook).
 - Session 3 steg 5 ✅: 11 Claude Code-agenter skapade och committade. ADR 0002 komplett, ADR 0005 skapad.
 - Session 3 steg 6 ✅: 5 design-skills skapade och committade. DESIGN.md transformerad till index-format (631 → 180 rader, per ADR 0003 Alt B). `.claude/README.md` uppdaterad med agent- och skill-lista.
+- Session 3/4 STEG 7.1-7.5 ✅: 7 Claude Code-hooks + 2 Husky-hooks (pre-commit, pre-push). Commits: 584f048 (7.1-7.3), 46e5feb (7.4), 4d96a00 (7.5).
+- Session 4 STEG 7.6 ✅: End-to-end smoke-test. Tre begränsningar dokumenterade i ADR 0006.
 
-## Committat i session 3 (nuläge på origin/main)
+## Committat i session 3-4 (nuläge på origin/main)
 
 | Commit | Innehåll |
 |--------|----------|
@@ -30,25 +32,27 @@ Inget aktivt — session-break efter STEG 6.
 | `b72969a` | docs(session): current-work + 2 research issues |
 | `c36c26d` | feat(claude): 5 design skills (principles, tokens, components, copy, a11y) — 3 100 insertions |
 | `cae7ccb` | docs(design): DESIGN.md → index-format + .claude/README.md skill-lista |
+| `584f048` | feat(claude): STEG 7.1-7.3 hooks infrastructure |
+| `46e5feb` | feat(claude): STEG 7.4 code-reviewer auto-trigger |
+| `4d96a00` | feat(claude): STEG 7.5 Husky + test-gates |
 
 ## Nästa
 
-- **STEG 7**: Slash commands per SESSION-2-PLAN §15
-- STEG 8: Hooks (pre-commit, pre-push)
-- STEG 9: Code-reviewer auto-trigger workflow
-- STEG 10: GitHub-integration
-- STEG 11: Docs-struktur + ADRs
-- STEG 12: CLAUDE.md uppdateringar
-- STEG 13: End-to-end smoke test
-- STEG 14: Final push
-- STEG 15: Handover-dokument
+- **STEG 8**: GitHub-integration (PR-templates, CODEOWNERS, branch protection)
+- STEG 9: Docs-struktur + fler ADRs
+- STEG 10: CLAUDE.md-uppdateringar
+- STEG 11: End-to-end smoke test (hela feature-flödet)
+- STEG 12: Final push + handover
 
 ---
 
-## Design-system-noteringar (från STEG 5-6 review)
+## Kända begränsningar från STEG 7.6
 
-- **"Suboptimal component composition"** (STEG 5.9-5.10): Fördes från design-reviewer till code-reviewer (Area 5, Conventions/TypeScript-sektion). design-reviewer renodlad till estetik/a11y/copy; code-reviewer äger komponent-sammansättning.
-- **App-shell-layout** (sidebar 240px, collapsed 60px): Finns i DESIGN.md:s ursprungsversion §4.2 men inte i skills. Ska dokumenteras i `jobbpilot-design-components/references/` under Fas 1 när app-shell byggs.
+Dokumenterade i **ADR 0006**:
+
+- SessionStart-hook stdout osynlig i VS Code-extensionen (hooken körs, output syns inte)
+- PostToolUse(TodoWrite) `additionalContext` propageras inte reliable → code-reviewer auto-trigger funkar inte; manuell invocation eller Husky pre-commit är fallback
+- Code-reviewer sparar inte rapport i `docs/reviews/` per spec — fix vid första Fas 0-review
 
 ---
 
@@ -106,7 +110,7 @@ Model access är redan `AUTHORIZED` för Opus 4.7 — ingen Console-request beh�
 ### Mediator pipeline-ordning — dokumentera innan Fas 1
 
 Ordningen Logging → Validation → Authorization → UnitOfWork är inte explicit
-motiverad. Dokumentera i CLAUDE.md §3 eller som ADR 0006 innan Fas 1 kodning börjar.
+motiverad. Dokumentera i CLAUDE.md §3 eller som ADR 0007 innan Fas 1 kodning börjar.
 
 ### Terraform backend — dynamodb_table → use_lockfile (ej brådskande)
 
