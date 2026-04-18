@@ -7,6 +7,48 @@
   "respectGitignore": true,
   "autoMemoryDirectory": ".claude/auto-memory",
 
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          { "type": "command", "command": "bash .claude/hooks/session-start.sh", "timeout": 10000 }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          { "type": "command", "command": "bash .claude/hooks/guard-spec-files.sh", "timeout": 5000 }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          { "type": "command", "command": "bash .claude/hooks/guard-bash.sh", "timeout": 5000 }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          { "type": "command", "command": "bash .claude/hooks/post-cs-edit.sh", "timeout": 30000 },
+          { "type": "command", "command": "bash .claude/hooks/post-ts-edit.sh", "timeout": 30000 }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "",
+        "hooks": [
+          { "type": "command", "command": "bash .claude/hooks/pre-compact-save.sh", "timeout": 15000 }
+        ]
+      }
+    ]
+  },
+
   "permissions": {
     "defaultMode": "default",
 
