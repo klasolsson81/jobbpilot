@@ -35,20 +35,23 @@ Från Klas-beslut #5:
 
 ## 1. Agenter (kurerat urval)
 
-Per Klas-beslut #1: inte kopiera LMS:s 13 agenter blint. 8 essentiella agenter för v1 + motivering av LMS-urval.
+Per Klas-beslut #1: inte kopiera LMS:s 13 agenter blint. 9 essentiella agenter för v1 + motivering av LMS-urval.
+
+> **Uppdatering 2026-04-18 (session 2.5):** `design-reviewer` tillagd som agent #9 efter att DESIGN.md splittrats till skills (se ADR 0003). Modell-ID:n är nu explicit enligt Klas-beslut §17.1.2 (ingen alias).
 
 ### 1.1 Urval för JobbPilot v1
 
 | # | Agent | Modell | LMS-motsvarighet | Motivering för JobbPilot |
 |---|-------|--------|------------------|----------------------------|
-| 1 | `code-reviewer` | **opus** | `code-reviewer` (BE + FE) | Kvalitets-vakt. Klas högsta prio (DEL 5). |
-| 2 | `security-auditor` | **opus** | `/security` command (BE + FE) | BYOK + GDPR + OAuth — kritisk yta i JobbPilot (BUILD.md §8.4, §13). |
-| 3 | `dotnet-architect` | sonnet | `feature-scaffolder` (BE) | Clean Arch-vakt + scaffolding av aggregates/handlers. |
-| 4 | `nextjs-ui-engineer` | sonnet | `feature-scaffolder` + `page-builder` + `api-integrator` (FE) | Scaffolding av pages, komponenter, query hooks + civic-design-compliance. |
-| 5 | `test-writer` | sonnet | `test-writer` (BE + FE) | Skriver xUnit + Shouldly + Vitest-tester innan implementation. |
-| 6 | `db-migration-writer` | sonnet | `migration-helper` (BE) | EF Core 10 + PostgreSQL 18 + svensk kollation + soft delete. |
-| 7 | `ai-prompt-engineer` | sonnet | *(ny — LMS har ingen)* | Hanterar `/prompts/*.prompt.md` för JobbPilot AI-layer (BUILD.md §8.5). |
-| 8 | `docs-keeper` | sonnet | `map-updater` (BE + FE) + doc-uppdaterings-delar av `/pr` | Uppdaterar `current-work.md`, session-loggar, entity/cqrs-maps, ADRs. |
+| 1 | `code-reviewer` | **`claude-opus-4-7`** | `code-reviewer` (BE + FE) | Kvalitets-vakt. Klas högsta prio (DEL 5). |
+| 2 | `security-auditor` | **`claude-opus-4-7`** | `/security` command (BE + FE) | BYOK + GDPR + OAuth — kritisk yta i JobbPilot (BUILD.md §8.4, §13). |
+| 3 | `dotnet-architect` | `claude-sonnet-4-6` | `feature-scaffolder` (BE) | Clean Arch-vakt + scaffolding av aggregates/handlers. |
+| 4 | `nextjs-ui-engineer` | `claude-sonnet-4-6` | `feature-scaffolder` + `page-builder` + `api-integrator` (FE) | Scaffolding av pages, komponenter, query hooks + civic-design-compliance. |
+| 5 | `test-writer` | `claude-sonnet-4-6` | `test-writer` (BE + FE) | Skriver xUnit + Shouldly + Vitest-tester innan implementation. |
+| 6 | `db-migration-writer` | `claude-sonnet-4-6` | `migration-helper` (BE) | EF Core 10 + PostgreSQL 18 + svensk kollation + soft delete. |
+| 7 | `ai-prompt-engineer` | `claude-sonnet-4-6` | *(ny — LMS har ingen)* | Hanterar `/prompts/*.prompt.md` för JobbPilot AI-layer (BUILD.md §8.5). |
+| 8 | `docs-keeper` | `claude-sonnet-4-6` | `map-updater` (BE + FE) + doc-uppdaterings-delar av `/pr` | Uppdaterar `current-work.md`, session-loggar, entity/cqrs-maps, ADRs. |
+| 9 | `design-reviewer` | `claude-sonnet-4-6` | *(ny — se ADR 0003)* | Verifierar DESIGN.md-compliance på frontend-diff:ar; parallell med `code-reviewer` utan överlappning. |
 
 ### 1.2 LMS-agenter som SKIPPAS (motivering)
 
@@ -299,6 +302,46 @@ await repo.Received(1).AddAsync(Arg.Any<Application>(), Arg.Any<CancellationToke
 
 ---
 
+#### 1.3.9 `design-reviewer`
+
+*(Tillagd session 2.5 per ADR 0003.)*
+
+| Fält | Värde |
+|------|-------|
+| **Fil** | `.claude/agents/design-reviewer.md` |
+| **Syfte** | Verifies DESIGN.md compliance on frontend diffs (tokens usage, radius, focus ring, contrast, Swedish copy tone, no emojis, no exclamation marks, no gradients/glow/blur). |
+| **LMS-referens** | *Ingen — ny för JobbPilot. DESIGN.md §13 review-checklist är startinnehåll.* |
+| **Modell** | `claude-sonnet-4-6` (mekanisk kontroll, ingen opus-överkill) |
+| **Tools tillåtna** | `Read, Grep, Glob, Bash(git diff:*), Bash(git status:*), Bash(git log:*)` |
+| **Tools blockerade** | `Write, Edit, Bash(git commit:*), Bash(git push:*)` (read-only granskare) |
+| **Isolation** | Ingen (körs i huvudsession, har full kontext) |
+| **Auto-trigger** | **PostToolUse(Edit\|Write)** när fil-paths matchar `web/jobbpilot-web/**/*.{tsx,ts,css,md}` **eller** `messages/sv.json` — parallell med `code-reviewer` (som kör på alla filer). Kollision hanteras: code-reviewer täcker logik/arch/security, design-reviewer täcker visuell compliance. Ingen överlappning. |
+| **Manuell trigger** | `/design-review` slash-skill (`.claude/skills/design-review/`) |
+| **Input** | Git diff på frontend-filer + auto-laddade skills: `jobbpilot-design-tokens`, `jobbpilot-design-components`, `jobbpilot-design-copy`, `jobbpilot-design-a11y` |
+| **Output** | Svensk markdown-rapport (samma format som `code-reviewer`): `## Kritiska fynd / ## Viktiga fynd / ## Nice-to-have`, varje fynd `fil:rad — beskrivning — DESIGN.md-regel — föreslagen fix`. Sparas i `docs/reviews/design-<YYYY-MM-DD-HHMMSS>-<slug>.md`. |
+| **Success-definition** | 0 kritiska fynd på visuell compliance → exit 0; ≥ 1 kritisk → exit 1 (blockerar nedströms hooks) |
+
+**Checklist (skrivs ut i systemprompten, på engelska):**
+
+1. **Tokens only, no hardcoded hex.** All `#xxxxxx` found in JSX or CSS (outside `globals.css` / `@theme`-block) is a critical finding. Use `--brand-*`, `--surface-*`, `--text-*`, etc.
+2. **Radius discipline.** `rounded-*`, `border-radius`, or equivalent: ≤ 6px except explicit pills/badges (then `rounded-full` / `999px`).
+3. **No emoji in UI strings.** Grep for emoji Unicode blocks in `*.tsx`, `messages/*.json`, JSX children, `alt=`, `title=`.
+4. **No exclamation marks in UI copy.** Grep `!` inside JSX text, `messages/sv.json`, error messages, toast strings.
+5. **No gradients / glow / blur / glasmorfism.** Reject `linear-gradient`, `radial-gradient`, `backdrop-filter`, `filter: blur`, `box-shadow` beyond `--shadow-sm` / `--shadow-md`.
+6. **Focus ring present.** Every interactive element (button, link, input, select, tab, accordion-trigger) must have `focus-visible` styles → verify `*:focus-visible` from `globals.css` is not overridden with `outline: none`.
+7. **Contrast ≥ AA.** If new color combination introduced, verify via token lookup that WCAG AA ratio ≥ 4.5:1 (body) or 3:1 (large text / UI components). Flag if unclear.
+8. **Swedish copy tone.** "du" lowercase; no "Du", no "ni"; no "Whoops" / "Oj" / "Hoppsan"; no marketing-hype ("brinner för", "drömjobb", "resan"). Reference: `jobbpilot-design-copy` skill.
+9. **Radius exceptions for pills.** Badges and status-pills use `rounded-full` / `border-radius: 999px` — allowed.
+10. **`next-intl` usage, not hardcoded strings.** New user-facing strings should live in `messages/sv.json`, not inline JSX text. Flag inline strings that aren't tech (IDs, class names, test-ids).
+
+**Parallel invocation med `code-reviewer`:** båda triggas av samma TodoWrite→completed-hook (§4.6). Huvud-Claude spawnar dem i samma tool-round via flera `Agent`-calls. Rapporter sparas separat; PR-beskrivning länkar båda.
+
+**Systemprompt (utkast, engelska, slutet):**
+
+> Report findings to the user in Swedish, keeping English technical terms (token, radius, focus ring, contrast, pill, gradient, JSX, Tailwind class) untranslated. If zero critical findings, emit "Design-review godkänd — inga blockerande fynd." and exit 0. If critical findings exist, list them and exit 1.
+
+---
+
 ## 2. Skills
 
 Per Klas-beslut #6: samma skills som LMS (med svensk översättning av användar-output) + JobbPilot-specifika tillägg.
@@ -339,13 +382,84 @@ Per Klas-beslut #6 (JobbPilot-specifika tillägg). Noterat: vissa är semantiskt
 | `jobbpilot-domain` | `.claude/rules/domain.md` (rule, alltid laddad via `paths: ["src/JobbPilot.Domain/**/*.cs"]`) | Hur aggregates/VO/events skrivs: private setters, record struct IDs, domain events via `RaiseDomainEvent`, state machines via SmartEnum. |
 | `jobbpilot-clean-arch` | `.claude/rules/clean-arch.md` (rule, alltid laddad) | Lager-beroenden: Domain→∅, Application→Domain, Infrastructure→Application+Domain, Api/Worker→Application+Infrastructure. Verifieras av NetArchTest. **v1-notis:** `NetArchTest.Rules` är formellt abandoned sedan 2022 men funkar för JobbPilots skala; noteras som tekniskt skuld — överväg `TngTech.ArchUnitNET` vid v2-refactor. |
 | `jobbpilot-testing` | `.claude/rules/testing.md` (rule) | xUnit + Shouldly + NSubstitute + Testcontainers; namngivning `<Class>_<Scenario>_<Expected>`; coverage-mål per lager (Domain ≥ 90%, Application ≥ 80%). |
-| `jobbpilot-design-system` | `.claude/rules/design-system.md` (rule, `paths: ["web/jobbpilot-web/**/*.{ts,tsx,css}"]`) | DESIGN.md §2–8 komprimerat: tokens, typografi, radius-max-6px, ingen emoji, svensk copy, inga gradients. |
+| `jobbpilot-design-principles` | `.claude/skills/jobbpilot-design-principles/SKILL.md` (skill, on-demand) | Civic-utility-filosofin (DESIGN.md §1 + §1.2 do/don't-kort): tillit > roligt, tabeller > kort, Digg/1177 > Linear. **Källa-till-sanning för "ska denna UI-riktning vara OK?"**-beslut. Se §2.4 nedan för taxonomi. |
+| `jobbpilot-design-tokens` | `.claude/skills/jobbpilot-design-tokens/SKILL.md` + `references/tokens-full.md` | DESIGN.md §2 + §12: färg-tokens, radius-skala (2/4/6/999px), spacing-skala (4px-bas). **Alltid laddad vid CSS- och Tailwind-class-redigering.** |
+| `jobbpilot-design-components` | `.claude/skills/jobbpilot-design-components/SKILL.md` + `references/component-specs.md` | DESIGN.md §5: Button/Input/Card/Table/Badge/Nav/Breadcrumb/Dialog/Toast/EmptyState-specs. **Laddad vid `.tsx`-redigering under `web/jobbpilot-web/components/`.** |
+| `jobbpilot-design-copy` | `.claude/skills/jobbpilot-design-copy/SKILL.md` + `references/copy-examples.md` | DESIGN.md §8: svensk ton ("du", inga "Du/ni/Whoops/!/🚀"), empty states, microcopy, datum/valuta-formatering. **Laddad vid ändring av `messages/sv.json` eller JSX-text.** |
+| `jobbpilot-design-a11y` | `.claude/skills/jobbpilot-design-a11y/SKILL.md` + `references/a11y-full.md` | DESIGN.md §9 + §10: WCAG 2.1 AA, fokusring, kontrast-krav, keyboard-nav, `prefers-reduced-motion`, ARIA. **Laddad vid ändring av `.tsx` med interaktiva element (button, form, link, dialog, menu).** |
 | `jobbpilot-ai-prompts` | `.claude/skills/add-prompt/` + `.claude/skills/version-prompt/` | Skapa/versionera prompts i `/prompts/*.prompt.md`. Se agent `ai-prompt-engineer`. |
 | `jobbpilot-gdpr` | `.claude/rules/gdpr.md` (rule, alltid laddad) | Checklista när ny PII hanteras: soft-delete, retention-period, export-path, audit-log-entry. |
 | `jobbpilot-commit` | `.claude/skills/commit/SKILL.md` | Conventional commits (type(scope): beskrivning) på svenska eller engelska (konsekvent per PR); PR-template på svenska. |
 | `jobbpilot-mediator` | `.claude/rules/mediator-pattern.md` (rule, `paths: ["src/JobbPilot.Application/**/*.cs"]`) | Mediator.SourceGenerator-syntax (`[Handler]`, `IRequestHandler<,>` attribut-baserat); INGA MediatR-kvarlevor; pipeline behaviors registration via `Mediator(opts => opts.PipelineBehaviors...)`. |
 
-### 2.3 Skill-struktur (per skill)
+### 2.3 Design-skills — laddningsmönster och DESIGN.md-transformation
+
+*(Tillagd session 2.5 per [ADR 0003](../decisions/0003-design-as-skills.md) och [CLAUDE-DESIGN-FINDINGS.md](./CLAUDE-DESIGN-FINDINGS.md).)*
+
+#### Laddningsmönster
+
+Claude Code auto-triggar skills på description-match (progressive disclosure). Varje design-skill har en pushy description som nämner exakt vilka filtyper/kontexter triggar den.
+
+| Skill | Trigger-kontexter | Typisk `description:`-formulering (engelska, i SKILL.md) |
+|-------|-------------------|----------------------------------------------------------|
+| `jobbpilot-design-principles` | On-demand vid design-beslut / vid "bör vi göra X"-frågor | *"Loads JobbPilot's civic-utility design philosophy. Use this skill whenever the user asks about design direction, UI tone, whether a visual treatment fits, or compares JobbPilot's look to other products. Triggers on words like 'design', 'tone', 'civic', 'look', 'feel', 'brand'."* |
+| `jobbpilot-design-tokens` | **Auto vid** `.css`, `tailwind.config.ts`, `globals.css`, eller Tailwind class-attribute-edits | *"Loads JobbPilot's locked design tokens (colors, radius, spacing, typography). Use this skill whenever CSS files are edited, Tailwind classes added or removed, or color/spacing/radius values are introduced. Triggers on 'color', 'radius', 'spacing', 'token', 'css', 'tailwind', hex codes, or class-name changes."* |
+| `jobbpilot-design-components` | **Auto vid** `.tsx` i `web/jobbpilot-web/components/**` | *"Loads JobbPilot's component specs (Button, Input, Card, Table, Badge, Nav, Dialog, Toast, EmptyState). Use this skill whenever a React component file is edited in `web/jobbpilot-web/components/`, a shadcn component is customized, or a new component is introduced. Triggers on 'component', 'Button', 'Card', 'Table', 'shadcn', or any `components/` file edit."* |
+| `jobbpilot-design-copy` | **Auto vid** `messages/sv.json` eller JSX-text-ändringar | *"Loads JobbPilot's Swedish copy guidelines (civic tone, 'du' lowercase, no emojis, no exclamation marks, no marketing hype). Use this skill whenever user-facing strings are written, `messages/sv.json` is edited, error messages are drafted, empty states are written, or toast notifications are created. Triggers on 'copy', 'text', 'message', 'toast', 'error message', 'empty state', or edits to `messages/*.json`."* |
+| `jobbpilot-design-a11y` | **Auto vid** `.tsx` som innehåller interaktiva element (button, form, input, select, link, dialog, menu, tab) | *"Loads JobbPilot's accessibility rules (WCAG 2.1 AA, focus ring, contrast, keyboard navigation, `prefers-reduced-motion`, ARIA). Use this skill whenever interactive elements are added or modified: buttons, forms, inputs, selects, links, dialogs, menus, tabs, focus behavior, ARIA attributes, keyboard handlers. Triggers on 'focus', 'aria', 'keyboard', 'a11y', 'accessibility', 'WCAG', 'contrast', 'screen reader'."* |
+
+**Alltid-laddat vs selektivt:**
+
+- **Alltid** (varje FE-session): `jobbpilot-design-tokens` (liten fil; tokens är kritiska i varje FE-edit).
+- **Selektivt** (per kontext): `jobbpilot-design-components`, `jobbpilot-design-copy`, `jobbpilot-design-a11y`.
+- **On-demand** (vid design-resonemang): `jobbpilot-design-principles`.
+
+Laddningsordningen når 2–4 skills samtidigt vid en typisk FE-edit, vilket är ~5–20 % av den context-kostnad som DESIGN.md-monoliten medför. Progressive-disclosure-mönstret är kärnfördelen (se [CLAUDE-DESIGN-FINDINGS §2.4](./CLAUDE-DESIGN-FINDINGS.md)).
+
+#### DESIGN.md blir index (inte duplicering)
+
+DESIGN.md behålls som fil i repo-roten men **innehållet flyttas ut till skills**. Ny struktur för DESIGN.md efter session 3 steg 7 (se ADR 0003):
+
+```markdown
+# DESIGN.md — JobbPilot design system (index)
+
+> **Källor-till-sanning:** design-systemets innehåll ligger i Claude Code-skills under `.claude/skills/jobbpilot-design-*/`.
+> DESIGN.md är ett index — ingen duplicering.
+
+## 1. Filosofi
+(~1 sida civic-utility-filosofi — oförändrad, detta är "människans ingång")
+
+## 2. Var finns vad?
+
+| Område | Skill | Reference-filer |
+|--------|-------|-----------------|
+| Filosofi + do/don't | `.claude/skills/jobbpilot-design-principles/SKILL.md` | — |
+| Färg, radius, spacing, typografi | `.claude/skills/jobbpilot-design-tokens/` | `references/tokens-full.md` |
+| Komponenter | `.claude/skills/jobbpilot-design-components/` | `references/component-specs.md` |
+| Svensk copy | `.claude/skills/jobbpilot-design-copy/` | `references/copy-examples.md` |
+| Tillgänglighet | `.claude/skills/jobbpilot-design-a11y/` | `references/a11y-full.md` |
+
+## 3. Granskning
+Design-compliance kontrolleras automatiskt av `design-reviewer`-agenten (se SESSION-2-PLAN §1.3.9) vid varje frontend-diff.
+
+## 4. Claude Design-produkten
+**Används INTE för v1 produkt-UI.** Se SESSION-2-PLAN §18 för framtida användning (marknadsmaterial).
+```
+
+**Viktig regel (dokumenteras i ADR 0003):** informationen får **INTE** dupliceras mellan DESIGN.md och skills. Skills äger innehållet; DESIGN.md är ett index. Om tokens ändras → ändras i `jobbpilot-design-tokens/references/tokens-full.md`, inte i DESIGN.md. Detta verifieras av `docs-keeper`-agenten vid session-end.
+
+#### Beroenden mellan skills
+
+- `jobbpilot-design-components` refererar indirekt `jobbpilot-design-tokens` (komponenter använder tokens) — men ingen formell `imports:`-länk; skillen nämner bara att tokens är kanoniska.
+- `jobbpilot-design-copy` är oberoende — inga tokens eller komponenter nödvändiga.
+- `jobbpilot-design-a11y` refererar `jobbpilot-design-tokens` för kontrast-värden (WCAG 4.5:1).
+- `jobbpilot-design-principles` refererar alla — den är filosofi-lagret ovanför implementation-skills.
+
+Ingen hård coupling — Claude laddar beroenden via description-match, inte explicit import. Om a11y-skill aktivt nämner tokens → tokens-skill laddas också.
+
+---
+
+### 2.4 Skill-struktur (per skill)
 
 Alla skills använder 2026-standardformatet `.claude/skills/<name>/SKILL.md` (inte `.claude/commands/<name>.md` även om det fortfarande fungerar — skills har precedence, och är rätt framtid enligt [SESSION-1-FINDINGS.md §1.1](./SESSION-1-FINDINGS.md)).
 
@@ -1856,8 +1970,54 @@ Förkrav som är uppfyllda eller levereras nu:
 
 ---
 
+## 18. Framtida möjligheter (inte för v1)
+
+*(Tillagd session 2.5 per [ADR 0003](../decisions/0003-design-as-skills.md) och [CLAUDE-DESIGN-FINDINGS.md](./CLAUDE-DESIGN-FINDINGS.md).)*
+
+### 18.1 Claude Design (Anthropic Labs)
+
+**Vad det är.** Lanserad 2026-04-17 av Anthropic Labs. Claude Opus 4.7-baserad produkt som genererar polished visuals (prototyper, slides, one-pagers, landing-pages) från prompts + valfri codebase-läsning. Exports till Canva, PDF, PPTX, standalone HTML och **Claude Code handoff-bundle** (format odokumenterat publikt). Inkluderat i Pro/Max/Team/Enterprise-planer.
+
+**När blir det relevant för JobbPilot?**
+
+| Use case | Fas | Rationale |
+|----------|-----|-----------|
+| LIA-pitch deck till Infinet/handledare | ~fas 7 | PPTX-export + code-läsning passar för "här är min app"-deck |
+| Klass-launch landing-page-variationer | ~fas 8 | Landing-page-prototyper för att testa copy-alternativ med klasskamrater |
+| Pitch-deck för eventuell investor-konversation | senare | Om JobbPilot får traction efter klass-launch och vi behöver kapital |
+| Sommar-demo-material för klasskamrater | efter fas 8 | One-pager med features, screenshots, value prop |
+
+**Varför INTE för v1 produkt-UI.**
+
+- Civic-utility-estetik (Digg/1177-ton) är motsatsen till Claude Designs "rapid visual exploration"-styrka.
+- DESIGN.md §2 tokens är **låsta**; §5 förbjuder explicit glow, gradients, radius > 6px — exakt det Claude Design excellerar på.
+- Att mata in JobbPilots codebase → få bundle-output tillbaka skulle regenerera det vi redan har.
+- Handoff-bundle-format är inte publikt dokumenterat (se [CLAUDE-DESIGN-FINDINGS.md §1.1](./CLAUDE-DESIGN-FINDINGS.md)) — att basera produktions-UI på odokumenterat format är teknisk risk.
+
+**Omvärderas:** efter klass-launch (fas 8). Då testas Claude Design mot LIA-pitch-deck som pilot-projekt. Om den levererar värde → lägg till i `.claude/settings.json` MCP-server-listan för marknadsmaterial-workflows. Produkt-UI förblir utanför Claude Designs scope.
+
+### 18.2 Figma MCP
+
+**Vad det är.** Officiell Figma-produkt i beta (gratis under betaperioden). Exponerar Figma Dev Mode som MCP-server för Claude Code. Stödjer write-to-canvas och code-to-canvas. Install via `claude mcp add --transport sse figma-dev-mode-mcp-server http://127.0.0.1:3845/sse` eller `claude plugin install figma@claude-plugins-official`.
+
+**Relevans för JobbPilot: skip.**
+
+- JobbPilot använder inte Figma som design-verktyg.
+- DESIGN.md + skills (§2.3) är SSOT för tokens och komponenter.
+- MCP är beta; långsiktig stabilitet oklar.
+
+**Omvärderas:** om en designer joinar teamet, eller om JobbPilot behöver exportera pitch/brand-artefakt från Figma. Ingen nuvarande driver.
+
+### 18.3 Övriga framtida spår (förs in här när de uppstår)
+
+*(Plats för senare beslut. Nu tomt.)*
+
+---
+
 **Slut på SESSION-2-PLAN.md.** Systerdokument:
 - [`SESSION-1-FINDINGS.md`](./SESSION-1-FINDINGS.md) — research-underlag
 - [`SESSION-1-VERSION-AUDIT.md`](./SESSION-1-VERSION-AUDIT.md) — konkreta version-ändringar för BUILD.md (implementeras session 3 steg 1)
+- [`CLAUDE-DESIGN-FINDINGS.md`](./CLAUDE-DESIGN-FINDINGS.md) — session 2.5-research om Claude Design + design-skill-mönster
 - [`../decisions/0001-clean-architecture.md`](../decisions/0001-clean-architecture.md) — ADR-stub
 - [`../decisions/0002-explicit-model-versions.md`](../decisions/0002-explicit-model-versions.md) — ADR-stub
+- [`../decisions/0003-design-as-skills.md`](../decisions/0003-design-as-skills.md) — ADR (fylld, session 2.5)
