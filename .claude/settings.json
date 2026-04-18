@@ -37,6 +37,12 @@
           { "type": "command", "command": "bash .claude/hooks/post-cs-edit.sh", "timeout": 30000 },
           { "type": "command", "command": "bash .claude/hooks/post-ts-edit.sh", "timeout": 30000 }
         ]
+      },
+      {
+        "matcher": "TodoWrite",
+        "hooks": [
+          { "type": "command", "command": "bash .claude/hooks/post-todo-review.sh", "timeout": 5000 }
+        ]
       }
     ],
     "PreCompact": [
