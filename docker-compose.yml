@@ -1,0 +1,121 @@
+# Compose Specification v5 — ingen top-level `version:`-nyckel (obsolete sedan 2024).
+#
+# Profiles:
+#   (default)  — postgres-dev, redis-dev, seq
+#   test       — postgres-test, redis-test
+#   full       — allt ovan (default-services + test-services)
+#
+# Starta:
+#   docker compose up -d                         # dev
+#   docker compose --profile test up -d          # lägg till test
+#   docker compose --profile full up -d          # alla services
+#
+# Förkrav: .env-fil i repo-roten med POSTGRES_PASSWORD_DEV + POSTGRES_PASSWORD_TEST.
+# Se .env.example för mall.
+
+name: jobbpilot
+
+services:
+
+  # ==============================================================
+  # DEFAULT (dev) — alltid aktiv
+  # ==============================================================
+
+  postgres-dev:
+    image: postgres:18.3
+    container_name: jobbpilot-postgres-dev
+    environment:
+      POSTGRES_DB: jobbpilot
+      POSTGRES_USER: jobbpilot
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_DEV:?POSTGRES_PASSWORD_DEV måste sättas i .env}
+    ports:
+      - "5432:5432"
+    volumes:
+      # Postgres 18+: mount /var/lib/postgresql (inte .../data) så att
+      # version-specifika subkataloger skapas — krävs för pg_upgrade --link.
+      - jobbpilot_postgres_dev_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jobbpilot -d jobbpilot"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  redis-dev:
+    image: redis:8.6-alpine
+    container_name: jobbpilot-redis-dev
+    ports:
+      - "6379:6379"
+    volumes:
+      - jobbpilot_redis_dev_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+
+  seq:
+    image: datalust/seq:latest
+    container_name: jobbpilot-seq
+    environment:
+      ACCEPT_EULA: "Y"
+      # Seq 2025.2+ kräver explicit firstRun-konfig. För localhost-dev
+      # stänger vi av auth helt — Seq är bunden till loopback och innehåller
+      # bara dev-loggar. Produktion kör aldrig Seq (CloudWatch istället).
+      SEQ_FIRSTRUN_NOAUTHENTICATION: "true"
+    ports:
+      - "5341:80"      # Seq UI + API (unified http-port)
+      - "5342:5341"    # Seq ingestion-port (separat listener enligt Seq-startlog)
+    volumes:
+      - jobbpilot_seq_data:/data
+    restart: unless-stopped
+
+  # ==============================================================
+  # PROFILE test — aktiveras med `--profile test` eller `--profile full`
+  # ==============================================================
+
+  postgres-test:
+    image: postgres:18.3
+    container_name: jobbpilot-postgres-test
+    profiles: ["test", "full"]
+    environment:
+      POSTGRES_DB: jobbpilot_test
+      POSTGRES_USER: jobbpilot
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_TEST:?POSTGRES_PASSWORD_TEST måste sättas i .env}
+    ports:
+      - "5433:5432"
+    volumes:
+      - jobbpilot_postgres_test_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jobbpilot -d jobbpilot_test"]
+      interval: 3s
+      timeout: 2s
+      retries: 15
+      start_period: 10s
+    restart: unless-stopped
+
+  redis-test:
+    image: redis:8.6-alpine
+    container_name: jobbpilot-redis-test
+    profiles: ["test", "full"]
+    ports:
+      - "6380:6379"
+    volumes:
+      - jobbpilot_redis_test_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 2s
+      retries: 15
+      start_period: 5s
+    restart: unless-stopped
+
+volumes:
+  jobbpilot_postgres_dev_data:
+  jobbpilot_redis_dev_data:
+  jobbpilot_seq_data:
+  jobbpilot_postgres_test_data:
+  jobbpilot_redis_test_data:
