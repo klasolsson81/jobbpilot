@@ -120,37 +120,40 @@ Se §18 Utvecklingsfaser.
 
 | Komponent | Val | Version | Notis |
 |-----------|-----|---------|-------|
-| Backend runtime | .NET | 9.0 (migrera till 10.0 vid GA ~nov 2026) | LTS, stabilt |
-| Språk (backend) | C# | 13 (12 fallback) | Primära funktioner, records, pattern matching |
-| Backend framework | ASP.NET Core | 9 | Minimal API |
-| ORM | EF Core | 9 | Npgsql-provider |
-| Auth | ASP.NET Core Identity | 9 | Egen Identity-DB |
-| Mediator | MediatR | 12.x | CQRS pipeline |
-| Validering | FluentValidation | 11.x | Via MediatR-pipeline |
-| Mapping | Mapster | 7.x | Snabbare än AutoMapper, kodgenerering |
+| Backend runtime | .NET | 10 (LTS till 2028-11) | GA sedan 2025-11-11 |
+| Språk (backend) | C# | 14 | Extension members, `field` keyword GA, null-conditional assignment |
+| Backend framework | ASP.NET Core | 10 | Minimal API |
+| ORM | EF Core | 10 | Npgsql-provider 10.x |
+| Auth | ASP.NET Core Identity | 10 | Egen Identity-DB |
+| Mediator | Mediator (martinothamar) | 3.x | Source-generated CQRS, MIT, Native AOT-kompatibelt (ersätter MediatR) |
+| Validering | FluentValidation | 12.x | Via Mediator-pipeline |
+| Mapping | Mapster | 10.x | Snabbare än AutoMapper, kodgenerering |
 | Background jobs | Hangfire | 1.8.x | Postgres-storage |
 | Smart enum | Ardalis.SmartEnum | 8.x | State machines i domänen |
 | Logging | Serilog | 4.x | CloudWatch + Seq dev |
-| Observability | OpenTelemetry | 1.10+ | Traces + metrics |
-| PDF parsing | PdfPig | 0.1.10+ | Text extraction |
+| Observability | OpenTelemetry | 1.15+ | Traces + metrics |
+| PDF parsing | PdfPig | 0.1.14+ | Text extraction |
 | DOCX parsing | DocumentFormat.OpenXml | 3.x | Microsoft-underhåll |
-| PDF generation | QuestPDF | 2024.x | Community-license (free för JobbPilot) |
+| PDF generation | QuestPDF | 2026.2.x | Community MIT free under USD 1M revenue; `QuestPDF.Settings.License = LicenseType.Community` i startup |
 | DOCX generation | DocumentFormat.OpenXml | 3.x | Template-baserad |
-| AI SDK (Bedrock) | AWSSDK.BedrockRuntime | 3.7.x+ | Primary för systemnyckel |
-| AI SDK (direkt) | Anthropic.SDK | 5.x+ (community) eller egen HTTP-klient | BYOK-flöde |
-| HTTP | HttpClientFactory + Refit | 7.x | JobTech-klient |
-| Database | PostgreSQL | 17.x | RDS, Sweden region |
-| Cache | Redis | 7.4 | ElastiCache |
-| Frontend framework | Next.js | 15 (App Router) | SSR + ISR |
-| Språk (frontend) | TypeScript | 5.6+ | Strict mode |
-| UI-komponenter | shadcn/ui | senaste | Tung customisering, se DESIGN.md |
-| Styling | Tailwind CSS | 4 | v4 config i `tailwind.config.ts` |
+| AI SDK (Bedrock) | AWSSDK.BedrockRuntime | 4.x | Converse API, primary för systemnyckel |
+| AI SDK (direkt) | Anthropic (officiell NuGet) | 12.x | MIT, BYOK-flöde (ersätter community `Anthropic.SDK`) |
+| HTTP | HttpClientFactory + Refit | 10.x | JobTech-klient |
+| Database | PostgreSQL | 18.3 | RDS eu-north-1 |
+| Cache | Redis | 8.6 | ElastiCache (tri-license, extern cache-användning OK) |
+| Test-assertions | Shouldly | 4.3.x | MIT, ersätter commercial FluentAssertions |
+| Test-mocks | NSubstitute | 5.x | Mock-ramverk för Application-tester |
+| Arch-tests | NetArchTest.Rules | 1.x | V1-val; abandoned sedan 2022 — överväg ArchUnitNET vid v2 |
+| Frontend framework | Next.js | 16.2 (App Router) | SSR + ISR |
+| Språk (frontend) | TypeScript | 6.0 | Strict mode |
+| UI-komponenter | shadcn/ui | senaste (CLI v4) | Tung customisering, se DESIGN.md |
+| Styling | Tailwind CSS | 4.2 | v4 config i `tailwind.config.ts` |
 | Data fetching | TanStack Query | 5.x | Server state |
 | Tabeller | TanStack Table | 8.x | Headless |
-| Form | React Hook Form + Zod | latest | Schema-baserad validering |
-| Auth-klient | NextAuth.js (Auth.js) | 5 beta | Integrerar mot backend Identity-JWT |
+| Form | React Hook Form + Zod | RHF ^7.72, Zod 4.x | Schema-baserad validering |
+| Auth-klient | NextAuth.js (Auth.js) | 5 | Integrerar mot backend Identity-JWT (cookie-sessions) |
 | Datum | date-fns | 4.x | Svensk locale |
-| Ikoner | Lucide React | latest | Minimalistiskt, civic-vänligt |
+| Ikoner | Lucide React | ^1.8 | Minimalistiskt, civic-vänligt |
 | Typografi | Hanken Grotesk | Google Fonts | Primär; Inter som fallback |
 
 ### 3.2 Infrastruktur
@@ -159,10 +162,10 @@ Se §18 Utvecklingsfaser.
 |--------|-----|--------|-------|
 | Compute (backend) | AWS ECS Fargate | eu-north-1 (Stockholm) | Container-baserat |
 | Compute (worker) | AWS ECS Fargate (separat service) | eu-north-1 | Hangfire-server |
-| Database | AWS RDS PostgreSQL | eu-north-1, Multi-AZ | 17.x |
-| Cache | AWS ElastiCache Redis | eu-north-1 | 7.4 |
+| Database | AWS RDS PostgreSQL | eu-north-1, Multi-AZ | 18.3 |
+| Cache | AWS ElastiCache Redis | eu-north-1 | 8.6 |
 | Object storage | AWS S3 | eu-north-1 | CV-uppladdningar, genererade PDF/DOCX |
-| AI inferens (systemnyckel) | AWS Bedrock | eu-central-1 (Frankfurt) eller eu-west-1 (Irland) | Bedrock EU-inferensprofiler |
+| AI inferens (systemnyckel) | AWS Bedrock | EU cross-region inference profile callable från eu-north-1; fallback eu-central-1 / eu-west-1 | Ingen cross-region-kostnad från backend |
 | AI inferens (BYOK) | Anthropic direkt API | Global routing | Användarens eget ansvar, tydligt samtycke |
 | Email | AWS SES | eu-north-1 | DKIM/SPF/DMARC konfigurerat |
 | Frontend | Vercel | eu | Next.js hosting |
@@ -174,16 +177,18 @@ Se §18 Utvecklingsfaser.
 | Monitoring | CloudWatch | eu-north-1 | Logs, metrics, alarms |
 | Errors | Sentry | EU datacenter | Backend + frontend |
 | CI/CD | GitHub Actions | — | Build, test, deploy till ECS + Vercel |
-| IaC | Terraform | 1.9+ | AWS-provider |
+| IaC | Terraform | 1.14+ | AWS-provider |
 
 ### 3.3 Miljöer
 
 | Miljö | Syfte | Deployment | Domän |
 |-------|-------|-----------|-------|
 | local | Utveckling | Docker Compose | localhost |
-| dev | Integration | Auto på merge till `develop` | dev.jobbpilot.se |
-| staging | Pre-prod test | Auto på merge till `staging` | staging.jobbpilot.se |
-| production | Live | Manuell approval på `main` | jobbpilot.se |
+| dev | Integration | Auto på tag `v*-dev` från `main` | dev.jobbpilot.se |
+| staging | Pre-prod test | Auto på tag `v*-rc*` från `main` | staging.jobbpilot.se |
+| production | Live | Manuell approval på tag `v*` (ej `-rc`) från `main` | jobbpilot.se |
+
+GitHub Flow tillämpas: `main` är den enda långlivade branchen. Feature-branches mergeas via squash-PR. Inga `develop`/`staging`-branches — staging är en *miljö*, inte en branch (se §15.3).
 
 ---
 
@@ -240,7 +245,7 @@ Se §18 Utvecklingsfaser.
 
 ### 4.2 Dependency direction
 
-Domain beror på ingenting (inte ens MediatR).
+Domain beror på ingenting (inte ens Mediator.SourceGenerator).
 Application beror på Domain.
 Infrastructure beror på Application (implementerar interfaces) och Domain (läser entities).
 Api och Worker beror på Infrastructure och Application.
@@ -278,7 +283,7 @@ Verifieras via ArchUnit.NET eller NetArchTest-regler i Domain.ArchitectureTests-
 
 ### 4.4 Cross-cutting concerns
 
-**Alla genom MediatR-pipeline i Application-lagret:**
+**Alla genom Mediator.SourceGenerator-pipeline i Application-lagret:**
 
 1. `LoggingBehavior` — loggar request-start, duration, success/fail
 2. `ValidationBehavior` — kör FluentValidation, returnerar `Result<T>.Failure` vid fel
@@ -470,7 +475,7 @@ public sealed class ApplicationStatus : SmartEnum<ApplicationStatus>
 
 ### 5.5 Domain events
 
-Alla domain events implementerar `IDomainEvent` och dispatchas av `SaveChangesInterceptor` efter `SaveChangesAsync`. Events hanteras av MediatR `INotificationHandler<>` i Application-lagret.
+Alla domain events implementerar `IDomainEvent` och dispatchas av `SaveChangesInterceptor` efter `SaveChangesAsync`. Events hanteras av Mediator.SourceGenerator `INotificationHandler<>` i Application-lagret.
 
 **Händelser som ska finnas:**
 
@@ -906,27 +911,37 @@ public enum AiOperationType { CvParse, CvTailor, CoverLetterGenerate, MatchDeep,
 
 ### 8.2 Modell-mappning
 
-| Use case | Tier | Modell (Bedrock) | Modell (direkt) |
-|----------|------|-------------------|------------------|
-| CV-parsing (text → JSON) | Fast | `eu.anthropic.claude-haiku-4-5-...` | `claude-haiku-4-5-20251001` |
+| Use case | Tier | Modell (Bedrock EU-profil) | Modell (Anthropic direkt) |
+|----------|------|----------------------------|---------------------------|
+| CV-parsing (text → JSON) | Fast | `eu.anthropic.claude-haiku-4-5-20251001-v1:0` | `claude-haiku-4-5-20251001` |
 | Anti-klyscha-detektor | Fast | Haiku | Haiku |
-| Matchningsscore (Deep) | Deep | Sonnet 4.6 | Sonnet 4.6 |
+| Matchningsscore (Deep) | Deep | `eu.anthropic.claude-sonnet-4-6` | `claude-sonnet-4-6` |
 | Skräddarsytt CV | Deep | Sonnet 4.6 | Sonnet 4.6 |
 | Personligt brev | Deep | Sonnet 4.6 | Sonnet 4.6 |
 | Företagsresearch-brief | Deep | Sonnet 4.6 (+ web search tool) | Sonnet 4.6 |
 | Rekommendations-reasoning | Fast | Haiku | Haiku |
+| Premium (optional) | Premium | `eu.anthropic.claude-opus-4-7` | `claude-opus-4-7` |
+
+Alla tre EU-profil-ID:n verifierade mot `aws bedrock list-inference-profiles` i
+både `eu-central-1` och `eu-west-1` per session 3 steg 2g — se
+[`docs/research/bedrock-inference-profiles.md`](./docs/research/bedrock-inference-profiles.md).
+Sonnet 4.6 och Opus 4.7 saknar datumsuffix; Haiku 4.5 har det.
+Model access är redan `AUTHORIZED` i kontot — ingen manuell Console-request behövs.
 
 Modellnamn ska hämtas från konfiguration, inte hårdkodas. `appsettings.json`:
 
-```json
+```jsonc
 {
   "Ai": {
     "SystemProvider": "BedrockClaude",
     "Bedrock": {
-      "Region": "eu-central-1",
+      // Backend körs i eu-north-1; EU cross-region inference profile
+      // tillåter anrop från eu-north-1 utan cross-region-kostnad.
+      "Region": "eu-north-1",
       "ModelIds": {
-        "Fast": "eu.anthropic.claude-haiku-4-5-<date>",
-        "Deep": "eu.anthropic.claude-sonnet-4-6-<date>"
+        "Fast": "eu.anthropic.claude-haiku-4-5-20251001-v1:0",
+        "Deep": "eu.anthropic.claude-sonnet-4-6",
+        "Premium": "eu.anthropic.claude-opus-4-7"
       }
     },
     "AnthropicDirect": {
@@ -934,7 +949,8 @@ Modellnamn ska hämtas från konfiguration, inte hårdkodas. `appsettings.json`:
       "InferenceGeo": "global",
       "Models": {
         "Fast": "claude-haiku-4-5-20251001",
-        "Deep": "claude-sonnet-4-6"
+        "Deep": "claude-sonnet-4-6",
+        "Premium": "claude-opus-4-7"
       }
     }
   }
@@ -1084,18 +1100,17 @@ Runtime laddar prompts via `IPromptLibrary`, gör token-substitution, och skicka
 
 ### 9.6 AWS Bedrock (systemnyckel)
 
-- SDK: `AWSSDK.BedrockRuntime`
-- Region: `eu-central-1` (Frankfurt) — Claude-modeller tillgängliga
-- Alternativ: `eu-west-1` (Irland) — större kapacitet
-- EU-inferens-profiler: `eu.anthropic.claude-*`
-- IAM-policy minimal: `bedrock:InvokeModel` mot specifika model ARNs
-- Cross-region: om backend ligger i `eu-north-1` (Stockholm) och Bedrock i `eu-central-1` → fortfarande inom EU-datalokaliseringsgränsen
+- SDK: `AWSSDK.BedrockRuntime` 4.x (Converse API, ersätter äldre `InvokeModel`-flöde)
+- Region: `eu-north-1` (Stockholm) som call-region via EU cross-region inference profile
+- EU inference profile: `eu.anthropic.claude-*`; fallback-källregioner inkluderar `eu-central-1`, `eu-west-1`, `eu-south-1`, `eu-south-2`, `eu-west-3`
+- IAM-policy minimal: `bedrock:InvokeModel` + `bedrock:Converse*` mot specifika inference-profile-ARNs
+- Data stannar inom EU oavsett vilken källregion som servar requesten
 
 ---
 
 ## 10. Frontend-arkitektur
 
-### 10.1 Next.js 15 App Router-struktur
+### 10.1 Next.js 16 App Router-struktur
 
 ```
 /web/jobbpilot-web
@@ -1230,7 +1245,7 @@ Roles lagras i `user_roles` (Identity).
 - `[Authorize]` på alla endpoints utom `/auth/*`, `/health`
 - `[Authorize(Roles = "Admin,SuperAdmin")]` för admin-endpoints
 - Resource-based authorization: user kan bara läsa/skriva egna resumes, applications, etc.
-- Implementerat via `IAuthorizationRequirement`-handlers som injiceras i MediatR-pipelinen
+- Implementerat via `IAuthorizationRequirement`-handlers som injiceras i Mediator.SourceGenerator-pipelinen
 
 ---
 
@@ -1268,6 +1283,12 @@ Se [`DESIGN.md`](./DESIGN.md) för komplett specifikation: färgtokens, typograf
 - TLS 1.3 överallt
 - HSTS + preload
 - Certificate pinning i mobilklient (framtida)
+
+**Secrets-hantering per miljö:**
+- `local`: `.env`-fil i repo-roten, gitignored; `.env.example` committas som mall utan värden
+- `dev` / `staging` / `production`: AWS Secrets Manager i eu-north-1 (SSM Parameter Store för icke-känslig config)
+- BYOK-nycklar: ALDRIG i `.env` eller Secrets Manager i plaintext — alltid KMS envelope (§8.4)
+- `IConfiguration`-abstraktionen gör att koden är identisk oavsett källa; endast DI-registreringen skiljer
 
 ### 13.3 GDPR-flöden
 
@@ -1373,15 +1394,15 @@ CloudWatch alarms:
 │   ├─ service: api (2 tasks min, autoscale to 10)
 │   └─ service: worker (1 task min, autoscale to 4)
 │
-├─ RDS Postgres 17, Multi-AZ, db.t4g.medium
-├─ ElastiCache Redis 7.4, cache.t4g.small, 2-node
+├─ RDS Postgres 18.3, Multi-AZ, db.t4g.medium
+├─ ElastiCache Redis 8.6, cache.t4g.small, 2-node
 │
 ├─ S3 buckets:
 │   ├─ jobbpilot-uploads-prod (CVs, encrypted, 7-dagar lifecycle för tmp)
 │   ├─ jobbpilot-exports-prod (genererade PDF/DOCX, 24h expiry)
 │   └─ jobbpilot-logs-prod (flow logs, audit log archival)
 │
-├─ Bedrock endpoints i eu-central-1 (via VPC endpoint till eu-central bedrock)
+├─ Bedrock via EU cross-region inference profile (anropas från eu-north-1)
 │
 └─ Route 53 → CloudFront → ALB → ECS
 ```
@@ -1390,6 +1411,7 @@ CloudWatch alarms:
 
 ```
 /infra/terraform
+  /bootstrap                  (S3 state-bucket + DynamoDB locks — körs en gång med bootstrap-profil)
   /modules
     /network
     /ecs-service
@@ -1397,12 +1419,15 @@ CloudWatch alarms:
     /redis
     /s3
     /iam
+    /budgets
+    /cloudtrail
+    /kms
+    /secrets_manager
+    /bedrock_model_access
   /environments
     /dev
-      /main.tf
-      /terraform.tfvars
     /staging
-    /prod
+    /prod                     (primär — main.tf + terraform.tfvars)
 ```
 
 - State i S3 + DynamoDB locks
@@ -1410,24 +1435,35 @@ CloudWatch alarms:
 
 ### 15.3 CI/CD
 
-**GitHub Actions workflows:**
+**GitHub Actions workflows (GitHub Flow, tag-baserad deploy):**
 
-`backend.yml`:
-- Trigger: push till `main`/`develop`, PR till `main`/`develop`
-- Jobs:
-  1. `test`: `dotnet restore`, `dotnet build`, `dotnet test` (med Testcontainers)
-  2. `lint`: `dotnet format --verify-no-changes`
-  3. `arch-test`: architecture tests
-  4. `docker-build`: bygg image, push till ECR
-  5. `deploy-dev` (vid develop-merge): ECS service update
-  6. `deploy-prod` (vid main-merge med manual approval)
+`ci.yml`:
+- Trigger: PR mot `main`, push till `main`
+- Jobs: `build`, `test` (unit + architecture), `typecheck`, `lint`, `docker-build` (push till ECR vid push till `main`)
+
+`code-review.yml`:
+- Trigger: PR opened / synchronize
+- Kör `code-reviewer`-agenten mot PR-diff, postar kommentar, arkiverar rapport under `docs/reviews/`
+
+`security.yml`:
+- Trigger: PR + veckovis cron
+- `security-auditor` + `dotnet list package --vulnerable` + `pnpm audit` + gitleaks
+
+`deploy-dev.yml`:
+- Trigger: tag `v*-dev` på `main` → ECS service update i dev
+
+`deploy-staging.yml`:
+- Trigger: tag `v*-rc*` på `main` → ECS service update i staging
+
+`deploy-prod.yml`:
+- Trigger: tag `v*` (ej `-rc`) på `main` → manuell approval via GitHub Environments → ECS + migrations-task
+
+`terraform.yml`:
+- Plan on PR, apply on merge till `main` (via OIDC federation)
 
 `frontend.yml`:
 - Vercel Git integration (auto-deploy)
 - Lint + type check + Playwright e2e i CI
-
-`terraform.yml`:
-- Plan on PR, apply on merge till `main`
 
 ### 15.4 Deployment-strategi
 
@@ -1479,16 +1515,18 @@ Triggas av handlers för:
 **Domain unit tests** (JobbPilot.Domain.UnitTests, ~70% av antalet tester)
 - Aggregate-invariants, state machines, value objects
 - Ingen databas, ingen I/O
-- Använder xUnit + FluentAssertions
+- Använder xUnit + Shouldly (ersätter FluentAssertions efter dess kommersialisering 2025)
 - Target coverage på Domain: **>90%**
 
 **Application unit tests** (JobbPilot.Application.UnitTests, ~20%)
 - Handlers mot in-memory fakes/mocks (NSubstitute)
+- xUnit + Shouldly + NSubstitute
 - Testar use case-logik utan Infrastructure
 
 **Integration tests** (JobbPilot.Api.IntegrationTests, ~10%)
-- Testcontainers för Postgres + Redis
+- Testcontainers för Postgres + Redis (ephemeral per test-klass)
 - WebApplicationFactory
+- Shouldly för assertions
 - Happy-path + nyckel-felscenarion per endpoint
 - Kör i CI med `dotnet test --filter Category=Integration`
 
@@ -1525,14 +1563,15 @@ Triggas av handlers för:
 Ingen hård deadline, men mjuka milstolpar för att driva framåt:
 
 ### Fas 0 — Foundation (~2 veckor)
-- AWS-konto, IAM-roller, OIDC-federation till GitHub
-- Terraform för dev-miljö uppe (VPC, ECS, RDS, Redis, S3, KMS)
-- Solution setup: Clean Arch-projekt + kors-skivor
+- AWS-konto + SSO (Identity Center), IAM-roller, OIDC-federation till GitHub
+- Terraform bootstrap (S3 state + DynamoDB locks) + prod-baseline (budgets, CloudTrail, KMS, Secrets Manager, Bedrock model access)
+- Clean Arch-solution setup + NetArchTest
 - ASP.NET Core Identity + första JWT-endpoint
-- Next.js-projekt + design system-baseline (tokens, Hanken Grotesk, Button, Card, Input)
-- Första deploy till dev (hello world backend + login/register flöde)
-- GitHub Actions CI/CD fungerar
+- Next.js 16-projekt + design system-baseline (tokens, Hanken Grotesk, Button, Card, Input)
+- Första deploy till dev (hello world backend + login/register-flöde)
+- GitHub Actions CI/CD fungerar (tag-baserad deploy per §15.3)
 - CLAUDE.md + DESIGN.md committade
+- Bootstrap-IAM-user raderas som sista steg när SSO-profilen fungerar för Terraform
 
 **Milstolpe:** Du kan registrera dig + logga in på dev.jobbpilot.se.
 
@@ -1540,7 +1579,7 @@ Ingen hård deadline, men mjuka milstolpar för att driva framåt:
 - Domain-projekt: alla aggregates, entities, VOs med >80% test coverage
 - EF Core-konfiguration för alla
 - Migrations, seed-data för SSYK
-- MediatR-pipeline med alla behaviors
+- Mediator.SourceGenerator-pipeline med alla behaviors
 - Application-lagret: grundläggande queries/commands för JobSeeker, Resume (utan AI), Application (utan integrations)
 - API-endpoints för ovan
 - Audit log-infrastruktur
