@@ -1,0 +1,216 @@
+# Local dev-setup — JobbPilot
+
+Lokal utveckling bygger på Docker Compose-stack:en i [`docker-compose.yml`](../../docker-compose.yml).
+Denna fil beskriver hur du kommer igång från nyklonad repo.
+
+---
+
+## 1. Förkrav
+
+| Verktyg | Version | Installation (Windows) |
+|---|---|---|
+| Docker Desktop | modern (Engine 28+) | `winget install Docker.DockerDesktop` |
+| Docker Compose | v2.x (bundlad) | kommer med Docker Desktop |
+| Git | modern | kommer med Git for Windows |
+| openssl | (för att generera .env-lösenord) | bundlat med Git for Windows (`/mingw64/bin/openssl`) eller `winget install FireDaemon.OpenSSL` |
+
+Starta Docker Desktop innan du kör compose-kommandon.
+
+---
+
+## 2. Första start
+
+### 2.1 Klona + .env-setup
+
+```bash
+git clone https://github.com/klasolsson81/jobbpilot.git
+cd jobbpilot
+cp .env.example .env
+```
+
+Generera starka lösenord. På bash/Git Bash/WSL:
+
+```bash
+{
+  echo "POSTGRES_PASSWORD_DEV=$(openssl rand -hex 16)"
+  echo "POSTGRES_PASSWORD_TEST=$(openssl rand -hex 16)"
+  echo "REDIS_PASSWORD_DEV="
+} > .env
+```
+
+På PowerShell:
+
+```powershell
+@"
+POSTGRES_PASSWORD_DEV=$(-join ((48..57)+(65..90)+(97..122) | Get-Random -Count 32 | ForEach-Object {[char]$_}))
+POSTGRES_PASSWORD_TEST=$(-join ((48..57)+(65..90)+(97..122) | Get-Random -Count 32 | ForEach-Object {[char]$_}))
+REDIS_PASSWORD_DEV=
+"@ | Out-File -Encoding utf8 .env
+```
+
+`.env` är gitignored — committa aldrig. Kontrollera:
+
+```bash
+git check-ignore -v .env
+# → .gitignore:6:.env	.env
+```
+
+### 2.2 Starta default-profile (dev)
+
+```bash
+docker compose up -d
+```
+
+Tre containrar startar:
+- `jobbpilot-postgres-dev` på `5432` (db: `jobbpilot`, user: `jobbpilot`)
+- `jobbpilot-redis-dev` på `6379`
+- `jobbpilot-seq` på `5341` (UI + API) och `5342` (ingestion)
+
+### 2.3 Verifiera
+
+```bash
+# Status (alla ska vara healthy, Seq up)
+docker compose ps
+
+# Postgres
+docker exec jobbpilot-postgres-dev psql -U jobbpilot -d jobbpilot -tAc "SELECT version();"
+# → PostgreSQL 18.3 ...
+
+# Redis
+docker exec jobbpilot-redis-dev redis-cli ping
+# → PONG
+
+# Seq UI
+curl -I http://localhost:5341
+# → HTTP/1.1 200 OK
+```
+
+Öppna http://localhost:5341 i webbläsaren för Seq-dashboarden.
+
+---
+
+## 3. Test-profilen
+
+Separata instanser på andra portar — används av integration-tester så de
+kan köra parallellt med dev-stacken.
+
+```bash
+docker compose --profile test up -d
+```
+
+Två extra containrar:
+- `jobbpilot-postgres-test` på `5433` (db: `jobbpilot_test`)
+- `jobbpilot-redis-test` på `6380`
+
+Verifiera:
+
+```bash
+docker exec jobbpilot-postgres-test psql -U jobbpilot -d jobbpilot_test -tAc "SELECT version();"
+docker exec jobbpilot-redis-test redis-cli ping
+```
+
+Stäng ner:
+
+```bash
+docker compose --profile test stop
+```
+
+---
+
+## 4. Full-profile
+
+Startar **allt** (default + test) i en kommando. Användbart när man
+kör E2E-tester mot verklig stack.
+
+```bash
+docker compose --profile full up -d
+```
+
+---
+
+## 5. Vanliga operationer
+
+```bash
+# Visa status
+docker compose ps
+
+# Tail logs
+docker compose logs -f postgres-dev
+docker compose logs --tail=50 seq
+
+# Stanna allt (behåller data)
+docker compose --profile full stop
+
+# Starta allt igen
+docker compose --profile full start
+
+# Riv allt inkl. volymer (MISTER DATA — kör endast vid behov)
+docker compose --profile full down -v
+```
+
+---
+
+## 6. Troubleshooting
+
+### 6.1 Port-konflikter
+
+Om `docker compose up` säger `Bind for 0.0.0.0:5432 failed: port is already allocated`:
+
+- En annan postgres-instans kör lokalt. Stoppa den eller ändra port i compose-filen.
+- På Windows: `netstat -ano | findstr :5432` → visar PID → `taskkill /PID <pid> /F`
+
+Samma procedur för 5433 (test-postgres), 6379/6380 (redis), 5341/5342 (seq).
+
+### 6.2 Docker Desktop inte igång
+
+`error during connect: ... The system cannot find the file specified.` → starta
+Docker Desktop och vänta på "Engine running"-statusen i dess tray-ikon.
+
+### 6.3 Postgres-volym korrupt
+
+Om postgres-containern restartar med fel som refererar `initdb` eller
+`could not read system configuration`:
+
+1. `docker compose down` (utan `-v` — behåll volymer för diagnostik först).
+2. `docker compose logs postgres-dev` — leta efter orsaken.
+3. Om det är en tom/corrupt volym efter avbruten init:
+   ```bash
+   docker compose down -v          # raderar volymerna
+   docker compose up -d             # Postgres re-initierar
+   ```
+
+### 6.4 Seq `firstRun.adminPassword` / `noAuthentication`-fel
+
+Seq 2025.2+ kräver antingen admin-lösenord eller explicit no-auth. I vår
+compose-fil har vi satt `SEQ_FIRSTRUN_NOAUTHENTICATION=true` — om du vill
+aktivera auth lokalt:
+
+1. Ta bort den raden från compose-filen.
+2. Lägg till `SEQ_FIRSTRUN_ADMINPASSWORD=${SEQ_ADMIN_PASSWORD}` under Seq-servicen.
+3. Lägg till `SEQ_ADMIN_PASSWORD=...` i `.env` + `.env.example`.
+4. `docker compose up -d --force-recreate seq`.
+
+### 6.5 Postgres 18+ volym-mount
+
+JobbPilot:s compose mountar `jobbpilot_postgres_dev_data` på
+`/var/lib/postgresql` (**inte** `.../data`). Detta är det nya 18+-mönstret
+som tillåter `pg_upgrade --link` vid major-uppgraderingar. Om du migrerar
+från en tidigare 17-volym till 18 → läs
+https://github.com/docker-library/postgres/issues/37.
+
+### 6.6 Windows-specifika fallgropar
+
+- **WSL2-backend**: Docker Desktop måste köra WSL2-backend för bästa
+  volym-IO. Kontrollera i Docker Desktop → Settings → General.
+- **Filbehörigheter**: om containern klagar på `permission denied` på
+  volyme: Docker Desktop → Resources → File sharing — lägg till
+  `C:\DOTNET-UTB` om det inte redan är med.
+
+---
+
+## 7. Vad som EJ ingår (än)
+
+- Ingen .NET- eller Next.js-kod körs i compose än — det kommer i Fas 1.
+- Inga migrations (Postgres-dbs är tomma, vilket är korrekt nu).
+- Ingen Azurite/Minio — vi kör riktig S3 när det behövs.
+- Ingen app-container för backend/worker — Fas 1-arbete.
