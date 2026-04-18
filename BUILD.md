@@ -1587,6 +1587,12 @@ Ingen hård deadline, men mjuka milstolpar för att driva framåt:
 **Milstolpe:** Du kan skapa CV manuellt, submit:a "fake" ansökningar, se dem i admin-audit.
 
 ### Fas 2 — JobTech Integration (~2 veckor)
+
+> **Förkrav innan Fas 2 påbörjas:** ADR 0005 (go-to-market) måste vara beslutad
+> och samtliga kostnadsskydd implementerade enligt ADR:s obligatoriska sektion
+> (Budget Actions, feature flag `registrations_open`, rate limiting per user,
+> runbook `docs/runbooks/aws-cost-recovery.md`).
+
 - `IJobSource` + `PlatsbankenJobSource`
 - Hangfire-setup + första syncjob
 - JobAd-domän + CRUD
