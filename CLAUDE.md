@@ -15,11 +15,85 @@ JobbPilot är en svensk jobbansökningshanterare byggd som en **civic utility** 
 
 ---
 
+## 1.5 Session Protocol (mandatory)
+
+**At session start**, before any other work:
+
+1. Read `docs/current-work.md` — captures status from previous session
+2. Read the latest file in `docs/sessions/` for context on recent work
+3. Run `git log --oneline -8` to verify HEAD matches expected state from current-work.md
+4. If hooks should be active: verify `bash .claude/hooks/session-start.sh` produces output
+
+**During the session**:
+
+- Track multi-step work with TodoWrite
+- Mark todos as completed only when verified working (post-todo-review hook
+  triggers code-reviewer on completed code-related todos)
+- Pause and ask Klas before deviating from the planned step
+
+**At session end**, before pause:
+
+1. Update `docs/current-work.md`:
+   - Status header (current step + next step)
+   - "Active now" section (what was completed, what's pending)
+   - Commit table (append new commits)
+   - "Done last session" list
+2. Create or update session log in `docs/sessions/YYYY-MM-DD-HHMM-<slug>.md`
+   - YAML frontmatter (session, datum, slug, status, commits)
+   - Body covers: goals, what was completed per step, decisions, commits, next session
+3. Commit current-work + session log together
+4. Push to origin/main
+
+**Format for session log files**:
+
+- Filename: `YYYY-MM-DD-HHMM-<slug>.md` (e.g., `2026-04-19-1000-session-4-hooks-github-docs.md`)
+- Hybrid format: YAML frontmatter + freeform markdown body
+- Medium detail: focus on decisions and detours, not what's already in commit messages
+- See `docs/sessions/` for examples (sessions 3 and 4 are reference templates)
+
+---
+
+## 1.6 Docs structure (where things live)
+
+The `docs/` directory is organized by purpose. When generating new
+documentation, place it according to this map:
+
+| Directory | Purpose | Examples |
+|-----------|---------|----------|
+| `docs/current-work.md` | Single source of truth for session state | (one file) |
+| `docs/sessions/` | Per-session retrospective logs | `2026-04-19-1000-session-4-*.md` |
+| `docs/decisions/` | Architecture Decision Records (ADRs) | `0001-clean-architecture.md` |
+| `docs/decisions/README.md` | ADR index — auto-maintained by docs-keeper | (one file) |
+| `docs/runbooks/` | Operational procedures | `aws-setup.md`, `local-dev-setup.md` |
+| `docs/research/` | Investigative findings, planning docs | `SESSION-1-FINDINGS.md` |
+| `docs/research/issues/` | Open research questions awaiting decision | `tailwind-config-approach.md` |
+| `docs/reviews/` | Code review reports (auto-generated) | `pre-commit-YYYY-MM-DD-*.md` |
+| `docs/test-reports/` | Test coverage outputs | `coverage-YYYY-MM-DD.xml` |
+| `docs/api/` | OpenAPI exports (post-Fas 0) | `openapi.yaml` |
+
+**Top-level files** (repo root, not under docs/):
+
+- `BUILD.md` — main spec, edit only on explicit Klas instruction
+- `CLAUDE.md` — this file, edit only on explicit Klas instruction
+- `DESIGN.md` — design system index (real specs in `.claude/skills/jobbpilot-design-*/`)
+- `README.md` — project overview for outside readers
+
+**Convention**: when an agent or skill creates a new doc, it should pick the
+correct directory automatically. If unsure, ask Klas before placing it.
+The docs-keeper agent (`.claude/agents/docs-keeper.md`) verifies cross-references
+and structure at session-end.
+
+**For new ADRs**: use the `/new-adr <slug>` command which triggers the
+adr-keeper agent. Numbering is sequential (next free number = look at
+`docs/decisions/README.md` index).
+
+---
+
 ## 2. Kärnprinciper
 
 ### 2.1 Clean Architecture är icke-förhandlingsbart
 
-- **Domain** beror på **ingenting** — inte ens MediatR, inte EF Core, inte IDomainEvent bas-klass utanför projektet
+- **Domain** beror på **ingenting** — inte ens Mediator.SourceGenerator, inte EF Core, inte IDomainEvent bas-klass utanför projektet
 - **Application** beror på Domain, definierar alla interfaces som Infrastructure implementerar
 - **Infrastructure** implementerar Application-interfaces, innehåller EF Core, externa API-klienter
 - **Api / Worker** beror på Application + Infrastructure, komponerar DI-container
@@ -34,7 +108,7 @@ Om du någonsin ser dig importera `Microsoft.EntityFrameworkCore` i Domain eller
 - Aggregates refererar varandra **endast via strongly-typed IDs**, aldrig direkta objekt
 - State-övergångar går genom explicita metoder med preconditions (`Application.TransitionTo(status)`)
 
-### 2.3 CQRS via MediatR
+### 2.3 CQRS via Mediator.SourceGenerator
 
 - Commands returnerar `Result<T>` där `T` är det som ändrats
 - Queries returnerar DTOs direkt, inga domänobjekt ut genom Application-gränsen
@@ -53,7 +127,7 @@ Om du någonsin ser dig importera `Microsoft.EntityFrameworkCore` i Domain eller
 
 ### 3.1 Stil
 
-- C# 13-syntax där det hjälper (primary constructors, collection expressions, `field` keyword)
+- C# 14-syntax där det hjälper (primary constructors, collection expressions, `field` keyword)
 - Nullable reference types **på** för hela lösningen
 - `file`-scoped namespaces
 - `global using` i varje projekt för vanliga imports (List, Task, etc.)
@@ -190,11 +264,12 @@ Om du någonsin ser dig importera `Microsoft.EntityFrameworkCore` i Domain eller
 
 ### 6.1 Branches
 
-- `main` = produktion, skyddad, kräver PR + godkänd review + grön CI
-- `develop` = dev-miljö, ev. skyddad
+- `main` = produktion + utveckling (GitHub Flow per ADR 0004), skyddad, kräver PR + godkänd review + grön CI när workflows finns
 - Feature branches: `feat/<kontext>-<beskrivning>` — `feat/applications-ghosted-detection`
 - Fix branches: `fix/<beskrivning>`
 - Chore: `chore/<beskrivning>`
+- Deploy via taggar på `main`: `v*-dev` → dev-miljö, `v*-rc*` → staging, `v*` → prod (manuell approval)
+- Staging är *miljö*, inte *branch*
 
 ### 6.2 Commits
 
@@ -346,7 +421,7 @@ En feature är "klar" när:
 
 ### 11.3 Dev environment
 
-- Docker Compose i repo-root: `postgres`, `redis`, `seq` (local Serilog sink), `localstack` (för AWS-mocking)
+- Docker Compose i repo-root: `postgres`, `redis`, `seq` (local Serilog sink). Riktig AWS används direkt — ingen LocalStack i dev (medvetet val per SESSION-2-PLAN).
 - `make dev` eller `pnpm dev:up` startar allt lokalt
 - `.env.local` för frontend, `appsettings.Development.json` för backend (committade defaults + overrides i `appsettings.Local.json` som är gitignorad)
 
