@@ -1,26 +1,34 @@
 # Current work — JobbPilot
 
-**Status:** STEG 8 klar. Nästa: STEG 9 (docs-struktur + fler ADRs).
+**Status:** STEG 9 klar. Session 4 stängd. Nästa session: STEG 10 (CLAUDE.md-uppdateringar).
 **Datum:** 2026-04-19
 
 ---
 
 ## Aktivt nu
 
-**PAUS efter session 4.** STEG 7 (hooks-infrastruktur) + STEG 8 (GitHub-integration) + gitleaks-fallback-fix klart. Allt pushat till origin/main.
+**SESSION 4 KOMPLETT.** STEG 7 (hooks-infrastruktur) + STEG 8
+(GitHub-integration) + STEG 9 (docs-struktur + ADRs) klart.
+Allt pushat till origin/main.
 
 **När nästa session startar:**
 
-1. Kör `git log --oneline -6` — ska visa senaste commits med `e1c48eb` som HEAD.
-2. Läs ADR 0006 (hooks-begränsningar) och ADR 0007 (branch protection).
+1. Kör `git log --oneline -8` — ska visa STEG 9-commits överst med `7c4ad28` som HEAD-relativ.
+2. Läs `docs/sessions/2026-04-19-1000-session-4-hooks-github-docs.md` för fullständig session 4-kontext.
 3. Verifiera att hooks fortfarande triggar: `bash .claude/hooks/session-start.sh` ska ge output.
-4. STEG 9 startar: docs-struktur + fler ADRs (§15 rad 17-18). Lättare omfattning än STEG 7-8.
+4. STEG 10 startar: CLAUDE.md-uppdateringar (§15 rad 20). Mindre omfattning.
 
 **Aktiva skyddslager på main:**
 - Pre-push gitleaks-scan (blockerar push vid saknad binär, scannar hela historiken)
-- Branch protection: no force push, no deletion
+- Branch protection: no force push, no deletion (B-nivå per ADR 0007)
 - Claude Code-hooks: guard-bash, guard-spec-files, post-todo-review, m.fl.
 - Husky pre-commit: scaffold-gate (aktiveras fullt i Fas 0/1)
+
+**Komplett docs-struktur:**
+- `docs/decisions/` — 7 ADRs + README-index
+- `docs/sessions/` — session 3 + session 4 loggade
+- `docs/runbooks/` — aws-setup, claude-code-setup, local-dev-setup (från session 3)
+- `docs/research/` — SESSION-1/2-planning + bedrock-inference-profiles + 2 research-issues
 
 ## Klart senaste session
 
@@ -36,6 +44,7 @@
 - Session 3/4 STEG 7.1-7.5 ✅: 7 Claude Code-hooks + 2 Husky-hooks (pre-commit, pre-push). Commits: 584f048 (7.1-7.3), 46e5feb (7.4), 4d96a00 (7.5).
 - Session 4 STEG 7.6 ✅: End-to-end smoke-test. Tre begränsningar dokumenterade i ADR 0006.
 - Session 4 STEG 8 ✅: GitHub-integration (templates, CODEOWNERS, Dependabot, branch protection). Repo bytt till publikt. 3 commits: 4d403f3, acf007e, 2550ae6.
+- Session 4 STEG 9 ✅: Docs-struktur komplett. ADR 0001 fylld, ADR 0004 + ADR-index skapade, session 3 + 4 loggade. 3 commits: 6763e65, 8c50c75, 7c4ad28.
 
 ## Committat i session 3-4 (nuläge på origin/main)
 
@@ -55,13 +64,17 @@
 | `2550ae6` | docs(decisions): STEG 8.3 ADR 0007 branch protection (B-nivå) |
 | `bc70e5f` | docs(session): STEG 8 klar — current-work updated + repo public note |
 | `e1c48eb` | fix(husky): robust gitleaks-lookup + block push on missing binary |
+| `6763e65` | docs(decisions): STEG 9.1 ADR 0001 (Clean Architecture) + ADR 0004 (GitHub Flow) |
+| `8c50c75` | docs(decisions): STEG 9.2 ADR-index + filnamn-fix |
+| `7c4ad28` | docs(sessions): STEG 9.3 session 3 + session 4 logs |
 
 ## Nästa
 
-- **STEG 9**: Docs-struktur + fler ADRs (§15 rad 17-18)
-- STEG 10: CLAUDE.md-uppdateringar (§15 rad 20)
+- **STEG 10**: CLAUDE.md-uppdateringar (§15 rad 20) — lägga till "Session Protocol" + "Docs-struktur"-sektioner från LMS-mönster
 - STEG 11: End-to-end smoke test hela feature-flödet (§15 rad 21)
 - STEG 12: Final push + handover
+
+Session 5 kan vara Fas 0-start om STEG 10-12 är lättviktiga.
 
 ---
 
