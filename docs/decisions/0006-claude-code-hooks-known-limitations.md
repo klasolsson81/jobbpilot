@@ -67,13 +67,57 @@ Agent-spec `.claude/agents/code-reviewer.md` säger att varje review ska sparas 
 
 **Mitigering:** Uppdatera code-reviewer-promten i `.claude/agents/code-reviewer.md` när första "riktiga" reviewen sker i Fas 0. Enkelt fix: lägg till explicit steg "Efter du producerat rapporten, spara den till `docs/reviews/...` via Write-tool innan du returnerar kontroll."
 
+### 4. Silent dependency failures i hooks
+
+**Symptom:** `guard-spec-files.sh` triggade men släppte igenom alla Edit/Write
+på spec-filer (BUILD.md, CLAUDE.md, DESIGN.md) utan approval-prompt under
+STEG 10 (commit `bda9f72`).
+
+**Rotorsak:** Hooken använde `jq` för att extrahera `file_path` från JSON-input.
+`jq` saknades i Claude Code-spawn-context (samma WinGet PATH-propagerings-
+problem som med `gitleaks` i STEG 8 followup). `2>/dev/null` på `jq`-anropet
+dolde felet. Resultatet blev tom `FILE`-variabel → early-exit på rad
+`if [ -z "$FILE" ]; then exit 0; fi` → silent allow.
+
+**Mönster:** Detta var tredje incident i samma kategori under session 4:
+1. STEG 8.3: `jq` saknades i `gh api`-verifiering — fix: använd `gh api --jq`
+2. STEG 8 followup: `gitleaks` PATH-propagering broken — fix: trestegs
+   fallback-lookup i Husky pre-push
+3. STEG 10 followup (denna): `jq` saknas → guard-spec-files dead — fix:
+   bash-native parsing utan externa beroenden
+
+**Fix (commit `1879b4b`):**
+- `guard-spec-files.sh` skrivet om med bash-native JSON-parsing (`grep -oE` +
+  `sed -E`)
+- Inget `2>/dev/null` — alla fel syns i stderr
+- Loud failure: exit 2 om protected spec-fil utan approval-fras (tidigare
+  silent exit 0)
+- Stöd för Bash-tool också (fångar `sed -i CLAUDE.md`)
+- Stöd för båda JSON-format (flat + wrapped)
+
+**Lessons learned (gäller alla framtida hooks):**
+
+1. **Undvik externa CLI-beroenden i hook-skript.** `jq`, `python`, andra
+   tools failar tyst i Claude Code-spawn-context på Windows. Bash-native
+   parsing (`grep`, `sed`, `awk`) finns alltid.
+2. **Aldrig `2>/dev/null` på kommandon hookens säkerhet beror på.** Tyst
+   fel = osäker hook utan att någon vet om det.
+3. **Loud failure som default.** Hooks ska blockera när något oklart
+   händer, inte tillåta. För spec-filer specifikt: fail-closed är rätt
+   default — hellre falskt blockad legitim edit än tyst tillåten skadlig.
+4. **Verifiera hooks empiriskt, inte bara konfigurationsmässigt.** Att
+   settings.json refererar en hook betyder inte att hooken faktiskt
+   skyddar något. Kör mock-tester (se test-suite i denna fix-commit).
+
 ## Beslut
 
-**Acceptera de tre begränsningarna i Fas 0.** Ingen av dem blockerar utveckling:
+**Acceptera de tre ursprungliga begränsningarna i Fas 0.** Ingen av dem blockerar
+utveckling. Begränsning 4 är åtgärdad per commit som följer denna ADR-uppdatering.
 
 - Begränsning 1 (SessionStart): kosmetisk miss, mitigation trivial.
 - Begränsning 2 (auto-trigger): funktionell miss men Husky pre-commit är reell fallback-gate i Fas 0+.
 - Begränsning 3 (reviews-persistering): fix planerad vid första Fas 0-review, inte brådskande.
+- Begränsning 4 (silent dependency failures): **fixad** — bash-native parsing, inga externa beroenden.
 
 Hooks-infrastrukturen är i övrigt komplett och verifierad isolerat (25/25 tester + smoke-test-del 3 godkänt).
 
