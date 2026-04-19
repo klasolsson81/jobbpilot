@@ -72,6 +72,27 @@ public class DomainLayerTests
     }
 
     [Fact]
+    public void Identity_types_should_stay_in_Infrastructure()
+    {
+        var domainResult = Types.InAssembly(typeof(JobbPilot.Domain.Common.AggregateRoot<>).Assembly)
+            .ShouldNot()
+            .HaveDependencyOnAny(
+                "Microsoft.AspNetCore.Identity",
+                "Microsoft.AspNetCore.Authentication.JwtBearer")
+            .GetResult();
+
+        var appResult = Types.InAssembly(typeof(JobbPilot.Application.AssemblyMarker).Assembly)
+            .ShouldNot()
+            .HaveDependencyOn("Microsoft.AspNetCore.Identity.EntityFrameworkCore")
+            .GetResult();
+
+        domainResult.IsSuccessful.ShouldBeTrue(
+            $"Domain läcker mot Identity/JWT: {string.Join(", ", domainResult.FailingTypeNames ?? [])}");
+        appResult.IsSuccessful.ShouldBeTrue(
+            $"Application läcker mot Identity.EntityFrameworkCore: {string.Join(", ", appResult.FailingTypeNames ?? [])}");
+    }
+
+    [Fact]
     public void Domain_aggregates_should_only_have_private_setters()
     {
         var aggregateTypes = Types.InAssembly(typeof(JobbPilot.Domain.Common.AggregateRoot<>).Assembly)

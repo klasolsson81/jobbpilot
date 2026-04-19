@@ -1,3 +1,4 @@
+using JobbPilot.Infrastructure.Identity;
 using JobbPilot.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -5,22 +6,22 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Testcontainers.PostgreSql;
+using Testcontainers.Redis;
 
 namespace JobbPilot.Api.IntegrationTests.Infrastructure;
 
 public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
-        .WithImage("postgres:18")
+    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:18")
+        .Build();
+
+    private readonly RedisContainer _redis = new RedisBuilder("redis:8-alpine")
         .Build();
 
     // Serialize host creation so parallel test classes don't overwrite each
-    // other's environment variable before base.CreateHost reads it.
+    // other's environment variables before base.CreateHost reads them.
     private static readonly Lock _createHostLock = new();
 
-    // Called by WebApplicationFactory before Program.Main runs — container is
-    // already started at this point (InitializeAsync starts it before Services
-    // is first accessed, which triggers this method).
     protected override IHost CreateHost(IHostBuilder builder)
     {
         lock (_createHostLock)
@@ -28,22 +29,31 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             Environment.SetEnvironmentVariable(
                 "ConnectionStrings__Postgres",
                 _postgres.GetConnectionString());
+            Environment.SetEnvironmentVariable(
+                "ConnectionStrings__Redis",
+                _redis.GetConnectionString());
             return base.CreateHost(builder);
         }
     }
 
     public async ValueTask InitializeAsync()
     {
-        await _postgres.StartAsync();
+        await Task.WhenAll(_postgres.StartAsync(), _redis.StartAsync());
+
         using var scope = Services.CreateScope();
+
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         await db.Database.MigrateAsync();
+
+        var identityDb = scope.ServiceProvider.GetRequiredService<AppIdentityDbContext>();
+        await identityDb.Database.MigrateAsync();
     }
 
     public new async ValueTask DisposeAsync()
     {
         Environment.SetEnvironmentVariable("ConnectionStrings__Postgres", null);
-        await _postgres.StopAsync();
+        Environment.SetEnvironmentVariable("ConnectionStrings__Redis", null);
+        await Task.WhenAll(_postgres.StopAsync(), _redis.StopAsync());
         await base.DisposeAsync();
     }
 }
