@@ -1,108 +1,63 @@
 # Current work — JobbPilot
 
-**Status:** Fas 0 kod-scaffolding STEG 1 KOMPLETT. Nästa: STEG 2 — Mediator-pipeline + IAppDbContext + första aggregate.
+**Status:** Session 7 KOMPLETT — Fas E (Application + API + tester) klar. Nästa: session 8 — push + Fas F (nästa aggregate eller feature).
 **Datum:** 2026-04-19
 
 ---
 
 ## Aktivt nu
 
-**FAS 0 KOD-SCAFFOLDING STEG 1 KOMPLETT.** .NET Solution + 5 src-projekt + 4 test-projekt
-scaffoldade. Build grön, 4 Smoke-tester gröna, Husky pre-commit test-gates aktiva.
+**FAS E KOMPLETT.** Application-lager, API-endpoints och fullständig testsvit för job-ads är på plats.
 
-**Vad som är på plats (Fas 0 bootstrap + STEG 1):**
-- AWS-foundation (Terraform: budgets, KMS, Bedrock model access, secrets manager)
-- Docker-compose dev/test (Postgres 18 + Redis 8.6 + Seq 2025.2)
-- 11 Claude Code-agenter (7 Opus 4.7 + 4 Sonnet 4.6 per ADR 0002)
-- 5 design-skills (DESIGN.md som index per ADR 0003)
-- 7 Claude Code-hooks + 2 Husky-hooks (med kända begränsningar i ADR 0006)
-- GitHub-integration (templates, CODEOWNERS, Dependabot, branch protection B-nivå)
-- Komplett docs-struktur (10 ADRs med index, runbooks, session-loggar)
-- ADR 0008 (pipeline-order), ADR 0009 (no-repository), ADR 0010 (worker comp root)
-- `JobbPilot.sln` + `Directory.Build.props` + `Directory.Packages.props` (CPM)
-- `global.json` (SDK 10.0.200 latestPatch)
-- 5 src-projekt: Domain, Application, Infrastructure, Api, Worker (per ADR 0010)
-- 4 test-projekt: Domain.UnitTests, Application.UnitTests, Api.IntegrationTests, Architecture.Tests
-- xUnit v3 MTP v2 (`xunit.v3.mtp-v2 3.2.2`), Shouldly, NSubstitute, NetArchTest.Rules
-- tests/Directory.Build.props (parent-import + CA1707-suppression för underscore-testnamn)
-- Husky pre-commit: dotnet format + 3 test-gates aktiva (Domain, Application, Architecture)
+**Vad som är på plats (Fas 0 bootstrap + STEG 1-7):**
+- AWS-foundation, Docker-compose, Claude Code-agenter/skills/hooks, GitHub-integration, docs
+- ADR 0001-0011, .NET Solution, 5 src-projekt, 4 test-projekt
+- Domain: JobAd aggregate (Company VO, JobAdStatus, JobSource), domain events
+- Infrastructure: AppDbContext, JobAdConfiguration, DateTimeProvider, EF Core migration
+- Application: 4 pipeline-behaviors, IAppDbContext, CreateJobAd + ListJobAds + GetJobAd
+- API: 3 endpoints under `/api/v1/job-ads` via MapGroup, Mediator Scoped
+- Tests: 35 tester (12 domain, 15 application, 5 arch, 3 integration) — alla gröna
 
-**När nästa session startar (STEG 2):**
-
-1. Kör `git log --oneline -8` — verifiera STEG 1-commits överst
-2. Läs `docs/sessions/` senaste session-logg (session 6)
-3. Verifiera: `dotnet build --configuration Release` — ska ge 0 errors/warnings
-4. Verifiera: `dotnet test --configuration Release` — ska ge 4/4 gröna
-5. Kör `bash .husky/pre-commit` — ska passera alla gates
-
-**STEG 2 — vad som ska göras:**
-- `IAppDbContext`-interface i JobbPilot.Application (DbSet per aggregate root + SaveChangesAsync)
-- `IUnitOfWork`-interface i JobbPilot.Application
-- `AppDbContext : DbContext, IAppDbContext` i JobbPilot.Infrastructure
-- Mediator-pipeline-behaviors (Logging → Validation → Authorization → UnitOfWork) per ADR 0008
-- Första aggregate: `JobSeeker` med invarianter + domain events
-- Initial EF Core-migration
-
-**Aktiva skyddslager på main:**
-- Pre-push gitleaks-scan med 3-stegs fallback-lookup
-- Branch protection B-nivå (no force push, no deletion)
-- Claude Code-hooks (alla 7 fungerande)
-- Husky pre-commit: dotnet format + 3 test-gates (Domain, Application, Architecture)
-- Husky pre-push: gitleaks-scan
-
-## Klart senaste session
-
-- Session 1: research (`docs/research/SESSION-1-*.md`).
-- Session 2: plan godkänd (`docs/research/SESSION-2-PLAN.md`).
-- Session 2.5: Claude Design-research + skill-arkitektur.
-- Session 3–4: AWS, Docker, agents, skills, hooks, GitHub-integration, docs-struktur.
-- Session 5: CLAUDE.md uppdaterat, guard-spec-files fix, Bootstrap IAM-user raderad.
-- Session 6 ✅: ADR 0008-0010 + .NET Solution STEG 1 (se commithistorik nedan).
-
-## Committat i session 6
+**Commits session 7:**
 
 | Commit | Innehåll |
 |--------|----------|
-| `87e870d` | docs(decisions): ADR 0008-0010 — pipeline order, no repo, worker comp root |
-| *(pending)* | feat(solution): JobbPilot.sln + Directory.Build.props + global.json (CPM) |
-| *(pending)* | feat(src): scaffold 5 .NET projekt per ADR 0010 (Domain/App/Infra/Api/Worker) |
-| *(pending)* | feat(tests): scaffold 4 xUnit v3 testprojekt med Shouldly |
-| *(pending)* | feat(husky): aktivera test-gates i pre-commit |
-| *(pending)* | docs(session): session 6 — Fas 0 kod-scaffolding STEG 1 |
+| `f6ef80a` | feat(domain): Common building blocks + architecture tests |
+| `0ea0c6b` | feat(application): Common building blocks + 4 pipeline behaviors per ADR 0008 |
+| `fbe46c9` | feat(application): explicit EF Core dependency + arch test precision |
+| `5bd47b8` | feat(domain): JobAd-aggregate med Company VO + JobAdStatus + JobSource |
+| `fab6b24` | feat(infra): AppDbContext + JobAdConfiguration + DateTimeProvider + DependencyInjection |
+| `8e9d346` | feat(infra): InitialCreate migration (job_ads table) |
+| `4a79eb6` | feat(application): CreateJobAd command + ListJobAds + GetJobAd queries |
+| `aed8a8b` | feat(api): job-ads endpoints under /api/v1/ via MapGroup + Mediator Scoped |
+| `9a095c9` | test(job-ads): handler unit tests + integration tests + ApiFactory race fix |
 
-## Committat i session 3-5 (referens)
+**När nästa session startar:**
 
-| Commit | Innehåll |
-|--------|----------|
-| `1e98ce4` | docs(session): fix session 5 log — fill in STEG 12 commit hash |
-| `4e8128a` | docs(session): STEG 12 — Fas 0 bootstrap KOMPLETT |
-| `6c37a1c` | docs(decisions): ADR 0006 add 4th limitation — silent dependency failures |
-| `1879b4b` | fix(hooks): bash-native parsing in guard-spec-files (drop jq dependency) |
-| `bda9f72` | docs(claude): STEG 10 — Session Protocol + Docs structure + spec-drift fix |
+1. Kör `git log --oneline -12` — verifiera 9 nya commits + push om ej gjort
+2. Läs `docs/sessions/` senaste session-logg (session 7)
+3. Verifiera: `dotnet build --configuration Release` — 0 errors/warnings
+4. Verifiera: `dotnet test --project tests/JobbPilot.Domain.UnitTests/... && ...Application.UnitTests/... && ...Architecture.Tests/...` — alla gröna
+5. Bestäm nästa fas: nästa aggregate (JobSeeker?) eller feature
 
----
+**Tekniska iakttagelser från session 7:**
+- `Mediator.SourceGenerator` defaultar till `ServiceLifetime.Singleton` — måste explicit sätta `Scoped` annars captive dependency mot IAppDbContext
+- `WebApplicationFactory` + eager connection string read: löses via `CreateHost` override som sätter env var FÖRE `base.CreateHost`
+- Parallella `IClassFixture<ApiFactory>` overskrider varandras process-globala env var — löst med `static Lock` i `CreateHost`
+- `xUnit v3 IAsyncLifetime` kräver `ValueTask` (inte `Task`) för `InitializeAsync`/`DisposeAsync`
+- EF Core InMemory + `OwnsOne` fungerar korrekt i unit tests
 
-## Nästa (STEG 2+)
+## Klart senaste sessioner
 
-**STEG 2 — Domain + Infrastructure grund:**
-- IAppDbContext + IUnitOfWork interfaces i Application
-- AppDbContext i Infrastructure
-- Mediator-pipeline-behaviors per ADR 0008
-- Första aggregate (JobSeeker)
-- Initial EF Core-migration
-
-**STEG 3+ — Application layer:**
-- Commands + Queries för JobSeeker, Resume, Application
-- API-endpoints
-- MILSTOLPE Fas 1: Manuellt skapa CV, submit "fake" ansökan, se i admin-audit
-
----
+- Session 1: research
+- Session 2: plan
+- Session 2.5: Design-research
+- Session 3–5: AWS, Docker, agents, skills, hooks, GitHub, docs
+- Session 6 ✅: ADR 0008-0011 + .NET Solution STEG 1
+- Session 7 ✅: Domain, Infrastructure, Application, API, Tests (35 tester gröna)
 
 ## Kända begränsningar
 
 Se **ADR 0006** för Claude Code-hooks-begränsningar.
 
-**Nya tekniska iakttagelser från STEG 1:**
-- `.NET 10 SDK` skapar `.slnx` som default — NuGet + solution-folders ger "Invalid framework identifier". Workaround: `dotnet new sln --format sln` + manuell rensning av solution-folder entries. Dokumenterat i session 6-loggen.
-- `dotnet test <dir>` kräver nu `--project`-flagga i SDK 10.0.202 (breaking change vs tidigare SDK).
-- `tests/Directory.Build.props` måste explicit importera root-filen via MSBuild `GetDirectoryNameOfFileAbove`-funktion — annars blockeras TargetFramework-arv.
+**DesignTimeDbContextFactory** använder hårdkodade `postgres/postgres`-credentials för `migrations add`. Ej ett problem i runtime — bara för design-time verktyg. Behöver uppdateras om en CI-pipeline ska köra `database update`.
