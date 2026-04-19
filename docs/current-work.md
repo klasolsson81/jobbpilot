@@ -7,14 +7,20 @@
 
 ## Aktivt nu
 
-**STEG 8 komplett.** GitHub-integration klar: PR/issue-templates, CODEOWNERS,
-Dependabot (npm + nuget + github-actions), branch protection (B-nivå),
-Discussions aktiverat. Repot bytt från privat till publikt (ADR 0007 motiverar).
+**PAUS efter session 4.** STEG 7 (hooks-infrastruktur) + STEG 8 (GitHub-integration) + gitleaks-fallback-fix klart. Allt pushat till origin/main.
 
-**Nästa session:**
-1. Kör `git log --oneline -6` — ska visa STEG 8-commits: 2550ae6, acf007e, 4d403f3.
-2. Verifiera branch protection: `MSYS_NO_PATHCONV=1 gh api /repos/klasolsson81/jobbpilot/branches/main/protection --jq '.allow_force_pushes.enabled'` → `false`.
-3. STEG 9: docs-struktur + ADRs (§15 rad 17-18). Mindre omfattning än STEG 7-8.
+**När nästa session startar:**
+
+1. Kör `git log --oneline -6` — ska visa senaste commits med `e1c48eb` som HEAD.
+2. Läs ADR 0006 (hooks-begränsningar) och ADR 0007 (branch protection).
+3. Verifiera att hooks fortfarande triggar: `bash .claude/hooks/session-start.sh` ska ge output.
+4. STEG 9 startar: docs-struktur + fler ADRs (§15 rad 17-18). Lättare omfattning än STEG 7-8.
+
+**Aktiva skyddslager på main:**
+- Pre-push gitleaks-scan (blockerar push vid saknad binär, scannar hela historiken)
+- Branch protection: no force push, no deletion
+- Claude Code-hooks: guard-bash, guard-spec-files, post-todo-review, m.fl.
+- Husky pre-commit: scaffold-gate (aktiveras fullt i Fas 0/1)
 
 ## Klart senaste session
 
@@ -47,6 +53,8 @@ Discussions aktiverat. Repot bytt från privat till publikt (ADR 0007 motiverar)
 | `4d403f3` | feat(github): STEG 8.1 issue + PR templates |
 | `acf007e` | feat(github): STEG 8.2 CODEOWNERS + Dependabot |
 | `2550ae6` | docs(decisions): STEG 8.3 ADR 0007 branch protection (B-nivå) |
+| `bc70e5f` | docs(session): STEG 8 klar — current-work updated + repo public note |
+| `e1c48eb` | fix(husky): robust gitleaks-lookup + block push on missing binary |
 
 ## Nästa
 
