@@ -1,19 +1,20 @@
 # Current work — JobbPilot
 
-**Status:** STEG 7 klar. Nästa: STEG 8 (GitHub-integration).
-**Datum:** 2026-04-18
+**Status:** STEG 8 klar. Nästa: STEG 9 (docs-struktur + fler ADRs).
+**Datum:** 2026-04-19
 
 ---
 
 ## Aktivt nu
 
-**PAUS efter STEG 7-avslut.** Hooks-blocket helt levande och pushat till origin/main (senaste commit: `44c7592`). Nästa session startar med STEG 8 (GitHub-integration).
+**STEG 8 komplett.** GitHub-integration klar: PR/issue-templates, CODEOWNERS,
+Dependabot (npm + nuget + github-actions), branch protection (B-nivå),
+Discussions aktiverat. Repot bytt från privat till publikt (ADR 0007 motiverar).
 
-**När du startar nästa session:**
-1. Läs `docs/decisions/0006-claude-code-hooks-known-limitations.md` för kända hook-begränsningar.
-2. Verifiera att `git log --oneline -5` matchar tabellen nedan — om inte har något hänt sedan paus.
-3. STEG 8 per SESSION-2-PLAN §15 rad 16: PR/Issue-templates, CODEOWNERS (`@klasolsson81`), branch protection för `main`.
-4. Beräknad tid: 1-2 commits, ~30-45 min. Lättare än STEG 7.
+**Nästa session:**
+1. Kör `git log --oneline -6` — ska visa STEG 8-commits: 2550ae6, acf007e, 4d403f3.
+2. Verifiera branch protection: `MSYS_NO_PATHCONV=1 gh api /repos/klasolsson81/jobbpilot/branches/main/protection --jq '.allow_force_pushes.enabled'` → `false`.
+3. STEG 9: docs-struktur + ADRs (§15 rad 17-18). Mindre omfattning än STEG 7-8.
 
 ## Klart senaste session
 
@@ -28,6 +29,7 @@
 - Session 3 steg 6 ✅: 5 design-skills skapade och committade. DESIGN.md transformerad till index-format (631 → 180 rader, per ADR 0003 Alt B). `.claude/README.md` uppdaterad med agent- och skill-lista.
 - Session 3/4 STEG 7.1-7.5 ✅: 7 Claude Code-hooks + 2 Husky-hooks (pre-commit, pre-push). Commits: 584f048 (7.1-7.3), 46e5feb (7.4), 4d96a00 (7.5).
 - Session 4 STEG 7.6 ✅: End-to-end smoke-test. Tre begränsningar dokumenterade i ADR 0006.
+- Session 4 STEG 8 ✅: GitHub-integration (templates, CODEOWNERS, Dependabot, branch protection). Repo bytt till publikt. 3 commits: 4d403f3, acf007e, 2550ae6.
 
 ## Committat i session 3-4 (nuläge på origin/main)
 
@@ -42,14 +44,28 @@
 | `46e5feb` | feat(claude): STEG 7.4 code-reviewer auto-trigger (post-todo-review) |
 | `4d96a00` | feat(claude): STEG 7.5 Husky + test-gates (pre-commit, pre-push) |
 | `44c7592` | docs: STEG 7.6 smoke-test results + ADR 0006 |
+| `4d403f3` | feat(github): STEG 8.1 issue + PR templates |
+| `acf007e` | feat(github): STEG 8.2 CODEOWNERS + Dependabot |
+| `2550ae6` | docs(decisions): STEG 8.3 ADR 0007 branch protection (B-nivå) |
 
 ## Nästa
 
-- **STEG 8**: GitHub-integration (PR-templates, CODEOWNERS, branch protection) — SESSION-2-PLAN §15 rad 16
-- STEG 9: Docs-struktur + fler ADRs (§15 rad 17-18)
+- **STEG 9**: Docs-struktur + fler ADRs (§15 rad 17-18)
 - STEG 10: CLAUDE.md-uppdateringar (§15 rad 20)
 - STEG 11: End-to-end smoke test hela feature-flödet (§15 rad 21)
 - STEG 12: Final push + handover
+
+---
+
+## Repo-visibility-ändring (STEG 8.3)
+
+Repot ändrades från **privat → publikt** under STEG 8.3. Motivering dokumenterad
+i ADR 0007. Konsekvenser:
+
+- All kod, commits och historik nu synliga för världen
+- Gitleaks-scan genomförd utan fynd innan första publika push
+- GitHub Actions-quota ökar från 500 till 2000 min/mån (gratis tier)
+- Branch protection B-nivå aktiv på main
 
 ---
 
