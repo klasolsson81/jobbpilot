@@ -12,6 +12,9 @@
 .env.*.local
 appsettings.Local.json
 
+# RSA keys and other local secrets (never commit)
+.secrets/
+
 # .NET build artifacts
 bin/
 obj/
