@@ -1,0 +1,12 @@
+<Project>
+  <!-- Import root Directory.Build.props: MSBuild stops at the first Directory.Build.props
+       it finds going up — without this import, test projects would miss TargetFramework etc. -->
+  <Import Project="$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory).., Directory.Build.props))\Directory.Build.props"
+          Condition="'$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory).., Directory.Build.props))' != ''" />
+
+  <!-- CA1707 suppressed for test projects: our test naming convention uses underscores
+       per CLAUDE.md §3.2 (<ClassUnderTest>_<Scenario>_<Expected>). -->
+  <PropertyGroup>
+    <NoWarn>$(NoWarn);CA1707</NoWarn>
+  </PropertyGroup>
+</Project>
