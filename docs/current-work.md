@@ -1,34 +1,41 @@
 # Current work — JobbPilot
 
-**Status:** STEG 9 klar. Session 4 stängd. Nästa session: STEG 10 (CLAUDE.md-uppdateringar).
+**Status:** FAS 0 BOOTSTRAP KOMPLETT. Nästa: Fas 0 kod-scaffolding (.NET Solution + Next.js scaffolding).
 **Datum:** 2026-04-19
 
 ---
 
 ## Aktivt nu
 
-**SESSION 4 KOMPLETT.** STEG 7 (hooks-infrastruktur) + STEG 8
-(GitHub-integration) + STEG 9 (docs-struktur + ADRs) klart.
-Allt pushat till origin/main.
+**FAS 0 BOOTSTRAP KOMPLETT.** Alla 21 steg från SESSION-2-PLAN §15 hanterade
+(STEG 11 deferred — se nedan). Bootstrap IAM-user raderad. SSO är enda
+AWS-åtkomstvägen.
 
-**När nästa session startar:**
+**Vad som är på plats:**
+- AWS-foundation (Terraform: budgets, KMS, Bedrock model access, secrets manager)
+- Docker-compose dev/test (Postgres 18 + Redis 8.6 + Seq 2025.2)
+- 11 Claude Code-agenter (7 Opus 4.7 + 4 Sonnet 4.6 per ADR 0002)
+- 5 design-skills (DESIGN.md som index per ADR 0003)
+- 7 Claude Code-hooks + 2 Husky-hooks (med kända begränsningar i ADR 0006)
+- GitHub-integration (templates, CODEOWNERS, Dependabot, branch protection B-nivå)
+- Komplett docs-struktur (8 ADRs med index, runbooks, session-loggar)
+- CLAUDE.md uppdaterat med Session Protocol + Docs structure (STEG 10)
+- guard-spec-files-hook reellt aktiv (jq-beroende borttaget per fix `1879b4b`)
 
-1. Kör `git log --oneline -8` — ska visa STEG 9-commits överst med `7c4ad28` som HEAD-relativ.
-2. Läs `docs/sessions/2026-04-19-1000-session-4-hooks-github-docs.md` för fullständig session 4-kontext.
-3. Verifiera att hooks fortfarande triggar: `bash .claude/hooks/session-start.sh` ska ge output.
-4. STEG 10 startar: CLAUDE.md-uppdateringar (§15 rad 20). Mindre omfattning.
+**När nästa session startar (Fas 0 kod-scaffolding):**
+
+1. Kör `git log --oneline -10` — verifiera STEG 12-commits överst
+2. Läs `docs/sessions/` senaste session-logg
+3. Verifiera SSO: `aws sts get-caller-identity --profile jobbpilot`
+4. Verifiera hooks: `bash .claude/hooks/session-start.sh`
+5. Diskutera med Claude web (ny chat) innan första scaffolding —
+   beslut: Solution-layout, projekt-struktur, exakt Mediator.SourceGenerator-integration
 
 **Aktiva skyddslager på main:**
-- Pre-push gitleaks-scan (blockerar push vid saknad binär, scannar hela historiken)
-- Branch protection: no force push, no deletion (B-nivå per ADR 0007)
-- Claude Code-hooks: guard-bash, guard-spec-files, post-todo-review, m.fl.
-- Husky pre-commit: scaffold-gate (aktiveras fullt i Fas 0/1)
-
-**Komplett docs-struktur:**
-- `docs/decisions/` — 7 ADRs + README-index
-- `docs/sessions/` — session 3 + session 4 loggade
-- `docs/runbooks/` — aws-setup, claude-code-setup, local-dev-setup (från session 3)
-- `docs/research/` — SESSION-1/2-planning + bedrock-inference-profiles + 2 research-issues
+- Pre-push gitleaks-scan med 3-stegs fallback-lookup
+- Branch protection B-nivå (no force push, no deletion)
+- Claude Code-hooks (alla 7 fungerande, guard-spec-files reellt aktiv)
+- Husky pre-commit scaffold-gate (full test-gates aktiveras i Fas 0/1)
 
 ## Klart senaste session
 
@@ -45,6 +52,10 @@ Allt pushat till origin/main.
 - Session 4 STEG 7.6 ✅: End-to-end smoke-test. Tre begränsningar dokumenterade i ADR 0006.
 - Session 4 STEG 8 ✅: GitHub-integration (templates, CODEOWNERS, Dependabot, branch protection). Repo bytt till publikt. 3 commits: 4d403f3, acf007e, 2550ae6.
 - Session 4 STEG 9 ✅: Docs-struktur komplett. ADR 0001 fylld, ADR 0004 + ADR-index skapade, session 3 + 4 loggade. 3 commits: 6763e65, 8c50c75, 7c4ad28.
+- Session 5 STEG 10 ✅: CLAUDE.md uppdaterad med Session Protocol + Docs structure + spec-drift-fix (.NET 10/14, Mediator.SourceGenerator, GitHub Flow, ingen LocalStack). Commit: bda9f72.
+- Session 5 STEG 10-followup ✅: guard-spec-files-hook reellt aktiv (jq-beroende borttaget, ADR 0006 utökad med Begränsning 4). Commits: 1879b4b, 6c37a1c.
+- Session 5 STEG 11: DEFERRED till Fas 1 — feature-flödet-smoke-test (§15 rad 21) kräver slash-commands som inte existerar och scaffold som inte finns. STEG 7.6 (commit 44c7592) gjorde redan meningsfull infrastruktur-smoke-test som producerade ADR 0006.
+- Session 5 STEG 12 ✅: Bootstrap-IAM-user raderad (säkerhetsskuld stängd). SSO är nu enda AWS-åtkomstvägen. Fas 0 bootstrap KOMPLETT.
 
 ## Committat i session 3-4 (nuläge på origin/main)
 
@@ -67,14 +78,57 @@ Allt pushat till origin/main.
 | `6763e65` | docs(decisions): STEG 9.1 ADR 0001 (Clean Architecture) + ADR 0004 (GitHub Flow) |
 | `8c50c75` | docs(decisions): STEG 9.2 ADR-index + filnamn-fix |
 | `7c4ad28` | docs(sessions): STEG 9.3 session 3 + session 4 logs |
+| `bda9f72` | docs(claude): STEG 10 — Session Protocol + Docs structure + spec-drift fix |
+| `1879b4b` | fix(hooks): bash-native parsing in guard-spec-files (drop jq dependency) |
+| `6c37a1c` | docs(decisions): ADR 0006 add 4th limitation — silent dependency failures |
 
 ## Nästa
 
-- **STEG 10**: CLAUDE.md-uppdateringar (§15 rad 20) — lägga till "Session Protocol" + "Docs-struktur"-sektioner från LMS-mönster
-- STEG 11: End-to-end smoke test hela feature-flödet (§15 rad 21)
-- STEG 12: Final push + handover
+**Fas 0 kod-scaffolding** börjar nu (efter Fas 0 bootstrap).
 
-Session 5 kan vara Fas 0-start om STEG 10-12 är lättviktiga.
+Beslut att fatta innan första kod skrivs:
+- .NET Solution-layout (single solution, antal projekt, naming)
+- Next.js scaffolding (App Router struktur, src/lib organisering)
+- Hur Mediator.SourceGenerator integreras konkret (config, registrering)
+- Tailwind-config-beslut (CSS-first @theme vs hybrid — research-issue väntar)
+
+Diskutera med Claude web (ny chat) innan Claude Code börjar koda.
+
+**Efter scaffolding (Fas 1):**
+- Domain-projekt: alla aggregates med >80% test coverage
+- EF Core-konfiguration + migrations + SSYK seed-data
+- Mediator.SourceGenerator-pipeline (Logging→Validation→Auth→UnitOfWork)
+- Application: queries/commands för JobSeeker, Resume, Application (utan AI)
+- API-endpoints
+- MILSTOLPE Fas 1: Manuellt skapa CV, submit:a "fake" ansökan, se i admin-audit
+
+---
+
+## Fas 0 bootstrap — slutsummering
+
+**Tidsåtgång:** ~14 timmar fördelade över 5 sessioner (3 oktober — 19 april 2026)
+
+**Levererat:**
+- Komplett Claude Code-infrastruktur (settings, agents, skills, hooks, commands)
+- AWS-foundation via Terraform (idempotent, reproducerbar)
+- Docker-compose dev/test
+- GitHub-integration (templates, CODEOWNERS, Dependabot, branch protection)
+- 8 ADRs (Clean Arch, model versions, design as skills, GitHub Flow, go-to-market,
+  hooks limitations, branch protection, +ADR-index)
+- Spec-trio (BUILD.md, CLAUDE.md, DESIGN.md) på senaste versioner
+- Lokala skyddslager (gitleaks pre-push, hooks, Husky)
+
+**Tekniska skulder noterade för Fas 1:**
+- Code-reviewer auto-trigger funkar inte (ADR 0006 §2) — manuell invocation
+- SessionStart-hook output osynlig i VS Code-extension (ADR 0006 §1)
+- Code-reviewer sparar inte rapport i docs/reviews/ (ADR 0006 §3)
+- Tailwind-config-beslut väntar (`docs/research/issues/`)
+- Model-version-management-skills planerade (`docs/research/issues/`)
+
+**Stoppat utan att lösa (medvetet):**
+- Slash-commands (`/new-feature`, `/test`, `/review`, `/commit`) — Fas 1
+- ADR 0005 go-to-market-beslut — Fas 2-prereq
+- Pipeline-ordering ADR — innan Fas 1 kodning
 
 ---
 
