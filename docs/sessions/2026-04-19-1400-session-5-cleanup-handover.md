@@ -83,7 +83,7 @@ framtida Fas 1+ utveckling.
 | `bda9f72` | docs(claude): STEG 10 — Session Protocol + Docs structure + spec-drift fix |
 | `1879b4b` | fix(hooks): bash-native parsing in guard-spec-files (drop jq dependency) |
 | `6c37a1c` | docs(decisions): ADR 0006 add 4th limitation — silent dependency failures |
-| `<STEG 12-commit>` | docs(session): STEG 12 — Fas 0 bootstrap KOMPLETT (current-work + session 5 logg) |
+| `4e8128a` | docs(session): STEG 12 — Fas 0 bootstrap KOMPLETT (current-work + session 5 logg) |
 
 ## Lessons learned
 
