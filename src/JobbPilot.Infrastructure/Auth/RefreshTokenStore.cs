@@ -32,7 +32,19 @@ public sealed class RefreshTokenStore(
         if (token is null || !token.IsActive(now))
             return null;
 
-        return new StoredRefreshToken(token.Id, token.UserId, token.TokenHash, token.ExpiresAt, true);
+        return new StoredRefreshToken(token.Id, token.UserId, token.TokenHash, token.ExpiresAt, token.RevokedAt);
+    }
+
+    public async Task<StoredRefreshToken?> FindByHashAsync(string tokenHash, CancellationToken ct)
+    {
+        var token = await db.RefreshTokens
+            .AsNoTracking()
+            .FirstOrDefaultAsync(t => t.TokenHash == tokenHash, ct);
+
+        if (token is null)
+            return null;
+
+        return new StoredRefreshToken(token.Id, token.UserId, token.TokenHash, token.ExpiresAt, token.RevokedAt);
     }
 
     public async Task RevokeAsync(Guid tokenId, Guid? replacedByTokenId, CancellationToken ct)
