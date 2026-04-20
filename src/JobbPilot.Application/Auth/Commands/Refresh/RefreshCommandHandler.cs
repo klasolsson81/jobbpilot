@@ -2,13 +2,16 @@ using JobbPilot.Application.Auth.Dtos;
 using JobbPilot.Application.Common.Abstractions;
 using JobbPilot.Domain.Common;
 using Mediator;
+using Microsoft.Extensions.Logging;
 
 namespace JobbPilot.Application.Auth.Commands.Refresh;
 
-public sealed class RefreshCommandHandler(
+public sealed partial class RefreshCommandHandler(
     IRefreshTokenStore refreshTokenStore,
     IUserAccountService userAccountService,
-    IJwtTokenGenerator tokenGenerator)
+    IJwtTokenGenerator tokenGenerator,
+    IDateTimeProvider clock,
+    ILogger<RefreshCommandHandler> logger)
     : ICommandHandler<RefreshCommand, Result<AuthTokensDto>>
 {
     private static readonly DomainError InvalidToken =
@@ -21,9 +24,20 @@ public sealed class RefreshCommandHandler(
             return Result.Failure<AuthTokensDto>(InvalidToken);
 
         var tokenHash = tokenGenerator.HashToken(command.RefreshToken);
-        var stored = await refreshTokenStore.FindActiveByHashAsync(tokenHash, cancellationToken);
+        var stored = await refreshTokenStore.FindByHashAsync(tokenHash, cancellationToken);
 
         if (stored is null)
+            return Result.Failure<AuthTokensDto>(InvalidToken);
+
+        // Replay-detektering per ADR 0014: redan roterad token → revokera hela kedjan
+        if (stored.RevokedAt is not null)
+        {
+            LogReplayDetected(stored.UserId);
+            await refreshTokenStore.RevokeAllForUserAsync(stored.UserId, cancellationToken);
+            return Result.Failure<AuthTokensDto>(InvalidToken);
+        }
+
+        if (stored.ExpiresAt <= clock.UtcNow)
             return Result.Failure<AuthTokensDto>(InvalidToken);
 
         var roles = await userAccountService.GetRolesAsync(stored.UserId, cancellationToken);
@@ -46,4 +60,8 @@ public sealed class RefreshCommandHandler(
             newTokens.RefreshToken,
             newTokens.RefreshTokenExpiresAt));
     }
+
+    [LoggerMessage(Level = LogLevel.Warning,
+        Message = "Refresh token replay detected for user {UserId}. Revoking entire chain.")]
+    private partial void LogReplayDetected(Guid userId);
 }
