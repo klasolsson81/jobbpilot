@@ -29,6 +29,7 @@ Architecture Decision Records (ADRs) dokumenterar arkitekturella val som påverk
 | 0014 | Refresh tokens i DB + Redis för access-token jti (avviker från BUILD.md §11.2) | Accepted | 2026-04-19 | [0014-refresh-token-strategy.md](./0014-refresh-token-strategy.md) |
 | 0015 | Frontend-stack för JobbPilot (STEG 4a) | Accepted | 2026-05-06 | [0015-frontend-stack.md](./0015-frontend-stack.md) |
 | 0016 | Civic design language som arkitekturkrav | Accepted | 2026-05-06 | [0016-civic-design-language.md](./0016-civic-design-language.md) |
+| 0017 | Frontend Authentication Pattern (Custom, Cookie-Based) | Accepted | 2026-05-06 | [0017-frontend-auth-pattern.md](./0017-frontend-auth-pattern.md) |
 
 ## Planerade ADRs
 
