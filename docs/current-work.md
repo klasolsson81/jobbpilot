@@ -1,6 +1,6 @@
 # Current work — JobbPilot
 
-**Status:** Upptakten 2026-05-07 — Moment 5 (steg-tracker + denna fil) pågår. Nästa: STEG 5 (Application aggregate, Väg A) i ny chatt.
+**Status:** STEG 5 (Application aggregate, Väg A) — KLAR. Nästa: STEG 6 (frontend för ansökningar — pipeline-vy och formulär).
 **Senast uppdaterad:** 2026-05-07
 **Långsiktig bana:** `docs/steg-tracker.md` — single source of truth för STEG/fas-progression
 **Tech debt:** `docs/tech-debt.md`
@@ -9,55 +9,41 @@
 
 ## Aktivt nu
 
-**Upptakten 2026-05-07 — disciplin-uppgradering.** Moment 1-4 stängda, Moment 5 (denna fil + steg-tracker) pågår.
+**STEG 5 klar.** All kod committad och pushad (SHA 82af5fa).
 
-**Senaste klar-checkpoints:**
+**Vad som genomfördes:**
 
-- STEG 4b Turn 1-4 (backend session-auth — ISessionStore, SessionAuthenticationHandler, IAuthAuditLogger, ADR 0017-0018, 153 tester) — Session 4b.1
-- STEG 4b Turn 5+ (frontend auth — login/register/me-sidor, /(app)-layout, middleware) — Session 4b.2
-- ADR 0019 etablerad (solo direct-push till main, superseder ADR 0004)
-- CLAUDE.md uppgraderad (§6.1, §6.3, §9.1 punkt 8, §9.2 utökad, §9.4 ny, §9.5 ny)
-- tech-debt.md etablerad
-- Hook-vakt fix:ad för Agent SDK-läget (sentinel-fil-mekanism)
-- Precompact-rapporter exkluderade från versionshantering
+- Application aggregate (Domain): SmartEnum state machine (10 states), FollowUp + ApplicationNote child entities, 5 domain events, xmin-based optimistic concurrency (Npgsql-idiomatic)
+- EF Core (Infrastructure): ApplicationConfiguration/FollowUpConfiguration/ApplicationNoteConfiguration, 2 migrations (AddApplicationAggregate + RemoveRowVersionUseXmin)
+- CQRS (Application): 5 commands + 3 queries + DTOs + validators. AddFollowUp returns Result<FollowUpId> from domain method (no [^1] hack)
+- API: 7 endpoints under /api/v1/applications med RequireAuthorization()
+- Tests: 280 totalt (53 nya för Application-lagret: 37 unit + 16 integration), alla gröna
+- Security fixes: CoverLetter borttagen från list-DTOs, NotFoundException-meddelanden utan ID-läckage, TODO(GDPR) i ApplicationConfiguration, GetApplicationsQueryValidator med PageSize-gränser
+- Tech debt: TD-8 (GetPipeline hard cap .Take(500)), TD-9 (Application audit log saknas, GDPR Art. 5(2))
+- Decisions: B1 accepterat (IAppDbContext med DbSet<T> per ADR 0009), B3 dokumenterat (GetPipeline är kanban, inte paginerat), B4 uppskjutet till Fas 1
 
-## Vad som är på plats (kondenserat)
+**Viktiga tekniska beslut:**
 
-För komplett historik och fas-mappning, se `docs/steg-tracker.md`. Kortfattat:
+- `IsRowVersion()` på `byte[]` fungerar inte med Npgsql/PostgreSQL (ingen auto-generering) → bytte till xmin shadow property (`uint`, ValueGeneratedOnAddOrUpdate, IsConcurrencyToken) som Npgsql 10 detekterar och mappar till PostgreSQL:s xmin-systemkolumn automatiskt
+- `DomainApplication` type alias (global using) i Application- och Infrastructure-projekten för att lösa namespace-kollision med `JobbPilot.Application`
 
-- **Infra:** AWS-foundation, Docker-compose, Claude Code-agenter/skills/hooks, GitHub-integration
-- **ADRs:** 0001-0019 (se `docs/decisions/README.md`)
-- **.NET Solution:** 5 src-projekt, 4 test-projekt
-- **Domain:** JobAd + JobSeeker aggregates (Application aggregate kommande i STEG 5)
-- **Infrastructure:** AppDbContext, AppIdentityDbContext, SessionAuthenticationHandler, ISessionStore (InMemory + Redis), IAuthAuditLogger
-- **Application:** pipeline-behaviors, auth commands (Login/Register/Logout + SessionDto), JobSeeker queries
-- **API:** `/api/v1/job-ads`, `/api/v1/auth`, `/api/v1/me`
-- **Tests:** 153 tester (21 domain, 46 application, 6 arch, 80 integration)
-- **Frontend:** Next.js 16.2.4 + Tailwind v4, civic design-tokens, shadcn nova, login/register/me-sidor, /(app)-layout, session-auth via cookie
+## Senaste commits
 
-## Senaste commits (sedan upptaktens början 2026-05-07)
-
-Verifiera SHA via `git log --oneline -10`. Uppdaterad till och med Moment 4-stängning:
-
-| Riktnings-SHA | Moment | Beskrivning |
-|---------------|--------|-------------|
-| 085210a | Moment 4 | docs(tech-debt) etablering + ev. README-fix (no-op om länk redan korrekt) |
-| (förra) | Moment 3 | chore(gitignore): exkludera precompact-rapporter |
-| 808792d | Moment 2 | docs(claude): uppdatera workflow per ADR 0019 + discovery + agent-krav |
-| (förra) | Moment 2 | fix(hooks): aktivera spec-fil-vakt i Agent SDK-läget via sentinel-fil |
-| d372a57 | Moment 1 | ADR 0019 + README-uppdatering |
+| SHA | Beskrivning |
+|-----|-------------|
+| 82af5fa | feat(applications): implementera Application-aggregat med full CQRS-stack (STEG 5) |
 
 ## Open follow-ups
 
-Tidigare poster i denna fil har migrerat till `docs/tech-debt.md` (TD-numrering). Se den filen för aktuella poster.
+Se `docs/tech-debt.md` för aktuella poster (TD-numrering).
 
 ## När nästa session startar
 
-1. Kör `git log --oneline -10` — verifiera senaste commit
-2. Verifiera `dotnet test` — 153 tester gröna
+1. Kör `git log --oneline -10` — verifiera HEAD = 82af5fa
+2. Verifiera `dotnet test` — 280 tester gröna
 3. Läs `docs/steg-tracker.md` för långsiktig bana
-4. Läs senaste filen i `docs/sessions/` för senaste session-detaljer
-5. För STEG 5 (Application aggregate): plan-design med webb-Claude i ny chatt först
+4. Läs `docs/sessions/2026-05-07-1930-steg5-application-aggregate.md` för STEG 5-detaljer
+5. Påbörja STEG 6: frontend för ansökningar (pipeline-vy, formulär, detaljvy)
 
 ## Kända begränsningar
 
@@ -65,4 +51,4 @@ Se **ADR 0006** för Claude Code-hooks-begränsningar.
 
 **DesignTimeDbContextFactory** använder hårdkodade `postgres/postgres`-credentials för `migrations add`. Ej runtime-problem — bara design-time verktyg.
 
-**guard-spec-files.sh** uppgraderad 2026-05-07 — kontrollerar nu sentinel-fil i `.claude/spec-edit-approved` istället för `CLAUDE_USER_PROMPT` (som inte sätts i Agent SDK-läge). Se `fix(hooks)`-commit i Moment 2.
+**guard-spec-files.sh** kontrollerar sentinel-fil i `.claude/spec-edit-approved` istället för `CLAUDE_USER_PROMPT` (som inte sätts i Agent SDK-läge). Se `fix(hooks)`-commit 2026-05-07.
