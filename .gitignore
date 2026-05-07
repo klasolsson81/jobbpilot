@@ -61,3 +61,6 @@ override.tf.json
 
 # Sentinel-fil för spec-fil-vakt (one-shot, raderas av guard-hook)
 .claude/spec-edit-approved
+
+# Precompact-rapporter är temporära debug-artefakter
+docs/sessions/precompact-*.md
