@@ -1,6 +1,6 @@
 # Current work — JobbPilot
 
-**Status:** STEG 9 KLAR. ADR 0023 skriven. Pipeline-bug fångad och fixad. TD-17, TD-18, TD-19 nya. Nästa: STEG 10 — kräver beslut.
+**Status:** STEG 10a KLAR. ADR 0024 (D1+D2) implementerad. Audit-retention via PG native partitioning + 90-dagars rotation. TD-16 del 1 stängd, TD-20 ny. Nästa: STEG 10b — DELETE /me + Art. 17-cascade (ADR 0024 D3+D4+D5+D6).
 **Senast uppdaterad:** 2026-05-08
 **Långsiktig bana:** `docs/steg-tracker.md` — single source of truth för STEG/fas-progression
 **Tech debt:** `docs/tech-debt.md`
@@ -9,102 +9,74 @@
 
 ## Aktivt nu
 
-**STEG 9 klar.** Worker-pipeline-aktivering + Hangfire-infrastruktur (ADR 0023) implementerad och redo att pushas.
+**STEG 10a klar.** Audit-log retention via PostgreSQL native daily partitioning + Hangfire-jobb (ADR 0024 D1+D2). Stänger del 1 av TD-16 (Art. 5(1)(e) Storage Limitation). TD-16 del 2 (Art. 17-cascade) kvarstår för STEG 10b.
 
-### STEG 9 — Worker-pipeline-aktivering + Hangfire-infrastruktur
+### STEG 10a — Audit-retention via partitioning (ADR 0024 D1+D2)
 
-**Strategi (ADR 0023):** Aktivera Worker-shell (ADR 0010), splittra `AddInfrastructure` i moduler för CleanArch-renhet, registrera Worker-stubs av audit-portarna (per ADR 0022), lägga till Hangfire 1.8.23 + Hangfire.PostgreSql 1.21.1, första schemalagda jobb (`detect-ghosted` daily 03:00 UTC).
+**Strategi (ADR 0024):** `audit_log` konverterad till partitionerad tabell (`PARTITION BY RANGE (occurred_at)`). Daglig Hangfire-jobb skapar morgondagens partition + droppar partitions > 90 dagar. Idempotent. Default-partition som säkerhetsnät. `IAuditPartitionMaintainer`-port isolerad till orchestrator (arch-test-låst).
 
-**Domain (Fas 9.1):**
-- `Application`-aggregatet utökat med `LastStatusChangeAt` (DateTimeOffset, NOT NULL) + `GhostedThresholdDays` (int, NOT NULL, default 21) — per BUILD.md §schema rad 715–727 (per Application, INTE per JobSeeker som steg-tracker tidigare sade)
-- STRIKT-flippning av `LastStatusChangeAt` i `Create()`, `TransitionTo()`, `MarkGhosted()` — INTE i `AddFollowUp`/`AddNote`/`SoftDelete`
-- Ingen `SetGhostedThresholdDays`-metod i Fas 1 (deferred till Fas 3 när per-app-override-feature får UI)
+**Komposit-PK (Fas 10.2):**
+- `AuditLogEntryConfiguration`: `HasKey(a => new { a.Id, a.OccurredAt })` — partition-key krav från PG18 native partitioning
+- Explicit `.ValueGeneratedNever()` på OccurredAt (krav för konsistens; saknad triggade EF Core 10 PendingModelChangesWarning vid Migrate)
 
-**Migration (Fas 9.2):**
-- `20260508093139_AddApplicationStaleDetectionFields` applicerad mot dev-DB
-- Backfill `last_status_change_at = NOW()` (per Klas tillägg #1) — *inte* `updated_at` som hade orsakat mass-batch-ghosting vid första cron
-- Partial index `ix_applications_stale_detection` på `(last_status_change_at)` med `WHERE status IN ('Submitted', 'Acknowledged') AND deleted_at IS NULL`
+**Migration (Fas 10.3):**
+- `20260508152351_AddAuditLogPartitioning` applicerad mot dev-DB
+- Up: rename → CREATE PARTITION BY RANGE → 7 bootstrap-partitions (idag + 6 framåt) → default → INSERT-SELECT (explicit kolumnlista) → DROP legacy → CREATE INDEX
+- Down: symmetrisk reversering till icke-partitionerad tabell
+- **Lärdomar fångade vid första apply:** PK-constraint följde inte med RENAME (krock — fix: `ALTER TABLE … RENAME CONSTRAINT`). Och EF Core 10-quirk om komposit-PK kräver `ValueGeneratedNever` på alla key-kolumner.
 
-**Infrastructure DI-refaktor (Fas 9.3):**
-- `AddInfrastructure` blir composition. Tre nya extensions:
-  - `AddPersistence(configuration)` — DbContext, IAppDbContext, IDateTimeProvider
-  - `AddIdentityAndSessions(configuration)` — Identity, Redis, JWT, ICurrentUser via HTTP (HTTP-only)
-  - `AddHttpAuditing()` — HTTP-baserade audit-portar (HTTP-only)
-- Worker laddar bara `AddPersistence` + egna Worker-stubs
+**Port + impl + orchestrator (Fas 10.4):**
+- `IAuditPartitionMaintainer` i `Application/Common/Auditing/` — `EnsureNextDayPartitionAsync` + `DropPartitionsOlderThanAsync`
+- `AuditPartitionMaintainer` i `Infrastructure/Auditing/` — tar `AppDbContext` direkt (Database-facaden inte exponerad på interface). Idempotent via `CREATE IF NOT EXISTS` + `DROP IF EXISTS`. Lexikografisk filtrering på `audit_log_YYYYMMDD`-namn.
+- `AuditLogRetentionJob` i `Application/Common/Auditing/Jobs/AuditLogRetention/` — orchestrator. Constructor: port + clock + logger. **Ingen IMediator** (medvetet — partition-DDL är ren ops, ingen audit-rad skrivs av jobbet, undviker self-referential audit).
+- DI-registrering i `AddPersistence` (Scoped, Worker-tillgänglig)
 
-**Application (Fas 9.4):**
-- `StaleApplicationSpecification` i `Application/Applications/Specifications/` — tvådelat predikat (SQL Status-filter + client-side AddDays-check)
-- `DetectGhostedApplicationsJob` orchestrator i `Application/Applications/Jobs/GhostedDetection/` — AsNoTracking + per-id `mediator.Send`-loop + cancel-token-check + progress-log var 25:e
-- `MediatorPipelineBehaviors` i `Application/Common/` — delad konstant + `AddMediatorPipelineBehaviors()` extension (pipeline-bug-fix, se nedan)
+**Hangfire (Fas 10.5):**
+- `RecurringJobRegistrar` utökad med `audit-log-retention` cron `Cron.Daily(3)` (03:00 UTC daily)
+- Båda jobs (audit-retention + detect-ghosted) på 03:00 UTC. Skyddskommentar: PG hanterar atomisk DDL → ingen kontention.
 
-**Worker-aktivering (Fas 9.5):**
-- 3 stub-impls i `JobbPilot.Worker/Auditing/`:
-  - `WorkerSystemUser` (Singleton, ICurrentUser): UserId=null, IsAuthenticated=false
-  - `WorkerCorrelationIdProvider` (Scoped, ICorrelationIdProvider): instans-fält Guid → en correlation-ID per Hangfire-job-execution (K1-fix från arch-rapport)
-  - `WorkerRequestContextProvider` (Scoped, IRequestContextProvider): null IP/UA
-- `RecurringJobRegistrar` IHostedService — registrerar `detect-ghosted` cron daily 03:00 UTC
-- `Program.cs` full refaktor: AddPersistence + AddApplication + Worker-stubs + AddMediator + AddMediatorPipelineBehaviors + AddHangfire (schema=hangfire, prepareIfNecessary=true) + AddHangfireServer (WorkerCount=4) + AddHostedService<RecurringJobRegistrar>
-- `Worker.cs` heartbeat-stub TAS BORT (ersatt av Hangfire-server)
-- Hangfire-paket via `Directory.Packages.props`: Hangfire.Core 1.8.23, Hangfire.AspNetCore 1.8.23, Hangfire.PostgreSql 1.21.1
-- **CVE-fix:** Newtonsoft.Json 13.0.3 transitiv pinning för CVE-2024-21907 / GHSA-5crp-9r3c-p9vr (Hangfire drar in vulnerable 11.0.1)
+**Smoke-test (Fas 10.6):**
+- 4 nya tester med `[Trait("Category", "SmokeTest")]` mot Testcontainers Postgres
+- **Bug fångad:** SqlQueryRaw + format-string-syntax tolkade `[0-9]{8}` som `{8}`-placeholder → FormatException. Fix: escape till `{{8}}`.
 
-**Architecture-tester (Fas 9.6):**
-- `WorkerLayerTests.cs` — 5 nya tester: Worker AspNetCore-isolation, job i Application-lagret, Worker-stubs implementerar portar, RecurringJobRegistrar i Worker-assembly, MediatorPipelineBehaviors.InOrder verifierad
+**Architecture-test (Fas 10.7):**
+- Ny `AuditingLayerTests.cs` med 3 tester som låser `IAuditPartitionMaintainer`-konsumtion
+- Allow-list-pattern (Application: orchestrator only; Infrastructure: impl + DI; Worker: ingen direct dep)
 
-**Worker integration smoke-test (Fas 9.7 — Klas tillägg #3):**
-- Nytt projekt `JobbPilot.Worker.IntegrationTests` med Testcontainers Postgres
-- 6 tester med `[Trait("Category", "SmokeTest")]` — körs via `dotnet test --filter "Category=SmokeTest"`
-- Verifierar happy path + 5 negativa fall (Draft/Recent/SoftDeleted/Terminal/PerAppThreshold)
-- Verifierar audit-paritet: `entry.UserId.ShouldBeNull()` för system-jobb
-
-### KRITISK pipeline-bug fångad (Fas 9.7)
-
-Min Fas 9.6-refaktor flyttade pipeline-config till delad konstant `MediatorPipelineBehaviors.InOrder` och satte `options.PipelineBehaviors = MediatorPipelineBehaviors.InOrder` i båda composition roots. **Mediator.SourceGenerator 3.0.2 läser INTE `options.PipelineBehaviors` från fält-references vid compile-time** — den behöver inline-array-literal. Resultat: pipeline-behaviors registrerades aldrig i DI. UoW-SaveChanges anropades aldrig. **Audit-rader skrevs inte.**
-
-Hade detta landat utan integration smoke-test hade STEG 8:s audit-funktionalitet tyst brutits för Api också (regression-bug i alla audit-skrivningar).
-
-**Fix:** `AddMediatorPipelineBehaviors()`-extension i `JobbPilot.Application.Common.MediatorPipelineBehaviors`. Registrerar behaviors som **open-generic DI-services** (`services.AddScoped(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>))`). Mediator runtime hämtar dem via `GetServices<IPipelineBehavior<TRequest, TResponse>>()`. Robust runtime-pattern.
-
-**Regression-skydd dual-coverage:**
-- Architecture test `MediatorPipeline_should_have_expected_behaviors_in_order` (kompil-tid)
-- Integration smoke-test `RunAsync_StaleSubmittedApplication_TransitionsToGhostedAndWritesAuditEntry` (kör-tid)
+**Runbook (Fas 10.8):**
+- `docs/runbooks/audit-retention.md` med övervakning, failure-scenarier, manuell move-procedur, GDPR-noter
 
 ### Reviews genomförda
 
-- **dotnet-architect** (innan kod): 2 kritiska + 5 viktiga + 8 frågor besvarade. Alla åtgärdade. Rapport: `docs/reviews/2026-05-08-steg9-dotnet-architect.md`.
-- **code-reviewer:** Approved with Minors. 0 Blocker, 0 Major, 7 Minor (alla deferable). Rapport: `docs/reviews/2026-05-08-steg9-code-reviewer.md`.
-- **security-auditor:** Approved. 0 Critical, 2 Major (pre-prod-deploy, inte commit), 4 Minor. Rapport: `docs/reviews/2026-05-08-steg9-security-auditor.md`.
+- **db-migration-writer** (10.3): Block — 2 blockers + 3 viktiga. Alla fixade. Rapport sparad i agent-output.
+- **code-reviewer** (10.4–10.6): Approved with Minors. 0 Blocker, 0 Major, 3 Minor + 3 Nit. M1 + M3 + N1 fixade. M2 defererad som TD-20 + N2/N3 icke-issues.
 
-### Klas:s tre tillägg (alla implementerade)
-
-1. **Backfill `NOW()`** istället för `updated_at` — befintliga apps får 21-dagars-fönster räknat från migrationsdatum. Skyddar mot mass-batch-ghosting vid första cron.
-2. **Snäv `{Submitted, Acknowledged}` för Fas 1.** Definition of stale dokumenterad i ADR 0023. TD-18 spårar utökning till intervju-states.
-3. **Integration smoke-test** med Testcontainers istället för manuellt smoke-test. Bevisade sitt värde — fångade pipeline-bug.
-
-### Tech-debt-status efter STEG 9
+### Tech-debt-status efter STEG 10a
 
 - ~~**TD-9** stängd i STEG 8~~
 - **TD-13** (PII-encryption Fas 2) — kvarstår
 - **TD-14** (DeleteResumeVersion VersionInUse-check Fas 4) — kvarstår
-- **TD-15** (Resume-formulär aria-invalid per fält Fas 1 a11y-pass) — kvarstår
-- **TD-16** (Audit-log retention + Art. 17-anonymisering) — kvarstår, **nu unblockerad** (Hangfire finns)
-- **TD-17 ny** — Hangfire prod-härdning (5 punkter, blocker för Fas 1 prod-deploy)
-- **TD-18 ny** — Stale-detektering: utökning till intervju-states (vid första rapporterade fall)
-- **TD-19 ny** — Worker orchestrator + DI-pattern: defense-in-depth-förbättringar (Fas 2)
+- **TD-15** (Resume-formulär aria-invalid Fas 1) — kvarstår
+- **TD-16** — **del 1 (audit-retention) stängd via STEG 10a**. **Del 2 (Art. 17-cascade) kvar för STEG 10b.**
+- **TD-17** (Hangfire prod-härdning, blocker för Fas 1 prod-deploy) — kvarstår
+- **TD-18** (intervju-states-utökning) — kvarstår
+- **TD-19** (Worker defense-in-depth Fas 2) — kvarstår
+- **TD-20 ny** — `AuditPartitionMaintainer.DropPartitionsOlderThanAsync`: SqlQueryRaw + format-string-escape (defensiv refactor till `SqlQuery<FormattableString>`, defererad)
 
 ## Senaste commits
 
 | SHA | Beskrivning |
 |-----|-------------|
-| (pending) | docs: STEG 9 docs-sync (ADR 0023 + tech-debt + steg-tracker + current-work + session-logg) |
-| (pending) | feat(worker): STEG 9 — Worker-pipeline + Hangfire + DetectGhostedApplicationsJob (ADR 0023) |
+| (pending) | docs: STEG 10a docs-sync (current-work + steg-tracker + tech-debt + session-logg) |
+| (pending) | feat(auditing): STEG 10a — audit-log retention partitioning + Hangfire-job (ADR 0024 D1+D2) |
+| 8982213 | docs: STEG 9 docs-sync (ADR 0023 + tech-debt + steg-tracker + current-work + session-logg) |
+| 152f047 | feat(worker): STEG 9 — Worker-pipeline + Hangfire + DetectGhostedApplicationsJob (ADR 0023) |
 | 35efdf2 | docs: STEG 8 docs-sync (current-work + steg-tracker + tech-debt + session-logg) |
 | 8df61a9 | feat(auditing): STEG 8 — audit log-infrastruktur (ADR 0022, stänger TD-9) |
-| 1cb2926 | docs(claude): förtydliga §1.5 — docs-sync efter varje STEG, inte bara session-end |
 
 ## Tester totalt
 
-- **Backend:** 451 (157 Domain + 169 Application + 15 Architecture + 104 Api Integration + 6 Worker SmokeTest) — +32 sedan STEG 8
+- **Backend:** 458 (157 Domain + 169 Application + 18 Architecture + 104 Api Integration + 10 Worker SmokeTest) — +7 sedan STEG 9 (4 retention smoke + 3 auditing arch)
 - **Frontend:** 65 Vitest + 19 Playwright E2E (oförändrat)
 
 ## När nästa session startar
@@ -112,9 +84,9 @@ Hade detta landat utan integration smoke-test hade STEG 8:s audit-funktionalitet
 1. Kör `git log --oneline -10` — verifiera HEAD
 2. Verifiera backend-tester: kör test-exen direkt under `tests/*/bin/Debug/net10.0/` (`dotnet test` på solution-nivå är trasigt)
 3. För Worker SmokeTest: `tests/JobbPilot.Worker.IntegrationTests/bin/Debug/net10.0/JobbPilot.Worker.IntegrationTests.exe -trait "Category=SmokeTest"`
-4. Läs `docs/steg-tracker.md` §6 för STEG 10-kandidater
-5. Läs senaste session-logg (STEG 9) för detaljer
-6. Läs ADR 0023 för Worker/Hangfire-arkitektur
+4. Läs `docs/steg-tracker.md` §6 för STEG 10b-plan
+5. Läs senaste session-logg (STEG 10a) för detaljer
+6. Läs ADR 0024 — fokus på D3+D4+D5+D6 för STEG 10b
 
 ## Kända begränsningar / quirks
 
@@ -122,17 +94,34 @@ Hade detta landat utan integration smoke-test hade STEG 8:s audit-funktionalitet
 - **`dotnet ef`** plockar inte upp `appsettings.Local.json` — använd `export ConnectionStrings__Postgres=...`
 - **`dotnet test`** på solution-nivå returnerar "Zero tests ran" (xunit.v3.mtp-v2-issue) — kör test-exen direkt
 - **API kräver `ASPNETCORE_ENVIRONMENT=Development`** för Redis-connstring
-- **Audit-tabellen växer obegränsat** i dev — TD-16 dokumenterar retention-jobb (nu unblockerad)
+- **`audit_log` är nu partitionerad** — bootstrap-fönstret är 7 dagar framåt (idag + 6); retention-jobb skapar morgondagens partition dagligen 03:00 UTC. Default-partitionen fångar overflow.
 - **Hangfire-schema** skapas automatiskt vid Worker-start i dev (`PrepareSchemaIfNecessary=true`) — TD-17 dokumenterar prod-härdning
 - **Mediator-pipeline-config:** ALLTID via `AddMediatorPipelineBehaviors()` — `options.PipelineBehaviors`-fält fungerar INTE med Mediator.SourceGenerator 3.0.2 från fält-references
+- **Komposit-PK på audit_log:** `(id, occurred_at)` per ADR 0024 D2. Komplett kompletterar ADR 0022:s schema-spec.
+- **EF Core 10 PendingModelChangesWarning** kräver `.ValueGeneratedNever()` på alla komposit-PK-kolumner med blandad value-generation-config.
 - **Worker integration smoke-test** kräver Docker-Compose uppe + tar ~7-10 sekunder per körning (Testcontainers startar ny Postgres)
 - **Middleware-deprecation-varning** i Next.js (kvar från STEG 6)
 
 ## Open follow-ups
 
-Per ADR 0023:
+Per ADR 0024:
+- TD-16 del 2 (Art. 17-cascade) — STEG 10b
 - TD-17 (Hangfire prod-härdning) — innan Fas 1 prod-deploy
 - TD-18 (intervju-states-utökning) — vid första rapporterade fall
 - TD-19 (Worker defense-in-depth) — Fas 2 när Worker-jobb-yta växer
+- TD-20 (SqlQuery<FormattableString>-refactor) — opportunistiskt vid touch på AuditPartitionMaintainer
 
 Per CLAUDE.md §1.5: docs-sync efter varje STEG (inte bara session-end). Glöm inte session-logg.
+
+## STEG 10b — design klar, implementation kvar
+
+ADR 0024 D3 + D4 + D5 + D6 specar:
+- `IAuditTrailEraser`-port + Infrastructure-impl (audit-bypass-pattern, direct SQL UPDATE)
+- `DeleteAccountCommand` som samlat Mediator-command (cascade soft-delete)
+- `DELETE /me`-endpoint i `MeEndpoints.cs`
+- `LoginCommandHandler`-blockering vid `JobSeeker.DeletedAt is not null`
+- `HardDeleteAccountsJob` med Steg 0 orphan-cleanup + Steg 1 hämta + Steg 2 hard-delete + Identity-DELETE separat boundary
+
+Två öppna design-frågor som CC ska besluta inom ADR-ramen:
+1. `ISessionStore.InvalidateAllForUserAsync` — bygg secondary Redis-set (rek) eller SCAN-fallback
+2. `LoginCommandHandler`-blockering — ny `IAppDbContext`-injektion (rek) i auth-flödet

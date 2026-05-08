@@ -334,6 +334,7 @@ Adresseras lämpligen i ett a11y-pass tillsammans med TD-1, TD-2.
 **Fas:** 4 (AI Layer — när retention-jobb byggs)
 **Prioritet:** Hög (blocker för Fas 1 prod-deploy)
 **Källa:** Security audit STEG 8 2026-05-08 (Major M1 + Major M2)
+**Status:** Del 1 (audit-retention) **STÄNGD via STEG 10a** 2026-05-08 (ADR 0024 D1+D2). Del 2 (Art. 17-cascade) kvar för STEG 10b (ADR 0024 D3-D6 designade).
 
 ADR 0022 specificerar 90-dagars retention för `audit_log` via PostgreSQL daily
 partitioning, samt anonymiseringspolicy vid GDPR Art. 17-radering (user_id,
@@ -496,6 +497,42 @@ Hangfire-dashboard kommer att visa jobbet som "Succeeded" med warning-logg → k
 Plus: arch-test som verifierar att alla `IAuditableCommand`-impls antingen har `IAuthenticatedRequest` eller dokumenterar avsiktlig avsaknad i XML-doc (regression-skydd för `MarkGhostedCommand`-mönstret).
 
 **Beroenden:** Ingen — kan adresseras opportunistiskt vid Fas 2 Worker-jobb-tillägg.
+
+---
+
+### TD-20 — `AuditPartitionMaintainer.DropPartitionsOlderThanAsync`: SqlQueryRaw + format-string-escape (defensiv refactor)
+
+**Kategori:** Code quality / Robusthet
+**Fas:** 1+ (defensiv förbättring)
+**Prioritet:** Låg
+**Källa:** Code review STEG 10.6 2026-05-08 (M2)
+
+`AuditPartitionMaintainer.DropPartitionsOlderThanAsync` använder
+`SqlQueryRaw<string>` med `string.Format`-syntax. Regex-quantifier `{8}`
+i pattern `^audit_log_[0-9]{8}$` måste escapas till `{{8}}` för att
+inte tolkas som format-placeholder argument 8 (vilket failer run-time
+med `FormatException`). Buggen fångades av smoke-test i 10.6.
+
+**Risk:** Tyst run-time-fall vid framtida regex-justering (t.ex. om
+`{1,8}` läggs till) eller om en till parameter-position introduceras.
+`dotnet build` flaggar inte format-string-mismatch.
+
+**Föreslagen åtgärd:** Migrera till `SqlQuery<T>` med `FormattableString`-
+overload. Då escapas curly braces inte (regex blir verbatim) och
+parametrar binds som SQL-parameters automatiskt.
+
+Försök gjordes i 10.6: `SqlQuery<string>` returnerade tom rad-set mot
+`pg_class.relname`-kolumnen (sannolikt EF Core 10 shadow-projection-issue
+mot `name`-typen, inte `text`). Möjlig workaround: casta i SQL via
+`c.relname::text AS "Value"`. Behöver verifieras + smoke-test-pass innan
+landning.
+
+**Risk i Fas 1:** noll (smoke-test täcker den primära kodvägen och fångar
+regression).
+
+**Beroenden:** Ingen — kan adresseras opportunistiskt vid touch på
+`AuditPartitionMaintainer` eller om EF Core-versionsuppdatering ändrar
+`SqlQuery<T>`-projection-beteende.
 
 ---
 

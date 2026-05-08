@@ -1,6 +1,6 @@
 # JobbPilot — STEG-tracker
 
-> **Version:** 1.4
+> **Version:** 1.5
 > **Senast uppdaterad:** 2026-05-08
 > **Roll:** permanent översikt över STEG- och fas-progression.
 
@@ -63,6 +63,7 @@ STEG-numrering följer faktisk arbetsutveckling och mappar inte exakt mot fas-gr
 | STEG 7b | Fas 1 | Frontend /cv — Resume-pages, ResumeContentForm med RHF `useFieldArray` för Experiences/Educations/Skills, Server Actions, Zod v4, 37 Vitest + 6 Playwright E2E. TD-15. | 2026-05-08 |
 | STEG 8 | Fas 1 | Audit log-infrastruktur — pipeline-behavior + marker-interface (ADR 0022). 10 commands märkta IAuditableCommand. Migration `AddAuditLogTable`. IP-anonymisering /24+/48, server-gen correlation-ID. Stänger TD-9. +41 tester (14 Domain + 11 Application + 12 Integration + 4 Architecture). | 2026-05-08 |
 | STEG 9 | Fas 1+2/3 förskott | Worker-pipeline-aktivering + Hangfire-infrastruktur (ADR 0023). DI-modulär refaktor (`AddPersistence`/`AddIdentityAndSessions`/`AddHttpAuditing`). 3 Worker-stubs av audit-portarna. `DetectGhostedApplicationsJob` orchestrator + `StaleApplicationSpecification`. Application-aggregat utökat med `LastStatusChangeAt` + `GhostedThresholdDays` (per Application, BUILD.md §schema). Migration `AddApplicationStaleDetectionFields` (NOW()-backfill, partial index). **Pipeline-bug-fix:** `AddMediatorPipelineBehaviors()` (open-generic DI) ersätter trasig `options.PipelineBehaviors`-fält-reference. Newtonsoft.Json 13.0.3 transitiv CVE-pinning. +32 tester (9 Domain + 12 Application + 5 Architecture + 6 Worker SmokeTest). | 2026-05-08 |
+| STEG 10a | Fas 1 | Audit-log retention via PostgreSQL native daily partitioning + Hangfire-jobb (ADR 0024 D1+D2). `audit_log` konverterad till `PARTITION BY RANGE (occurred_at)` med komposit-PK `(id, occurred_at)`. Migration `AddAuditLogPartitioning` (rename → 7 bootstrap-partitions + default → INSERT-SELECT med explicit kolumnlista → DROP legacy). `IAuditPartitionMaintainer`-port + impl + `AuditLogRetentionJob`-orchestrator. Hangfire-cron 03:00 UTC daily. Idempotent (`CREATE IF NOT EXISTS`). 3 nya arch-tester för bypass-isolering. 4 nya smoke-tester. Runbook `docs/runbooks/audit-retention.md`. **Stänger del 1 av TD-16** (Art. 5(1)(e) Storage Limitation). TD-20 ny (defensiv refactor av SqlQueryRaw → SqlQuery<FormattableString>, defererad). +7 tester (3 arch + 4 smoke). | 2026-05-08 |
 
 ### Pågående
 
@@ -72,9 +73,7 @@ STEG-numrering följer faktisk arbetsutveckling och mappar inte exakt mot fas-gr
 
 | STEG | Fas | Beskrivning | Status |
 |------|-----|-------------|--------|
-| STEG 10 | Fas 1/0 | Ej beslutat. Kandidater: Alt B (Fas 0-stängning — deploy till dev.jobbpilot.se, GitHub Actions, bootstrap-IAM-cleanup) eller Alt C (TD-16 audit-retention + Art. 17-cascade — nu unblockerad av STEG 9) eller TD-17 (Hangfire prod-härdning) eller fortsätt features (Fas 2 JobTech-sync — kräver dock ADR 0005 go-to-market först) | Behöver beslutas |
-
-STEG 10 beslutas i nästa session.
+| STEG 10b | Fas 1 | TD-16 del 2: DELETE /me + GDPR Art. 17-cascade. ADR 0024 D3+D4+D5+D6 design klar. `IAuditTrailEraser`-port (audit-bypass via direct SQL UPDATE) + `DeleteAccountCommand` (cascade soft-delete JobSeeker + Application + Resume) + `DELETE /me`-endpoint + `LoginCommandHandler`-blockering vid `JobSeeker.DeletedAt` + `HardDeleteAccountsJob` (Steg 0 orphan-cleanup + Steg 1+2 hard-delete + separat Identity-DELETE-boundary). 30-dagars restore-fönster utan Identity-tabell-migration. Två öppna CC-design-frågor: `ISessionStore.InvalidateAllForUserAsync`-strategi (rek: secondary Redis-set) + `LoginCommandHandler`-blockering (rek: ny IAppDbContext-injektion). **Stänger del 2 av TD-16.** | Designed, redo att implementeras |
 
 ## 4. Mellan-arbete
 
@@ -86,7 +85,7 @@ Cleanup-passningar, disciplin-uppgraderingar och dokumentations-arbete som inte 
 
 ## 5. Aktuellt
 
-**STEG-fokus:** STEG 9 klar 2026-05-08. Worker-pipeline aktiverad, Hangfire-infrastruktur landad. Pipeline-bug fångad och fixad via integration smoke-test. Inga aktiva STEG.
+**STEG-fokus:** STEG 10a klar 2026-05-08. Audit-log retention via partitioning + Hangfire-jobb (ADR 0024 D1+D2). TD-16 del 1 stängd. Inga aktiva STEG.
 
 **STEG 7a** (Resume-aggregat backend): Komplett 2026-05-08.
 
@@ -102,38 +101,35 @@ Cleanup-passningar, disciplin-uppgraderingar och dokumentations-arbete som inte 
 
 **Test-strategi-validering:** Klas tillägg #3 (integration smoke-test framför manuellt smoke-test) bevisade sitt värde — manuellt smoke-test hade missat pipeline-bug-fyndet. Mönster: alla nya orchestrator-/Worker-jobb ska ha integration smoke-test med `[Trait("Category", "SmokeTest")]`.
 
-**Nästa:** STEG 10 kräver beslut. Se §6.
+**STEG 10a** (Audit-retention via partitioning): Komplett 2026-05-08. ADR 0024 D1+D2. `audit_log` partitionerad daglig. `AuditLogRetentionJob` registrerad i Hangfire 03:00 UTC. Komposit-PK `(id, occurred_at)`. **Lärdomar fångade:** PK-constraint följde inte med RENAME (fix: `ALTER TABLE … RENAME CONSTRAINT`); EF Core 10 PendingModelChangesWarning kräver `ValueGeneratedNever` på alla komposit-PK-kolumner; SqlQueryRaw + format-string tolkar `[0-9]{8}` som `{8}`-placeholder (fix: escape till `{{8}}`, smoke-test fångade). +7 tester (3 arch + 4 smoke). TD-16 del 1 stängd. TD-20 ny (defensiv refactor defererad).
+
+**Nästa:** STEG 10b — TD-16 del 2 (DELETE /me + Art. 17-cascade). Designad i ADR 0024 D3+D4+D5+D6. Se §6.
 
 För session-detaljer och commit-historik, se `docs/current-work.md`.
 
 ## 6. Nästa STEG
 
-**STEG 10 — kräver beslut**
+**STEG 10b — DELETE /me + Art. 17-cascade**
 
-Fyra primära kandidater (alla nu unblockerade efter STEG 9):
+ADR 0024 D3+D4+D5+D6 är designade i webb-Claude och justerade efter STEG 10.1-discovery. Implementation är bounded:
 
-**Alt B — Steg mot Fas 0-stängning (BUILD.md §18 kvarvarande)**
-- Första deploy till dev.jobbpilot.se
-- GitHub Actions CI/CD verifierad (tag-baserad deploy per BUILD.md §15.3)
-- Bootstrap-IAM-user raderad
-- Ren ops/AWS-uppsättning. Säkerhetskänsligt arbete (IAM, secrets) — security-auditor invokeras
+**Komponenter:**
+- `IAuditTrailEraser`-port + Infrastructure-impl (audit-bypass-pattern via direct SQL UPDATE)
+- `DeleteAccountCommand` som samlat Mediator-command (cascade soft-delete: JobSeeker + alla Application + alla Resume)
+- `DELETE /me`-endpoint i `MeEndpoints.cs` + post-commit `InvalidateAllForUserAsync`
+- `LoginCommandHandler`-blockering vid `JobSeeker.DeletedAt is not null` (kräver ny `IAppDbContext`-injektion)
+- `HardDeleteAccountsJob`-orchestrator: Steg 0 orphan-cleanup + Steg 1 hämta soft-deletade > 30 dagar + Steg 2 hard-delete med explicit transaction + separat Identity-DELETE-boundary
+- Architecture-test för `IAuditTrailEraser`-bypass-isolering (analog 10.7)
+- Smoke-test för Art. 17-cascade + hard-delete
+- Integration-test för DELETE /me end-to-end
+- Runbook `docs/runbooks/account-deletion.md`
 
-**Alt C — TD-16-implementation (Fas 1 prod-deploy-blockare 1)**
-- Audit-log retention-jobb (Hangfire — nu unblockerad efter STEG 9)
-- GDPR Art. 17-anonymiserings-cascade vid kontoradering
-- Runbook `docs/runbooks/audit-retention.md`
-- Stänger en av två kvarvarande prod-blockare
+**Två öppna CC-design-frågor inom ADR-ramen:**
 
-**Alt D — TD-17-implementation (Fas 1 prod-deploy-blockare 2)**
-- Hangfire prod-härdning (5 punkter): `PrepareSchemaIfNecessary`-konfig-overlay, schema-runbook, dashboard-skydd, separata DB-users, kalibrerings-fas-runbook
-- Stänger den andra kvarvarande prod-blockare från STEG 9
-- Synergi med Alt B (om Alt B kör först är Hangfire-härdning naturlig follow-up)
+1. **`ISessionStore.InvalidateAllForUserAsync`-strategi** (ADR 0017 listar metoden som deferred): bygg secondary Redis-set `user:{userId}:sessions` (rek — proper bulk invalidation) eller SCAN-fallback (O(N) över alla session-nycklar — temporary, dokumenterat som tech-debt)
+2. **`LoginCommandHandler`-blockering**: ny `IAppDbContext`-injektion (rek — standard pattern) för att hämta JobSeeker.DeletedAt mellan validate-credentials och session-create
 
-**Alt E — Fortsätt features**
-- Fas 2 JobTech-sync (men kräver ADR 0005 go-to-market först — blockerad)
-- Andra Fas 1-features (Application Management UX-pass, Resume-version-Tailored?)
-
-**Rekommendation:** Alt C eller Alt D — båda stänger Fas 1 prod-deploy-blockare. Alt C är mer bounded scope (1 jobb + 1 command + cascade). Alt D är 5 punkter men flesta är konfig + dokumentation. Klas beslutar.
+**Status:** Designed, redo att implementeras. Klas beslutar startdatum.
 
 ## 7. Numreringsfotnot
 
