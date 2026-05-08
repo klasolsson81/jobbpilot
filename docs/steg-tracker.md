@@ -1,6 +1,6 @@
 # JobbPilot — STEG-tracker
 
-> **Version:** 1.3
+> **Version:** 1.4
 > **Senast uppdaterad:** 2026-05-08
 > **Roll:** permanent översikt över STEG- och fas-progression.
 
@@ -62,6 +62,7 @@ STEG-numrering följer faktisk arbetsutveckling och mappar inte exakt mot fas-gr
 | STEG 7a | Fas 1 | Resume-aggregat backend — domain (Resume AR + ResumeVersion + ResumeContent VO), EF JSONB via HasConversion, migration `AddResumeAggregate`, 5 commands + 2 queries, 7 API-endpoints, +98 tester. Plan-design via CC (utan webb-Claude). ADR 0021 (Master-mutation), TD-13/TD-14. | 2026-05-08 |
 | STEG 7b | Fas 1 | Frontend /cv — Resume-pages, ResumeContentForm med RHF `useFieldArray` för Experiences/Educations/Skills, Server Actions, Zod v4, 37 Vitest + 6 Playwright E2E. TD-15. | 2026-05-08 |
 | STEG 8 | Fas 1 | Audit log-infrastruktur — pipeline-behavior + marker-interface (ADR 0022). 10 commands märkta IAuditableCommand. Migration `AddAuditLogTable`. IP-anonymisering /24+/48, server-gen correlation-ID. Stänger TD-9. +41 tester (14 Domain + 11 Application + 12 Integration + 4 Architecture). | 2026-05-08 |
+| STEG 9 | Fas 1+2/3 förskott | Worker-pipeline-aktivering + Hangfire-infrastruktur (ADR 0023). DI-modulär refaktor (`AddPersistence`/`AddIdentityAndSessions`/`AddHttpAuditing`). 3 Worker-stubs av audit-portarna. `DetectGhostedApplicationsJob` orchestrator + `StaleApplicationSpecification`. Application-aggregat utökat med `LastStatusChangeAt` + `GhostedThresholdDays` (per Application, BUILD.md §schema). Migration `AddApplicationStaleDetectionFields` (NOW()-backfill, partial index). **Pipeline-bug-fix:** `AddMediatorPipelineBehaviors()` (open-generic DI) ersätter trasig `options.PipelineBehaviors`-fält-reference. Newtonsoft.Json 13.0.3 transitiv CVE-pinning. +32 tester (9 Domain + 12 Application + 5 Architecture + 6 Worker SmokeTest). | 2026-05-08 |
 
 ### Pågående
 
@@ -71,9 +72,9 @@ STEG-numrering följer faktisk arbetsutveckling och mappar inte exakt mot fas-gr
 
 | STEG | Fas | Beskrivning | Status |
 |------|-----|-------------|--------|
-| STEG 9 | Fas 1/0 | Ej beslutat. Kandidater: Hangfire-setup + GhostedDetectionJob (Fas 2-3 förskott), eller steg mot Fas 0-stängning (deploy till dev.jobbpilot.se, GitHub Actions, bootstrap-IAM-cleanup) | Behöver beslutas |
+| STEG 10 | Fas 1/0 | Ej beslutat. Kandidater: Alt B (Fas 0-stängning — deploy till dev.jobbpilot.se, GitHub Actions, bootstrap-IAM-cleanup) eller Alt C (TD-16 audit-retention + Art. 17-cascade — nu unblockerad av STEG 9) eller TD-17 (Hangfire prod-härdning) eller fortsätt features (Fas 2 JobTech-sync — kräver dock ADR 0005 go-to-market först) | Behöver beslutas |
 
-STEG 9 beslutas i nästa session.
+STEG 10 beslutas i nästa session.
 
 ## 4. Mellan-arbete
 
@@ -85,49 +86,54 @@ Cleanup-passningar, disciplin-uppgraderingar och dokumentations-arbete som inte 
 
 ## 5. Aktuellt
 
-**STEG-fokus:** STEG 8 klar 2026-05-08. TD-9 (Major GDPR Art. 5(2) accountability-gap) stängd. Inga aktiva STEG.
+**STEG-fokus:** STEG 9 klar 2026-05-08. Worker-pipeline aktiverad, Hangfire-infrastruktur landad. Pipeline-bug fångad och fixad via integration smoke-test. Inga aktiva STEG.
 
 **STEG 7a** (Resume-aggregat backend): Komplett 2026-05-08.
 
 **STEG 7b** (Frontend /cv): Komplett 2026-05-08.
 
-**STEG 8** (Audit log-infrastruktur): Komplett 2026-05-08. Pipeline-behavior + marker-interface (ADR 0022). 10 commands i Application+Resume märkta `IAuditableCommand<TResponse>`. Audit-rad och data-mutation persisteras atomiskt i samma SaveChanges. IP-anonymisering /24+/48 per Breyer-domen + WP29. Server-gen correlation-ID per OWASP ASVS V7.1.4. +41 tester. TD-9 stängd, TD-16 ny (retention + Art. 17-anonymisering, blocker för Fas 1 prod-deploy).
+**STEG 8** (Audit log-infrastruktur): Komplett 2026-05-08. Pipeline-behavior + marker-interface (ADR 0022). 10 commands i Application+Resume märkta `IAuditableCommand<TResponse>`. Audit-rad och data-mutation persisteras atomiskt i samma SaveChanges. +41 tester. TD-9 stängd, TD-16 ny.
 
-**Plan-design-modell:** STEG 7+8 körde plan-design via CC istället för webb-Claude — fungerade när scope var upprepningsmönster eller väl-avgränsad infrastruktur. Lärdom: webb-Claude behövs inte för upprepningsmönster eller när ADR-spec finns färdig.
+**STEG 9** (Worker-pipeline + Hangfire): Komplett 2026-05-08. ADR 0023. Worker-aktivering + Hangfire 1.8.23 + Hangfire.PostgreSql 1.21.1. DI-modulär refaktor. Stale-detektering på Application-aggregatet (`LastStatusChangeAt` + `GhostedThresholdDays` per BUILD.md §schema). `DetectGhostedApplicationsJob` orchestrator. **Kritisk fångst:** Pipeline-bug där `MediatorPipelineBehaviors.InOrder` inte registrerade behaviors via `options.PipelineBehaviors` → tyst data-loss. Fix: `AddMediatorPipelineBehaviors()` open-generic DI. Newtonsoft.Json 13.0.3 transitiv CVE-pinning. +32 tester (9 Domain + 12 Application + 5 Architecture + 6 Worker SmokeTest). TD-17 ny (Hangfire prod-härdning, blocker för Fas 1 prod-deploy). TD-18 ny (intervju-states-utökning). TD-19 ny (defense-in-depth-förbättringar för Worker-jobb).
 
-**Nästa:** STEG 9 kräver beslut. Se §6.
+**Spec-drift fångad:** STEG 9-startprompt sade "ghosted_threshold_days per JobSeeker (default 21)" men BUILD.md §schema rad 715–727 specificerar **per Application**. Klas valde BUILD.md-versionen (DDD: Application-aggregatet äger sin tids-semantik). Steg-tracker uppdaterad ovan.
+
+**Plan-design-modell:** STEG 9 körde plan-design via CC + dotnet-architect-validering (utan webb-Claude). Fungerade för väl-avgränsad infrastruktur när ADR 0022-spec fanns delvis färdig. Webb-Claude behövs inte för upprepningsmönster eller infrastruktur som har ADR-stöd.
+
+**Test-strategi-validering:** Klas tillägg #3 (integration smoke-test framför manuellt smoke-test) bevisade sitt värde — manuellt smoke-test hade missat pipeline-bug-fyndet. Mönster: alla nya orchestrator-/Worker-jobb ska ha integration smoke-test med `[Trait("Category", "SmokeTest")]`.
+
+**Nästa:** STEG 10 kräver beslut. Se §6.
 
 För session-detaljer och commit-historik, se `docs/current-work.md`.
 
 ## 6. Nästa STEG
 
-**STEG 9 — kräver beslut**
+**STEG 10 — kräver beslut**
 
-Två primära kandidater (Alt B från STEG 8-valet är nu klar — TD-9 stängd):
-
-**Alt A — Hangfire-setup + GhostedDetectionJob (Fas 2-3 förskott)**
-- Hangfire-infrastruktur i Worker-projektet (ADR 0010-shell aktiveras)
-- Worker-pipeline-registrering (Mediator + Application + Infrastructure-DI)
-- Stub-implementationer av `ICurrentUser`, `ICorrelationIdProvider`,
-  `IRequestContextProvider` för Worker-scope (per ADR 0022)
-- `GhostedDetectionJob` som kör `MarkGhostedCommand` för stale applications
-- Konfiguration: `ghosted_threshold_days` per JobSeeker (default 21)
-- Sätter scenen för Fas 4 AI-jobb och Fas 2 JobTech sync-jobb
-- *Notera:* Hangfire är egentligen Fas 2 per BUILD.md §18 men kan tas tidigt
+Fyra primära kandidater (alla nu unblockerade efter STEG 9):
 
 **Alt B — Steg mot Fas 0-stängning (BUILD.md §18 kvarvarande)**
 - Första deploy till dev.jobbpilot.se
 - GitHub Actions CI/CD verifierad (tag-baserad deploy per BUILD.md §15.3)
 - Bootstrap-IAM-user raderad
-- Stänger Fas 0 ordentligt innan vi går vidare
+- Ren ops/AWS-uppsättning. Säkerhetskänsligt arbete (IAM, secrets) — security-auditor invokeras
 
-**Alt C — TD-16-implementation (Fas 1 prod-deploy-blockare)**
-- Audit-log retention-jobb (Hangfire — beroende av Alt A)
+**Alt C — TD-16-implementation (Fas 1 prod-deploy-blockare 1)**
+- Audit-log retention-jobb (Hangfire — nu unblockerad efter STEG 9)
 - GDPR Art. 17-anonymiserings-cascade vid kontoradering
 - Runbook `docs/runbooks/audit-retention.md`
-- Stänger den enda kvarvarande prod-blockaren från STEG 8
+- Stänger en av två kvarvarande prod-blockare
 
-**Rekommendation:** Alt A om Hangfire-infrastruktur behövs för senare faser (sätter chassit för Fas 4-AI-jobb och Fas 2-sync). Alt C kan inte göras utan Alt A. Alt B är ren Fas 0-stängning utan beroenden uppåt. Klas beslutar.
+**Alt D — TD-17-implementation (Fas 1 prod-deploy-blockare 2)**
+- Hangfire prod-härdning (5 punkter): `PrepareSchemaIfNecessary`-konfig-overlay, schema-runbook, dashboard-skydd, separata DB-users, kalibrerings-fas-runbook
+- Stänger den andra kvarvarande prod-blockare från STEG 9
+- Synergi med Alt B (om Alt B kör först är Hangfire-härdning naturlig follow-up)
+
+**Alt E — Fortsätt features**
+- Fas 2 JobTech-sync (men kräver ADR 0005 go-to-market först — blockerad)
+- Andra Fas 1-features (Application Management UX-pass, Resume-version-Tailored?)
+
+**Rekommendation:** Alt C eller Alt D — båda stänger Fas 1 prod-deploy-blockare. Alt C är mer bounded scope (1 jobb + 1 command + cascade). Alt D är 5 punkter men flesta är konfig + dokumentation. Klas beslutar.
 
 ## 7. Numreringsfotnot
 

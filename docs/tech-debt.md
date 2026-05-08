@@ -374,6 +374,131 @@ invarianten — motiverat val men dokumenteras).
 
 ---
 
+### TD-17 — Hangfire prod-härdning (multi-faceted, blocker för Fas 1 prod-deploy)
+
+**Kategori:** Säkerhet / Operations
+**Fas:** 1 (innan prod-deploy)
+**Prioritet:** Hög (blocker för Fas 1 prod-deploy, tillsammans med TD-16)
+**Källa:** Security audit STEG 9 2026-05-08 (MAJ-1, MAJ-2, MIN-3, MIN-4) + ADR 0023
+
+ADR 0023 aktiverar Hangfire-infrastrukturen i Worker. Fem operationella härdnings-punkter måste adresseras innan Fas 1 går till prod:
+
+**1. `PrepareSchemaIfNecessary` ska flippas till `false` i prod (MAJ-1):**
+
+`src/JobbPilot.Worker/Program.cs` har idag hårdkodat `PrepareSchemaIfNecessary = true`. I prod betyder detta att Worker vid uppstart kan skapa schema + tabeller. Två problem:
+- Worker-DB-användarens GRANT-set blir för brett (CREATE SCHEMA + CREATE TABLE) → privilege-escalation-yta vid kompromettering
+- Race condition om två concurrent Worker-instanser båda försöker skapa schema vid första deploy
+
+**Åtgärd:** Konfig-overlay som läser `PrepareSchemaIfNecessary` från `appsettings.{env}.json` (false i prod, true i dev/test).
+
+**2. Hangfire-schema-runbook (MAJ-1):**
+
+Skapa `docs/runbooks/hangfire-schema.md` med:
+- Initial schema-skapnings-DDL (kör manuellt i prod innan första Worker-deploy)
+- GRANT-modell: separat migrations-user (DDL-rättigheter) vs runtime-user (DML på `hangfire.*`)
+- Felsöknings-procedur om schema-state är inkonsistent
+
+**3. Hangfire dashboard får aldrig exponeras utan auth (MAJ-2):**
+
+Worker är inte HTTP-host idag, ingen dashboard. Men om dashboard någonsin exponeras i Api eller dev-tooling måste den default-skyddas:
+- Kräv custom `IDashboardAuthorizationFilter` (Hangfire-default är publik)
+- Admin-roll-policy + IP-restriktion + audit-logg av dashboard-access
+- Dashboard exponerar job-arguments (kan innehålla user-IDs/aggregat-IDs) + stack-traces (potentiellt PII i exception-data)
+
+**Åtgärd:** Lägg `// SECURITY:`-kommentar i Worker/Program.cs som varnar mot direkt-anrop av `UseHangfireDashboard(...)`. Eller bind till runbook ovan.
+
+**4. Splittra ConnectionStrings för least-privilege (MIN-4):**
+
+Idag delar `ConnectionStrings:Postgres` mellan AppDbContext och Hangfire-storage. Lateral access-yta — om Hangfire har sårbarhet kan den teoretiskt komma åt `applications`-tabellen.
+
+**Åtgärd vid prod-deploy:**
+- `ConnectionStrings:Postgres` — Worker-app-user (SELECT/INSERT/UPDATE på `public.*`)
+- `ConnectionStrings:HangfireStorage` — Hangfire-user (SELECT/INSERT/UPDATE/DELETE bara på `hangfire.*`)
+
+Kostsam i dev/test (kräver två DB-users) — defereras tills prod-deploy.
+
+**5. Defensiv runbook-anteckning för "kalibrerings-fas" (MIN-3):**
+
+Migration `AddApplicationStaleDetectionFields` backfillar `last_status_change_at = NOW()` (per Klas tillägg #1). Befintliga apps får 21-dagars-fönster räknat från migrationsdatum.
+
+**Åtgärd:** Dokumentera i runbook att de första 21 dagarna efter prod-deploy är "kalibrerings-fas" — Klas följer Hangfire-dashboard för anomaliska volymer av MarkGhostedCommand. Defensiv anteckning, ingen kodändring.
+
+**Beroenden:** ADR 0023 implementerad (klart). Inga andra beroenden — kan adresseras parallellt med TD-16 (audit-retention) eftersom båda gäller Fas 1 prod-deploy.
+
+---
+
+### TD-18 — Stale-detektering: utökning till intervju-states
+
+**Kategori:** UX / Domain-modell
+**Fas:** 1+ (vid första rapporterade fall)
+**Prioritet:** Låg (idag); Medium (när första fall rapporteras)
+**Källa:** ADR 0023 §"Definition of stale" (Klas tillägg #2 till STEG 9)
+
+ADR 0023 låser stale-detektering till snäv `{Submitted, Acknowledged}` för Fas 1. Definition: "transient-states där företaget förväntas svara". Intervju-states (`InterviewScheduled`, `Interviewing`) betraktas active oavsett kalendertid — antagandet är att användaren själv hanterar intervju-flödet och inte vill att jobbet auto-ghostas.
+
+**Risk i Fas 1:** noll (bara om användaren själv missar att markera "intervju ställdes in" och appen fastnar i `InterviewScheduled`-state utan vidare aktivitet).
+
+**Trigger för utökning:** Första rapporterade fallet av "intervju ställdes in, app fastnade i InterviewScheduled/Interviewing utan auto-progression".
+
+**Föreslagen åtgärd vid trigger:**
+1. Utöka `StaleApplicationSpecification.CandidateStatusFilter()` till att inkludera `InterviewScheduled` + `Interviewing` (eventuellt med längre `GhostedThresholdDays` per app/state)
+2. Eller: dedikerad `IsInterviewStaleNow(...)`-metod med separata thresholds (t.ex. 60 dagar för intervju-states vs 21 för Submitted/Acknowledged)
+3. Uppdatera ADR 0023 med "Definition of stale v2"-sektion
+4. Uppdatera DetectGhostedApplicationsJob-tester med nya scenarios
+
+**Inga nya migrations** — fältet `GhostedThresholdDays` finns redan per app.
+
+---
+
+### TD-19 — Worker orchestrator + DI-pattern: defense-in-depth-förbättringar
+
+**Kategori:** Code quality / Robusthet
+**Fas:** 2 (när Worker-jobb-yta växer)
+**Prioritet:** Medium
+**Källa:** Code review STEG 9 2026-05-08 (M1, M5, M6) + Security audit (MIN-1)
+
+Tre defensive förbättringar som inte blockerar STEG 9 men bör adresseras när Worker-jobb-yta växer (Fas 2 JobTech-sync, Fas 4 AI-jobb):
+
+**M5 — Max-batch-size-guard i `DetectGhostedApplicationsJob`:**
+
+Per-id `mediator.Send`-loop är medvetet val (audit-paritet, isolering). Acceptabel för Fas 1-volym (50–100 stale/dag). Men vid oväntad scale-stigning (t.ex. backfill efter migration-bug eller ovanligt långt downtime) kan loop:en köra över tusentals apps.
+
+**Åtgärd:** Lägg explicit guard i `RunAsync(...)`:
+
+```csharp
+const int MaxBatchSize = 500;
+if (staleIds.Count > MaxBatchSize)
+{
+    logger.LogWarning(
+        "DetectGhostedApplicationsJob: oväntat stort kandidat-set ({Count}). Avbryter — manuell granskning krävs.",
+        staleIds.Count);
+    return;
+}
+```
+
+Hangfire-dashboard kommer att visa jobbet som "Succeeded" med warning-logg → kräver manuell triage.
+
+**M1 — Smoke-test för correlation-ID-unikhet:**
+
+`DetectGhostedApplicationsJobIntegrationTests` verifierar audit-paritet (audit-rad skapas) men inte att `correlation_id` är unikt per Hangfire-job-execution. Efter K1-fixen (instans-fält Guid i `WorkerCorrelationIdProvider`) är detta värt regression-skydd.
+
+**Åtgärd:** Lägg till test som dispatchar två separata MarkGhostedCommand i två olika scope:s och verifierar att audit-raderna har **olika** `correlation_id`. Och samma command i samma scope → samma `correlation_id`.
+
+**M6 + MIN-1 — Architecture-test-utökning:**
+
+`WorkerLayerTests.cs` förbjuder Worker-beroende på `Microsoft.AspNetCore.Http`/`Identity`/`Authentication.JwtBearer`/`Identity.EntityFrameworkCore`. Listan är defensiv men inte uttömmande:
+- `Microsoft.AspNetCore.Authentication.Cookies`
+- `Microsoft.AspNetCore.Authorization`
+- `Microsoft.AspNetCore.Hosting`
+
+**Åtgärd:** Antingen utöka explicit lista eller flippa till **allow-list-pattern**: "Worker får INTE bero på `Microsoft.AspNetCore.*`". Tradeoff: arch-test blir mindre brittle på vissa NuGet-uppdateringar men kan ge falska positiver.
+
+Plus: arch-test som verifierar att alla `IAuditableCommand`-impls antingen har `IAuthenticatedRequest` eller dokumenterar avsiktlig avsaknad i XML-doc (regression-skydd för `MarkGhostedCommand`-mönstret).
+
+**Beroenden:** Ingen — kan adresseras opportunistiskt vid Fas 2 Worker-jobb-tillägg.
+
+---
+
 ## Adresseringsstrategi
 
 - Items i kategorierna a11y, UX och observability adresseras
