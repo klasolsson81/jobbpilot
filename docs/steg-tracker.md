@@ -1,6 +1,6 @@
 # JobbPilot — STEG-tracker
 
-> **Version:** 1.2
+> **Version:** 1.3
 > **Senast uppdaterad:** 2026-05-08
 > **Roll:** permanent översikt över STEG- och fas-progression.
 
@@ -61,6 +61,7 @@ STEG-numrering följer faktisk arbetsutveckling och mappar inte exakt mot fas-gr
 | STEG 6 | Fas 1 | Frontend /ansokningar — pipeline-tabell, ny-ansökan, detaljvy, transitionsformulär, Server Actions, Zod v4, 28 Vitest + 13 Playwright E2E | 2026-05-08 |
 | STEG 7a | Fas 1 | Resume-aggregat backend — domain (Resume AR + ResumeVersion + ResumeContent VO), EF JSONB via HasConversion, migration `AddResumeAggregate`, 5 commands + 2 queries, 7 API-endpoints, +98 tester. Plan-design via CC (utan webb-Claude). ADR 0021 (Master-mutation), TD-13/TD-14. | 2026-05-08 |
 | STEG 7b | Fas 1 | Frontend /cv — Resume-pages, ResumeContentForm med RHF `useFieldArray` för Experiences/Educations/Skills, Server Actions, Zod v4, 37 Vitest + 6 Playwright E2E. TD-15. | 2026-05-08 |
+| STEG 8 | Fas 1 | Audit log-infrastruktur — pipeline-behavior + marker-interface (ADR 0022). 10 commands märkta IAuditableCommand. Migration `AddAuditLogTable`. IP-anonymisering /24+/48, server-gen correlation-ID. Stänger TD-9. +41 tester (14 Domain + 11 Application + 12 Integration + 4 Architecture). | 2026-05-08 |
 
 ### Pågående
 
@@ -70,9 +71,9 @@ STEG-numrering följer faktisk arbetsutveckling och mappar inte exakt mot fas-gr
 
 | STEG | Fas | Beskrivning | Status |
 |------|-----|-------------|--------|
-| STEG 8 | Fas 1 | Ej beslutat. Kandidater: Hangfire-setup + GhostedDetectionJob, audit log-infrastruktur (TD-9), eller steg mot Fas 0-stängning (deploy till dev.jobbpilot.se) | Behöver beslutas |
+| STEG 9 | Fas 1/0 | Ej beslutat. Kandidater: Hangfire-setup + GhostedDetectionJob (Fas 2-3 förskott), eller steg mot Fas 0-stängning (deploy till dev.jobbpilot.se, GitHub Actions, bootstrap-IAM-cleanup) | Behöver beslutas |
 
-STEG 8 beslutas i nästa session.
+STEG 9 beslutas i nästa session.
 
 ## 4. Mellan-arbete
 
@@ -84,41 +85,49 @@ Cleanup-passningar, disciplin-uppgraderingar och dokumentations-arbete som inte 
 
 ## 5. Aktuellt
 
-**STEG-fokus:** STEG 7 (a + b) klara 2026-05-08. **Fas 1-milstolpe** ("Du kan skapa CV manuellt") uppfylld. Inga aktiva STEG.
+**STEG-fokus:** STEG 8 klar 2026-05-08. TD-9 (Major GDPR Art. 5(2) accountability-gap) stängd. Inga aktiva STEG.
 
-**STEG 7a** (Resume-aggregat backend): Komplett — domain (Resume AR + ResumeVersion + ResumeContent VO), EF JSONB-mappning, migration applicerad mot dev-DB, 5 commands + 2 queries, 7 API-endpoints, +98 tester. ADR 0021 (Master-mutation-strategi). TD-13/TD-14 dokumenterade.
+**STEG 7a** (Resume-aggregat backend): Komplett 2026-05-08.
 
-**STEG 7b** (Frontend /cv): Komplett — pipeline-lista, ny-CV-formulär, detaljvy med RHF + `useFieldArray` för Experiences/Educations/Skills, +43 tester (Vitest + Playwright). TD-15 dokumenterat.
+**STEG 7b** (Frontend /cv): Komplett 2026-05-08.
 
-**Plan-design-modell:** STEG 7 testade plan-design via CC istället för webb-Claude — fungerade när scope var upprepningsmönster av STEG 5+6 (Resume = samma arkitektur som Application). Lärdom: webb-Claude behövs inte för upprepningsmönster.
+**STEG 8** (Audit log-infrastruktur): Komplett 2026-05-08. Pipeline-behavior + marker-interface (ADR 0022). 10 commands i Application+Resume märkta `IAuditableCommand<TResponse>`. Audit-rad och data-mutation persisteras atomiskt i samma SaveChanges. IP-anonymisering /24+/48 per Breyer-domen + WP29. Server-gen correlation-ID per OWASP ASVS V7.1.4. +41 tester. TD-9 stängd, TD-16 ny (retention + Art. 17-anonymisering, blocker för Fas 1 prod-deploy).
 
-**Nästa:** STEG 8 kräver beslut. Se §6.
+**Plan-design-modell:** STEG 7+8 körde plan-design via CC istället för webb-Claude — fungerade när scope var upprepningsmönster eller väl-avgränsad infrastruktur. Lärdom: webb-Claude behövs inte för upprepningsmönster eller när ADR-spec finns färdig.
+
+**Nästa:** STEG 9 kräver beslut. Se §6.
 
 För session-detaljer och commit-historik, se `docs/current-work.md`.
 
 ## 6. Nästa STEG
 
-**STEG 8 — kräver beslut**
+**STEG 9 — kräver beslut**
 
-Tre kandidater per BUILD.md §18:
+Två primära kandidater (Alt B från STEG 8-valet är nu klar — TD-9 stängd):
 
-**Alt A — Hangfire-setup + GhostedDetectionJob (Fas 1 polish)**
-- Hangfire-infrastruktur (Worker-projekt — ADR 0010 redan etablerad)
+**Alt A — Hangfire-setup + GhostedDetectionJob (Fas 2-3 förskott)**
+- Hangfire-infrastruktur i Worker-projektet (ADR 0010-shell aktiveras)
+- Worker-pipeline-registrering (Mediator + Application + Infrastructure-DI)
+- Stub-implementationer av `ICurrentUser`, `ICorrelationIdProvider`,
+  `IRequestContextProvider` för Worker-scope (per ADR 0022)
 - `GhostedDetectionJob` som kör `MarkGhostedCommand` för stale applications
 - Konfiguration: `ghosted_threshold_days` per JobSeeker (default 21)
 - Sätter scenen för Fas 4 AI-jobb och Fas 2 JobTech sync-jobb
+- *Notera:* Hangfire är egentligen Fas 2 per BUILD.md §18 men kan tas tidigt
 
-**Alt B — Audit log-infrastruktur (kopplar till TD-9)**
-- `IApplicationAuditLogger` + `application_audit_log`-tabell
-- Pipeline-behavior eller domain event subscriber (val behöver ADR)
-- GDPR Art. 5(2) accountability — stänger en öppen TD
-
-**Alt C — Steg mot Fas 0-stängning (BUILD.md §18 kvarvarande)**
+**Alt B — Steg mot Fas 0-stängning (BUILD.md §18 kvarvarande)**
 - Första deploy till dev.jobbpilot.se
-- GitHub Actions CI/CD verifierad
+- GitHub Actions CI/CD verifierad (tag-baserad deploy per BUILD.md §15.3)
 - Bootstrap-IAM-user raderad
+- Stänger Fas 0 ordentligt innan vi går vidare
 
-**Rekommendation:** Alt A om vi vill konsolidera Fas 1, Alt C om vi vill stänga Fas 0 ordentligt innan vi går vidare. Klas beslutar.
+**Alt C — TD-16-implementation (Fas 1 prod-deploy-blockare)**
+- Audit-log retention-jobb (Hangfire — beroende av Alt A)
+- GDPR Art. 17-anonymiserings-cascade vid kontoradering
+- Runbook `docs/runbooks/audit-retention.md`
+- Stänger den enda kvarvarande prod-blockaren från STEG 8
+
+**Rekommendation:** Alt A om Hangfire-infrastruktur behövs för senare faser (sätter chassit för Fas 4-AI-jobb och Fas 2-sync). Alt C kan inte göras utan Alt A. Alt B är ren Fas 0-stängning utan beroenden uppåt. Klas beslutar.
 
 ## 7. Numreringsfotnot
 

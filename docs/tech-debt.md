@@ -142,10 +142,11 @@ i det skedet.
 
 ---
 
-## TD-9: Audit log saknas för Application-domänhändelser
+## TD-9: Audit log saknas för Application-domänhändelser ✓ STÄNGD STEG 8 (2026-05-08)
 **Kategori:** GDPR / Compliance
 **Severity:** Major
 **Källa:** security-auditor, STEG 5 (2026-05-07)
+**Stängd:** STEG 8 (2026-05-08) — implementerad enligt ADR 0022
 
 GDPR Art. 5(2) kräver att behandling av personuppgifter kan redovisas
 (accountability). Application-aggregatets domänhändelser (skapande,
@@ -161,6 +162,16 @@ skriver till en `application_audit_log`-tabell. Kräver ny migration,
 ny `IApplicationAuditLogger`-abstraktion i Application-lagret, och
 implementation i Infrastructure. Notera: ADR behövs för val av audit-
 strategi (inline i handler vs. domain event subscriber vs. pipeline behavior).
+
+**Stängningsnoteringar (STEG 8):**
+- Strategi: pipeline-behavior + marker-interface (ADR 0022)
+- Tabell: gemensam `audit_log` (per BUILD.md §7.1) — inte separata
+  per-aggregat-tabeller. Täcker både Application och Resume.
+- 10 commands markerade `IAuditableCommand<TResponse>` (5 Application + 5 Resume)
+- Atomicitet via UoW.SaveChanges (audit-rad och data-mutation persisteras
+  i samma transaction)
+- Tester: 14 Domain + 11 Application + 12 Integration + 4 Architecture (41 nya)
+- **Operativa beroenden vid prod-deploy:** se TD-16 (retention + Art. 17)
 
 ---
 
@@ -314,6 +325,52 @@ vars path matchar. Eller — strukturell fix: lös typkonflikten med en
 bättre per-field-feedback från första försök.
 
 Adresseras lämpligen i ett a11y-pass tillsammans med TD-1, TD-2.
+
+---
+
+### TD-16 — Audit-log retention + GDPR Art. 17-anonymisering
+
+**Kategori:** GDPR / Compliance / Data retention
+**Fas:** 4 (AI Layer — när retention-jobb byggs)
+**Prioritet:** Hög (blocker för Fas 1 prod-deploy)
+**Källa:** Security audit STEG 8 2026-05-08 (Major M1 + Major M2)
+
+ADR 0022 specificerar 90-dagars retention för `audit_log` via PostgreSQL daily
+partitioning, samt anonymiseringspolicy vid GDPR Art. 17-radering (user_id,
+ip_address, user_agent → NULL; övriga fält behålls 90 dagar för accountability
+per Art. 5(2)). Båda mekanismerna är **dokumenterade men inte implementerade**
+i Fas 1.
+
+**Risk i Fas 1 dev:** noll (ingen produktion, ingen riktig PII).
+
+**Risk vid Fas 1 prod-deploy:** Major.
+
+- Audit-tabellen växer obegränsat → bryter Art. 5(1)(e) storage limitation
+- GDPR Art. 17-begäran kan inte utföras korrekt utan anonymiserings-cascade
+- Datainspektionen kan ifrågasätta retention-policy om ingen aktiv mekanism finns
+
+**Föreslagen åtgärd (Fas 4 eller tidigare innan prod-deploy):**
+
+1. Hangfire-jobb `AuditLogRetentionJob` som dagligen:
+   - Skapar nästa dags partition (`audit_log_YYYYMMDD`)
+   - Droppar partitions äldre än 90 dagar
+2. Application-command `EraseUserAuditTrail(userId)` som cascade-anropas
+   av kontoraderings-flödet (`DELETE /me` Fas 1 eller admin-erase Fas 6).
+   Implementeras som direct SQL UPDATE (audit-bypass — write-only-disciplinen
+   gäller normala flöden, inte GDPR-anonymisering).
+3. Runbook `docs/runbooks/audit-retention.md` med manuell ops-procedur
+   (`pg_partman`-eller-manuell-ALTER-TABLE) som fallback om Hangfire-jobbet
+   inte körts på X dagar.
+
+**Beroenden:** Hangfire-setup (Fas 2) måste vara klar. ADR krävs eventuellt
+för audit-bypass-pattern (cascade-anonymisering bryter "audit är write-only"-
+invarianten — motiverat val men dokumenteras).
+
+**Tester:**
+- Integration-test som verifierar att daily partition skapas/droppas korrekt
+- Integration-test för anonymiserings-cascade vid kontoradering
+- Smoke-test som verifierar att `EraseUserAuditTrail` inte påverkar
+  `correlation_id`/`event_type`/`aggregate_id` (bara identifierande fält)
 
 ---
 
