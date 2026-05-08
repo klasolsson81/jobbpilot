@@ -6,8 +6,8 @@ status: KLAR
 commits:
   - sha: 3e6cff1
     msg: "feat(web): STEG 6 — frontend för ansökningar (pipeline, formulär, detaljvy)"
-  - sha: TBD  # docs-commit
-    msg: "docs: session-avslut STEG 6 + tech debt TD-10/TD-11"
+  - sha: f3506d9
+    msg: "docs: session-avslut STEG 6 — reviews, tech debt TD-10/TD-11, session-logg"
 ---
 
 ## Mål för sessionen
@@ -111,7 +111,7 @@ produktionsdomän — öppen, noterad i tech-debt.
 
 **STEG 7:** CV-hantering (upload, parse, lagring) — se BUILD.md §2.
 
-Förväntad HEAD: TBD (uppdateras efter commit)
+Förväntad HEAD: f3506d9
 
 Filer att läsa vid start:
 - `docs/current-work.md`
