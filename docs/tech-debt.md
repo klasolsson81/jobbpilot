@@ -607,12 +607,23 @@ användare/IP, vilket är credential-stuffing-yta.
 
 ---
 
-### TD-22 — App-logg-retention + IP/UA-redaction
+### TD-22 — App-logg-retention + IP/UA-redaction ✓ DELVIS STÄNGD STEG 11 (2026-05-08)
 
 **Kategori:** Säkerhet / GDPR / Data retention
 **Fas:** 1 (innan prod-deploy)
 **Prioritet:** Hög (urholkar Art. 17-anonymisering annars)
 **Källa:** Security audit STEG 10b 2026-05-08 (Major-3)
+**Status:** **Delvis stängd** STEG 11 (ADR 0024 D7).
+- ✓ Policy-beslut: 30d retention för CloudWatch (matchar Art. 17-fönstret)
+- ✓ Logg-tid-redaction implementerad: `IIpAnonymizer`-port (Application) +
+  `IpAnonymizer`-impl (Infrastructure) lyft från `RequestContextProvider`
+  och konsumeras nu även av `AuthAuditLogger` (defense-in-depth)
+- ✓ ADR-tillägg landad: ADR 0024 D7 (App-logg-redaction + retention-policy)
+- ✓ Tester: 8 IpAnonymizer Theory + 3 nya AuthAuditLogger-tester (IPv4
+  anonymisering vid logg-tid, "unknown" fallback)
+- **Utestående för Fas 0-stängning:** CloudWatch LogGroup retention=30 sätts
+  via AWS-konfig (IaC eller konsol) vid första prod-deploy
+- **Utestående för Fas 2:** EmailHash-HMAC med roterande nyckel — se TD-27
 
 Audit-tabellen anonymiseras efter Art. 17 (user_id/ip/user_agent → NULL
 efter 30 dagars restore-fönster). MEN app-loggen (CloudWatch sink i prod,
@@ -625,19 +636,57 @@ Samma user kan korreleras över tid via app-loggen även efter audit-
 anonymisering.
 
 **Risk i Fas 1:** noll (dev-loggar, ingen prod-data).
-**Risk vid Fas 1 prod-deploy:** Major (Art. 32 + Art. 5(1)(c)).
+**Risk vid Fas 1 prod-deploy:** Mitigerad efter STEG 11. CloudWatch LogGroup
+retention=30 är sista operativa pusslebit för full Fas 1 prod-deploy-
+godkännande.
 
-**Föreslagen åtgärd:**
-1. **Policy-beslut (Klas):** retention för app-loggar (≤ 30 dagar
-   rekommenderat för PII-konsistens med Art. 17-fönstret)
-2. **CloudWatch retention** sätts till 30 dagar via AWS-konfig
-3. **Seq lokal dev**: ingen retention nödvändig (utvecklarmiljö)
-4. **HashEmail** kan omvandlas till HMAC med roterande nyckel istället för
-   rå SHA-256 (mindre korrelerbart men kostnaden är ops-komplexitet)
-5. **ADR-tillägg** till ADR 0024 om kopplingen mellan audit-anonymisering
-   och app-logg-retention
+**Stängningsnoteringar (STEG 11):**
+- `IIpAnonymizer.Anonymize(IPAddress)` är stateless BCL-port, registrerad som
+  Singleton i `AddPersistence` så både Api+Worker har den tillgänglig
+- `RequestContextProvider` refaktorerad till att delegera till porten
+  (ingen logikförändring mot audit-tabellen)
+- `AuthAuditLogger` injicerar nu porten + maskar IP innan
+  `LogLoginSucceeded`/`LogLoginFailed`/`LogLogoutSucceeded`-anropen
+- 470 backend-tester gröna efter ändring (157 Domain + 182 Application
+  +11 nya + 22 Architecture + 109 Api Integration)
 
-**Beroenden:** AWS CloudWatch-konfig vid första prod-deploy.
+---
+
+### TD-27 — EmailHash → HMAC med roterande nyckel (Fas 2)
+
+**Kategori:** Säkerhet / GDPR
+**Fas:** 2
+**Prioritet:** Medium
+**Källa:** ADR 0024 D7 deferral 2026-05-08
+
+`LoginCommandHandler.HashEmail` använder rå SHA-256 (`Convert.ToHexString`
+av lower-cased email). Determinism gör hash-värdet korrelerbart över tid:
+samma email → samma hash, så app-loggen visar bestående pseudonym även
+efter Art. 17-anonymisering av audit-tabellen.
+
+HMAC med roterande nyckel bryter korrelationen — varje rotation gör
+historiska hashar omöjliga att matcha mot framtida login-events. Men
+kräver:
+1. KMS-baserat nyckel-arkiv (för att verifiera historiska hashar vid
+   restore eller audit-export)
+2. Rotations-strategi (kvartal/halvår)
+3. Migration av befintliga `EmailHash`-värden i logg/audit (oklart om
+   möjligt — om rotation sker kan gamla hashar inte längre tolkas)
+
+**Risk i Fas 1:** mitigerad av 30d CloudWatch-retention (TD-22 D7).
+**Risk i Fas 2:** medium (utökad audit-yta + AI-jobb-loggar ger längre
+korrelations-fönster).
+
+**Föreslagen åtgärd vid Fas 2:**
+1. Bunta ihop med TD-13 (PII-encryption) — båda kräver KMS + envelope-
+   encryption-mönster. Egen ADR.
+2. Statisk HMAC-key från Secrets Manager som Fas 2 bas-nivå (ingen
+   rotation än) — räcker för att blockera dictionary-attack mot
+   email-domain-rymden
+3. Full nyckel-rotation defererad till när KMS-key-rotation-mönstret
+   är etablerat (Fas 4+)
+
+**Beroenden:** TD-13 (KMS-integration). Bör adresseras tillsammans.
 
 ---
 

@@ -116,7 +116,41 @@ minuter till timmar att få approval.
    SESSION-2-PLAN §14. Om access inte approved än — dokumentera status, och
    uppdatera BUILD.md §8.2 när godkännandet kommer.
 
-### 3.2 Bootstrap-IAM-user cleanup
+### 3.2 CloudWatch LogGroup retention — pre-launch-gate
+
+Per ADR 0024 D7 (TD-22) ska alla JobbPilot-LogGroups i prod ha
+`retention_in_days = 30` så app-loggens IP/UA/EmailHash följer samma
+30d-fönster som DELETE /me-restore + audit-anonymisering. Utan explicit
+retention defaultar AWS till "never expire" — vilket är **GDPR-blocker**
+för Fas 1 prod-launch.
+
+**Pre-launch-gate (måste vara grönt innan första prod-trafiken):**
+
+```bash
+# Lista alla JobbPilot-LogGroups + deras retention
+aws logs describe-log-groups \
+    --log-group-name-prefix "/aws/jobbpilot" \
+    --query 'logGroups[].[logGroupName,retentionInDays]' \
+    --output table \
+    --profile jobbpilot
+
+# Förväntat: alla rader visar retentionInDays = 30. None/null = NOT OK.
+```
+
+**Sätt retention på en enskild grupp:**
+
+```bash
+aws logs put-retention-policy \
+    --log-group-name <namn> \
+    --retention-in-days 30 \
+    --profile jobbpilot
+```
+
+När IaC införs (Terraform/CDK): hantera via `aws_cloudwatch_log_group`-resurs
+med explicit `retention_in_days = 30`. Drift-detection upptäcker manuella
+ändringar.
+
+### 3.3 Bootstrap-IAM-user cleanup
 
 Raderas **som sista steg av Fas 0** — efter att Terraform verifierat fungerar
 fullt ut mot SSO-profilen. Detta är inte en del av session 3.
