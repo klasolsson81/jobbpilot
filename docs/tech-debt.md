@@ -387,12 +387,59 @@ invarianten — motiverat val men dokumenteras).
 
 ---
 
-### TD-17 — Hangfire prod-härdning (multi-faceted, blocker för Fas 1 prod-deploy)
+### TD-17 — Hangfire prod-härdning ✓ DELVIS STÄNGD STEG 11 (2026-05-09)
 
 **Kategori:** Säkerhet / Operations
 **Fas:** 1 (innan prod-deploy)
 **Prioritet:** Hög (blocker för Fas 1 prod-deploy, tillsammans med TD-16)
 **Källa:** Security audit STEG 9 2026-05-08 (MAJ-1, MAJ-2, MIN-3, MIN-4) + ADR 0023
+**Status:** **Delvis stängd** STEG 11. Punkt 1, 2, 3, 5, 6 stängda i kod + runbook.
+Punkt 4 (ConnectionStrings split för least-privilege) dokumenterad i runbook men
+defererad till Fas 0-stängning (kräver två DB-users i AWS-miljön).
+
+**Stängningsnoteringar (STEG 11):**
+- ✓ Punkt 1 — `HangfireWorkerOptions.PrepareSchemaIfNecessary` (default `true` Development/Test,
+  övriga miljöer kräver explicit `false`-overlay). Production-defense i `Worker/Program.cs`
+  använder allow-list — bara Development/Test får auto-skapa schema (kastar
+  `InvalidOperationException` annars). Range-validering på `ShutdownTimeoutSeconds` (1-300)
+  fail-loud vid orealistiska overlay-värden.
+- ✓ Punkt 2 — `docs/runbooks/hangfire-schema.md` skapad (Install.sql-export,
+  GRANT-modell, schema-state-felsökning).
+- ✓ Punkt 3 — `// SECURITY:`-kommentar i `Worker/Program.cs` + dashboard-auth-checklista
+  i runbook §5 (`AdminOnlyDashboardFilter` + IP-allowlist + audit-loggning).
+- ✓ Punkt 5 — Kalibrerings-fas-anteckning i runbook §8 (första 21 dagar efter
+  prod-deploy är detect-ghosted-anomaliska volymer förväntade).
+- ✓ Punkt 6 — `BackgroundJobServerOptions.ShutdownTimeout = 25s` (default via
+  `HangfireWorkerOptions.ShutdownTimeoutSeconds`) — strax under Fargate default
+  stopTimeout 30s. Plus explicit `HostOptions.ShutdownTimeout = +3s` så hela
+  timeout-kedjan (Hangfire 25s → Host 28s → Fargate 30s) är synlig. Idempotency-
+  tabell i runbook §6 verifierar att alla 3 jobb tål abort + restart.
+- ✓ Cron-kollision åtgärdad — `detect-ghosted` flyttat 03:00 → 03:30 UTC så det
+  inte krockar med `audit-log-retention` (Sec-Minor STEG 11).
+- ✓ REVOKE PUBLIC-block i runbook §4 (Sec-Major-2 STEG 11) — eliminerar default-
+  Postgres-PUBLIC-läs-yta innan GRANT-block.
+- ✓ Dashboard-checklistans utvidgning i runbook §5 (Sec-Major-3 STEG 11) — CSRF-
+  version-check, rate-limiting, kort admin-session-expire, CSP-relax, no-cache
+  headers, granulär audit-events, read-only-roll-not.
+- ⏸ Punkt 4 — ConnectionStrings split. Runbook §4 dokumenterar GRANT-modell +
+  Worker/Program.cs-ändring. Faktisk split appliceras vid första prod-deploy
+  (kräver två AWS Secrets Manager-poster). Kvarstår som operativ uppgift för
+  Fas 0-stängning.
+
+**Tester:** 5 nya `HangfireWorkerOptionsTests` (defaults, section-name, full+partial
+overlay, missing-section). Ingen smoke-test för SIGTERM mid-flight idempotency
+(svårt att simulera utan AWS-deployment) — verifieringen sker via runbook §7.4
+övervakning vid prod-deploy.
+
+**Återstående follow-ups (icke-blocker för STEG 11-stängning):**
+- Production-defense (`Worker/Program.cs` startup-throw) är inte direkt unit-tested.
+  Kräver refactor till en separat policy-klass för testbarhet — defererad som
+  opportunistic improvement (code-reviewer STEG 11 M2).
+- Worker.csproj refererar `Hangfire.AspNetCore` som drar in `Microsoft.AspNetCore.*`
+  — motverkar ADR 0023 "Worker HTTP-fri"-disciplin. Migrering till `Hangfire.NetCore`
+  utvärderas som del av TD-19 (Worker defense-in-depth Fas 2).
+- `appsettings.Production.json` med Hangfire-overlay-block skapas vid Fas 0-stängning
+  prod-deploy (kräver två AWS Secrets Manager-poster för ConnectionStrings split).
 
 ADR 0023 aktiverar Hangfire-infrastrukturen i Worker. Fem operationella härdnings-punkter måste adresseras innan Fas 1 går till prod:
 
