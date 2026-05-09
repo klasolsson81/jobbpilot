@@ -972,6 +972,126 @@ för cost-cap-design när AI-features designas.
 
 ---
 
+## TD-29: Strict readiness-probe vid Fas 2 — separera liveness från readiness
+**Kategori:** Observability / Deployment hygiene
+**Severity:** Minor
+**Källa:** dotnet-architect, STEG 13b review (2026-05-09)
+
+`/api/ready`-endpoint i `src/JobbPilot.Api/Program.cs:128` returnerar 200 OK
+utan DB/Redis-ping → namnet "ready" är missvisande. Det är liveness, inte
+readiness i Kubernetes-konventions-mening. Konsekvens: ALB target-group
+registrerar tasken som "healthy" innan `AppDbContext` är användbar — under
+EF Core cold-start kan första requests få 500.
+
+För Fas 0/MVP räcker liveness (BUILD.md §15.4 säger inte explicit "readiness
+inkluderar DB"). Vid Fas 2 trafikvolym behövs strict readiness annars dyker
+rolling-deploys 503:or under den ~10-30 sekunders DbContext-warmup-fönstret.
+
+**Föreslagen åtgärd:**
+```csharp
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<AppDbContext>("postgres", tags: ["ready"])
+    .AddRedis(redisCs, "redis", tags: ["ready"]);
+
+app.MapHealthChecks("/api/live", new HealthCheckOptions {
+    Predicate = _ => false  // bara process-status
+});
+app.MapHealthChecks("/api/ready", new HealthCheckOptions {
+    Predicate = check => check.Tags.Contains("ready")
+});
+```
+
+ALB target-group ska peka på `/api/ready`. ECS task-def kan optionellt få
+`/api/live` som container-level liveness (men Fargate respekterar inte
+Docker HEALTHCHECK ändå — så bara ALB-check är auktoritativ).
+
+**Beroenden:** Fas 2 trafikvolym + frontend rolling-deploy-känslighet.
+Adresseras i Fas 2 prereq-stängning (samma round som ADR 0005:s
+go-to-market-beslut + rate-limiting-utvidgning).
+
+---
+
+## TD-30: Domänköp + Route53 + ACM-cert (kopplad till ADR 0026-trigger)
+**Kategori:** Infra / Security
+**Severity:** Major (tidsbundet — hard deadline 2026-06-08)
+**Källa:** security-auditor STEG 13b Sec-Major-1 + ADR 0026
+
+ADR 0026 accepterar ALB HTTP-only under Fas 0 med tidsfönster 30 dagar
+(deadline **2026-06-08**) och 5 triggers för supersession. Trigger 1
+(domän + ACM-cert) är aktivitet som måste utföras före deadline för att
+undvika tvångs-trigger 3 (tidsgräns).
+
+**Operativa steg när Klas är redo:**
+
+1. Registrera `jobbpilot.se` (eller alternativ domän) hos svensk registrar
+   (~80 kr/år hos t.ex. Loopia/Binero/Glesys). Cirka 1 timme + DNS-
+   propagering.
+2. Skapa Route53 hosted zone i AWS:
+   ```hcl
+   resource "aws_route53_zone" "this" {
+     name = "jobbpilot.se"
+   }
+   ```
+   Delegera från registrar till AWS NS-records (4 nameservers från
+   `aws_route53_zone.this.name_servers`).
+3. Begär ACM-cert via DNS-validering:
+   ```hcl
+   resource "aws_acm_certificate" "this" {
+     domain_name       = "dev.jobbpilot.se"
+     validation_method = "DNS"
+   }
+   ```
+4. Skapa A-ALIAS-record `dev.jobbpilot.se → ALB-DNS`.
+5. I `environments/dev/terraform.tfvars`:
+   ```hcl
+   alb_https_enabled       = true
+   alb_acm_certificate_arn = "arn:aws:acm:..."
+   ```
+6. `terraform apply` — ALB konverterar HTTP-listenern till
+   HTTPS-redirect via dynamic-block (befintlig modul-kod).
+7. Skriv supersession-ADR (ADR 0027 eller liknande) som flippar
+   ADR 0026:s status → Superseded.
+8. Update `current-work.md` + `steg-tracker.md`.
+
+**Konsekvens om INTE adresserat innan 2026-06-08:**
+- ADR 0026 trigger 3 (tidsgräns) aktiveras automatiskt → krav på
+  ny ADR med uttryckligen förlängt fönster ELLER `terraform destroy`
+  på alb + ecs-modulerna (dev tas ner).
+
+**Beroenden:** Klas väljer registrar + domän + betalar. Inga tekniska
+hinder. Kan göras parallellt med STEG 13b-apply (ALB skapas först
+HTTP-only, HTTPS adderas senare via samma modul).
+
+---
+
+## TD-31: Test för UseHttpsRedirection env-gate (Sec-Major-2 anti-regression)
+**Kategori:** Testing / Security
+**Severity:** Minor
+**Källa:** code-reviewer, STEG 13b-fix-review (2026-05-09)
+
+`src/JobbPilot.Api/Program.cs:114-124` env-gate:ar `UseHttpsRedirection()` baserat
+på `AlbOptions.HttpsEnabled`-konfig (per ADR 0026). Detta är säkerhets-kritiskt:
+om någon framtida refaktor tar bort gaten → 307→443 mot HTTP-only-ALB → deploy
+fail-circuit-breaker (Sec-Major-2 STEG 13b). Anti-regression bör vara
+strukturell, inte bara docs-disciplin.
+
+**Föreslagen åtgärd:** Integration-test via `WebApplicationFactory<Program>` som:
+
+1. **Test 1:** `Alb:HttpsEnabled=false` + `ASPNETCORE_ENVIRONMENT=Production` →
+   request mot HTTP-endpoint returnerar 200 (ingen redirect)
+2. **Test 2:** `Alb:HttpsEnabled=true` + `ASPNETCORE_ENVIRONMENT=Production` →
+   request mot HTTP-endpoint returnerar 307 till HTTPS
+3. **Test 3:** `ASPNETCORE_ENVIRONMENT=Development` (oavsett Alb-flag) → redirect
+   aktiv (dev-cert via Kestrel)
+
+Filplats: `tests/JobbPilot.Api.IntegrationTests/Configuration/UseHttpsRedirectionGateTests.cs`.
+
+**Beroenden:** Inga blockare. Adresseras opportunistiskt vid nästa Api-test-skrivning
+eller som del av STEG 13c (när ADR 0026-trigger uppfylls och flag flippas — då
+behövs anti-regression mest).
+
+---
+
 ## Adresseringsstrategi
 
 - Items i kategorierna a11y, UX och observability adresseras
