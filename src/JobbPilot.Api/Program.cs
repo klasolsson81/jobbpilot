@@ -1,17 +1,18 @@
+using JobbPilot.Api.Configuration;
 using JobbPilot.Api.Endpoints;
 using JobbPilot.Api.RateLimiting;
 using JobbPilot.Application.Common;
-using Microsoft.AspNetCore.HttpOverrides;
+using JobbPilot.Application.Common.Abstractions;
 using JobbPilot.Application.Common.Auditing;
 using JobbPilot.Application.Common.Behaviors;
-using JobbPilot.Application.Common.Abstractions;
 using JobbPilot.Application.Common.Exceptions;
-using ValidationException = JobbPilot.Application.Common.Exceptions.ValidationException;
 using JobbPilot.Infrastructure;
 using JobbPilot.Infrastructure.Auth;
 using JobbPilot.Infrastructure.Auth.Sessions;
 using Mediator;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.DependencyInjection;
+using ValidationException = JobbPilot.Application.Common.Exceptions.ValidationException;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -87,14 +88,28 @@ if (app.Environment.IsDevelopment())
 // ALB/CloudFront så Connection.RemoteIpAddress reflekterar klient-IP, inte proxy-IP
 // (TD-21 / Sec-Major-1). I dev körs API:t direkt → headers saknas, ingen verkan.
 //
-// SECURITY: KnownProxies/KnownNetworks MÅSTE konfigureras med ALB:s VPC-CIDR i prod
-// innan första traffic. Standard-default (ForwardLimit=1, KnownProxies=loopback)
-// accepterar inte spoofade X-Forwarded-For från klient — men i prod-miljö med
-// proxy-kedja krävs explicit allow-list. Se docs/runbooks/aws-setup.md §3.3.
-app.UseForwardedHeaders(new ForwardedHeadersOptions
+// SECURITY: KnownNetworks/KnownProxies MÅSTE konfigureras med ALB:s VPC-CIDR i prod
+// innan första traffic. Konfig är direct-bound från ForwardedHeaders-sektionen
+// (STEG 12) — fail-loud vid ogiltigt CIDR/IP-format. I dev (tom array) bevaras
+// ASP.NET-default-beteendet (loopback only). Se docs/runbooks/aws-setup.md §3.3.
+var forwardedCfg = builder.Configuration
+    .GetSection(ForwardedHeadersConfig.SectionName)
+    .Get<ForwardedHeadersConfig>() ?? new ForwardedHeadersConfig();
+
+// Production-defense per allow-list (security-auditor STEG 12 Sec-Major-1).
+forwardedCfg.EnsureSafeForEnvironment(builder.Environment.EnvironmentName);
+
+var forwardedOptions = new ForwardedHeadersOptions
 {
     ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
-});
+    ForwardLimit = forwardedCfg.ValidateForwardLimit(),
+};
+foreach (var network in forwardedCfg.ParseKnownNetworks())
+    forwardedOptions.KnownIPNetworks.Add(network);
+foreach (var proxy in forwardedCfg.ParseKnownProxies())
+    forwardedOptions.KnownProxies.Add(proxy);
+
+app.UseForwardedHeaders(forwardedOptions);
 
 app.UseHttpsRedirection();
 app.UseAuthentication();
