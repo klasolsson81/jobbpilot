@@ -165,22 +165,46 @@ proxy-IP. Utan korrekt KnownProxies/KnownNetworks-konfig:
 1. Identifiera ALB:s VPC-CIDR-block. För standard-VPC: `aws ec2 describe-vpcs
    --query 'Vpcs[].CidrBlock' --profile jobbpilot`.
 2. Sätt `ForwardedHeaders__KnownNetworks__0` env-var (eller motsvarande IaC-
-   resurs på Fargate task-definition) till VPC-CIDR.
+   resurs på Fargate task-definition) till VPC-CIDR. STEG 12 production-defense
+   i `Api/Program.cs` throwar fail-loud vid uppstart om denna är tom utanför
+   Development/Test — ECS-container startar inte alls.
 3. Verifiera via curl + manuell `X-Forwarded-For: 198.51.100.42`-header att
    `Connection.RemoteIpAddress` i app-loggen reflekterar den header:n
    (om ALB skickar requesten — annars ignoreras header:n).
 
-**Kod-skiss för Fas 0-stängning** (uppdatering av Api/Program.cs när
-ALB-CIDR är känd):
+**Kod-status (STEG 12, klart):** `Api/Program.cs` läser konfig från
+`ForwardedHeaders`-sektionen via `ForwardedHeadersConfig` (direct-bound, fail-
+loud parse). Ingen kod-ändring krävs vid första prod-deploy — bara overlay-
+populering via env-var/IaC.
 
-```csharp
-app.UseForwardedHeaders(new ForwardedHeadersOptions
+**Konfig-exempel (overlay i `appsettings.Production.json` eller env-var):**
+
+```jsonc
 {
-    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
-    KnownNetworks = { new IPNetwork(IPAddress.Parse("10.0.0.0"), 16) },  // ALB:s VPC-CIDR
-    ForwardLimit = 2,  // 2 hops: ALB → CloudFront (om används)
-});
+  "ForwardedHeaders": {
+    "KnownNetworks": ["10.0.0.0/16"],   // ALB:s VPC-CIDR
+    "KnownProxies": [],
+    "ForwardLimit": 1                     // ALB-only — se nedan
+  }
+}
 ```
+
+**ForwardLimit-handling (CRITICAL — Sec-Major-2 från STEG 12 review):**
+
+ASP.NET ForwardedHeaders-middleware iterar `X-Forwarded-For` baklänges från ALB.
+För `ForwardLimit=N` måste **alla N hops** vara i `KnownNetworks`/`KnownProxies`
+— annars stoppar middleware vid första untrusted-hop och `RemoteIpAddress`
+fastnar på den IP:n.
+
+| Deploy-topologi | ForwardLimit | KnownNetworks/KnownProxies-täckning |
+|---|---|---|
+| ALB → Fargate (default) | **1** | VPC-CIDR i KnownNetworks räcker |
+| CloudFront → ALB → Fargate | **2** | VPC-CIDR + CloudFront-prefix-list (`com.amazonaws.global.cloudfront.origin-facing`) i KnownProxies — annars ForwardLimit=1-effekt utan att märkas |
+
+CloudFront edge-IP-rangerna är inte stabila — populeras dynamiskt från
+prefix-listan. När CloudFront introduceras: skripta KnownProxies-uppdatering
+via `aws ec2 describe-managed-prefix-lists` + `aws ec2 get-managed-prefix-list-entries`
+i ECS task-deploy-pipelinen.
 
 Idag (dev) körs Api direkt utan proxy → headers saknas → no-op. Säkerhets-
 impact noll i dev, kritiskt i prod.
