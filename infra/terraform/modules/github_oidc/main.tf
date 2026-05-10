@@ -149,7 +149,7 @@ data "aws_iam_policy_document" "deploy_dev" {
     resources = [local.ecr_api_arn, local.ecr_worker_arn]
   }
 
-  # ECS service + task-def — Describe (read) + Update (mutate).
+  # ECS service + task — resource-scoped read.
   statement {
     sid    = "EcsReadOurCluster"
     effect = "Allow"
@@ -157,16 +157,26 @@ data "aws_iam_policy_document" "deploy_dev" {
       "ecs:DescribeClusters",
       "ecs:DescribeServices",
       "ecs:DescribeTasks",
-      "ecs:DescribeTaskDefinition",
       "ecs:ListTasks",
     ]
     resources = [
       local.ecs_cluster_arn,
       local.ecs_api_service_arn,
       local.ecs_worker_service_arn,
-      local.ecs_api_taskdef_arn,
-      local.ecs_worker_taskdef_arn,
     ]
+  }
+
+  # ecs:DescribeTaskDefinition stödjer inte resource-level permissions —
+  # AWS-API:t loggar request som "*" oavsett ARN-format i policy:n. Måste
+  # vara separat statement med "*" som resource. Read-only, returnerar
+  # publik task-def-metadata (inga secrets, ingen mutation).
+  # Verifierat empiriskt i deploy-dev.yml run 25638084810 (AccessDeniedException
+  # trots resource-scoped policy med korrekt task-def-ARN-pattern).
+  statement {
+    sid       = "EcsDescribeTaskDefinition"
+    effect    = "Allow"
+    actions   = ["ecs:DescribeTaskDefinition"]
+    resources = ["*"]
   }
 
   # RegisterTaskDefinition kan inte begränsas per resource (AWS-API tar inga
