@@ -44,6 +44,9 @@ public sealed class StrictRateLimitApiFactory : WebApplicationFactory<Program>, 
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        // Tvinga Development-env explicit (samma rationale som ApiFactory).
+        builder.UseEnvironment("Development");
+
         builder.ConfigureServices(services =>
         {
             services.RemoveAll<DbContextOptions<AppDbContext>>();

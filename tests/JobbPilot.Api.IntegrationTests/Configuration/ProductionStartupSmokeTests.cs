@@ -1,3 +1,4 @@
+using System.Net;
 using System.Security.Cryptography;
 using JobbPilot.Infrastructure.Identity;
 using JobbPilot.Infrastructure.Persistence;
@@ -5,15 +6,22 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Shouldly;
 using Testcontainers.PostgreSql;
 using Testcontainers.Redis;
 
-namespace JobbPilot.Api.IntegrationTests.Infrastructure;
+namespace JobbPilot.Api.IntegrationTests.Configuration;
 
-public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
+/// <summary>
+/// Verifierar att <c>Program.cs</c> startar i Production-env utan att tippa över
+/// när env-gated config är populerad. Komplement till de övriga integration-
+/// testerna som tvingar Development-env via fixtures (TD-37 fix). Skyddar mot
+/// regression där en ny env-gated check (HSTS, ForwardedHeaders, etc.) tyst
+/// bara körs i Development och därmed bryter Production-deploy först i CI.
+/// </summary>
+public sealed class ProductionStartupFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:18").Build();
     private readonly RedisContainer _redis = new RedisBuilder("redis:8-alpine").Build();
@@ -21,36 +29,24 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     private readonly string _privateKeyPath;
     private readonly string _publicKeyPath;
 
-    // Set in InitializeAsync before Services is accessed (triggers host creation)
     private string _postgresCs = string.Empty;
     private string _redisCs = string.Empty;
 
-    public ApiFactory()
+    public ProductionStartupFactory()
     {
         var rsa = RSA.Create(2048);
-        _privateKeyPath = Path.Combine(Path.GetTempPath(), $"jobbpilot-test-private-{Guid.NewGuid()}.pem");
-        _publicKeyPath = Path.Combine(Path.GetTempPath(), $"jobbpilot-test-public-{Guid.NewGuid()}.pem");
+        _privateKeyPath = Path.Combine(Path.GetTempPath(), $"jobbpilot-prodsmoke-private-{Guid.NewGuid()}.pem");
+        _publicKeyPath = Path.Combine(Path.GetTempPath(), $"jobbpilot-prodsmoke-public-{Guid.NewGuid()}.pem");
         File.WriteAllText(_privateKeyPath, rsa.ExportRSAPrivateKeyPem());
         File.WriteAllText(_publicKeyPath, rsa.ExportSubjectPublicKeyInfoPem());
     }
 
-    // Replaces DbContext registrations (which are registered before ConfigureWebHost runs)
-    // with Testcontainer connection strings. Redis is replaced the same way.
-    // JWT key paths + rate-limit overrides är handled via environment variables i
-    // InitializeAsync — Program.cs läser dem direkt från builder.Configuration vid
-    // service-registration-tid (innan ConfigureWebHost-services körs).
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        // Tvinga Development-env explicit. Production-env tripper
-        // ForwardedHeadersConfig.EnsureSafeForEnvironment (Sec-Major-1, STEG 12)
-        // när KnownNetworks är tom — by design fail-loud i prod, men test-fixturen
-        // har inga proxy-CIDR:er. Production-startup verifieras isolerat av
-        // ProductionStartupSmokeTests.
-        builder.UseEnvironment("Development");
+        builder.UseEnvironment("Production");
 
         builder.ConfigureServices(services =>
         {
-            // Replace AppDbContext
             services.RemoveAll<DbContextOptions<AppDbContext>>();
             services.RemoveAll<AppDbContext>();
             services.AddDbContext<AppDbContext>(options =>
@@ -59,7 +55,6 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                         npgsql => npgsql.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName))
                     .UseSnakeCaseNamingConvention());
 
-            // Replace AppIdentityDbContext
             services.RemoveAll<DbContextOptions<AppIdentityDbContext>>();
             services.RemoveAll<AppIdentityDbContext>();
             services.AddDbContext<AppIdentityDbContext>(options =>
@@ -69,7 +64,6 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                     npgsql.MigrationsHistoryTable("__EFMigrationsHistory", "identity");
                 }));
 
-            // Replace Redis cache
             services.RemoveAll<IDistributedCache>();
             services.AddStackExchangeRedisCache(opts =>
             {
@@ -86,24 +80,20 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         _postgresCs = _postgres.GetConnectionString();
         _redisCs = _redis.GetConnectionString();
 
-        // JWT key paths are read at service-registration time in Program.cs via
-        // builder.Configuration. Setting env vars here (before Services is accessed, which
-        // triggers Program.cs to run) makes them available to WebApplication.CreateBuilder().
         Environment.SetEnvironmentVariable("Jwt__PrivateKeyPath", _privateKeyPath);
         Environment.SetEnvironmentVariable("Jwt__PublicKeyPath", _publicKeyPath);
 
-        // Höj IP-baserade rate-limits drastiskt för testkörning så befintliga
-        // tester (alla från 127.0.0.1) inte rate-limit:as på varandras gemen-
-        // samma IP-partition (TD-21). Account-deletion-policy (UserId-baserad)
-        // hålls default eftersom varje test skapar unik user → unik partition.
-        //
-        // OBSERVATION (process-globalt env): xunit.runner.json har
-        // parallelizeTestCollections=false så Api-collection och StrictRateLimit-
-        // collection inte kör samtidigt → ingen race på dessa env-vars.
-        Environment.SetEnvironmentVariable("RateLimiting__AuthWrite__PermitLimit", "10000");
-        Environment.SetEnvironmentVariable("RateLimiting__AuthWrite__WindowSeconds", "60");
-        Environment.SetEnvironmentVariable("RateLimiting__AuthLoose__PermitLimit", "10000");
-        Environment.SetEnvironmentVariable("RateLimiting__AuthLoose__WindowSeconds", "60");
+        // Production-defense per ForwardedHeadersConfig.EnsureSafeForEnvironment:
+        // KnownNetworks får inte vara tom när Environment != Development/Test.
+        // Loopback-CIDR är tillräckligt för smoke-startup (test-host gör direkt-anrop).
+        Environment.SetEnvironmentVariable("ForwardedHeaders__KnownNetworks__0", "127.0.0.1/32");
+
+        // Production-env kräver explicit ConnectionStrings:Postgres + Redis (Development
+        // tolererar saknad). ApiFactory replacer DbContext + IDistributedCache via
+        // ConfigureServices, men AddInfrastructure läser CS:erna direkt vid registrerings-
+        // tid innan replace körs. Sätt till container-CS:erna så registreringen passerar.
+        Environment.SetEnvironmentVariable("ConnectionStrings__Postgres", _postgresCs);
+        Environment.SetEnvironmentVariable("ConnectionStrings__Redis", _redisCs);
 
         using var scope = Services.CreateScope();
         await scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.MigrateAsync();
@@ -114,15 +104,33 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     {
         Environment.SetEnvironmentVariable("Jwt__PrivateKeyPath", null);
         Environment.SetEnvironmentVariable("Jwt__PublicKeyPath", null);
-        Environment.SetEnvironmentVariable("RateLimiting__AuthWrite__PermitLimit", null);
-        Environment.SetEnvironmentVariable("RateLimiting__AuthWrite__WindowSeconds", null);
-        Environment.SetEnvironmentVariable("RateLimiting__AuthLoose__PermitLimit", null);
-        Environment.SetEnvironmentVariable("RateLimiting__AuthLoose__WindowSeconds", null);
+        Environment.SetEnvironmentVariable("ForwardedHeaders__KnownNetworks__0", null);
+        Environment.SetEnvironmentVariable("ConnectionStrings__Postgres", null);
+        Environment.SetEnvironmentVariable("ConnectionStrings__Redis", null);
 
         if (File.Exists(_privateKeyPath)) File.Delete(_privateKeyPath);
         if (File.Exists(_publicKeyPath)) File.Delete(_publicKeyPath);
 
         await Task.WhenAll(_postgres.StopAsync(), _redis.StopAsync());
         await base.DisposeAsync();
+    }
+}
+
+[CollectionDefinition("ProductionStartup")]
+public sealed class ProductionStartupFixtureGroup : ICollectionFixture<ProductionStartupFactory>;
+
+[Collection("ProductionStartup")]
+public class ProductionStartupSmokeTests(ProductionStartupFactory factory)
+{
+    private readonly HttpClient _client = factory.CreateClient();
+
+    [Fact]
+    public async Task GET_api_ready_returns_200_in_Production_env()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        var response = await _client.GetAsync("/api/ready", ct);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
 }
