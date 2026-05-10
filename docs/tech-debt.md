@@ -1310,6 +1310,84 @@ Inte A2-introducerad regression — befintligt mönster.
 
 ---
 
+## TD-43: Komponent-test-strategi för forms (Vitest + RTL + user-event)
+
+**Kategori:** Testing / Quality Baseline
+**Fas:** 1 (eget block efter A4) eller parallell session med A4
+**Prioritet:** Medium-hög (kvalitets-baseline, inte feature-blocker)
+**Källa:** Off-topic-fråga från Klas under Fas 1 Block A3 (2026-05-10)
+
+JobbPilot:s test-pyramid har idag två lager: **Unit** (Vitest + Zod-schemas)
+och **E2E** (Playwright happy-paths). Mellanlagret — komponent-tests för
+React-forms — saknas helt. Forms är bland de mest kritiska user paths
+(auth, profil, CV, ansökningar) och bär logik som varken Zod-schema-tester
+eller E2E-tester täcker bra:
+
+- **Form-state-flöden** (RHF + Server Action + felmappning) — Zod testar schema,
+  E2E testar happy-path, men "vad händer när Server Action returnerar
+  `{success: false, error: ...}` mid-submit?" är komponent-test-territorium
+- **A11y-attribut-regression** — TD-15-läxan: bara design-reviewer fångade
+  saknad focus-flytt. Ett komponent-test kan låsa fast att `aria-invalid`
+  aktiveras vid fel + `document.activeElement === fält` post-submit
+- **Refactor-säkerhet** — när någon byter `RHF` mot `react-hook-form/zodResolver`
+  eller flyttar fält, fångar testet beteende-regression i sekunder
+
+**Mastercard-CTO-perspektiv:** Stripe, Vercel, Linear, GOV.UK — alla har
+komponent-tests som standard för alla forms med submit-logik.
+
+**Föreslagen åtgärd:**
+
+1. **Bibliotek:** `@testing-library/react`, `@testing-library/jest-dom`,
+   `@testing-library/user-event`
+2. **Test-coverage-mål per form:** rendering + happy submit + minst 1 felfall
+   + a11y-attribut (aria-invalid + focus efter fail)
+3. **Baseline-implementation:** börja med **3 highest-criticality forms**:
+   - `LoginForm` (auth-yta)
+   - `MeProfileForm` (TD-15-pattern att regression-låsa)
+   - `ResumeContentForm` (TD-15-fix:ad — verifiera att aria-invalid + focus håller)
+4. **Mall för alla framtida forms:** komponent-test obligatoriskt vid PR
+
+**Beroenden:** Inga blockare. Kan köras parallellt med A4 (TD-38) eftersom
+det är ren frontend-touch (ingen Migrate/Docker/Secrets Manager-koppling).
+
+---
+
+## TD-44: HSTS-header-anti-regression-test (Sec-Major-2 follow-up)
+
+**Kategori:** Testing / Security
+**Severity:** Minor
+**Fas:** 1 (lämplig parning med TD-43-block eller standalone)
+**Källa:** dotnet-architect Mindre 4, Fas 1 Block A3 review (2026-05-10)
+
+`UseHttpsRedirectionGateTests` (TD-31, stängd 2026-05-10) verifierar
+`UseHttpsRedirection`-gate men **inte** HSTS-header-aktivering. `Program.cs:150–153`
+sätter HSTS via samma env-gate-mönster (`!IsDevelopment() && albOptions.HttpsEnabled`)
+— samma regression-yta, separat middleware.
+
+**Risk:** Om HSTS-gate tas bort i produktion (och appens HTTPS-läge senare
+flippas av) skulle Strict-Transport-Security-headern fortfarande sättas →
+browser-cache:ar HTTPS-only-policy → users kan inte återgå till HTTP. Det är
+inte produktions-blockare just nu (`HttpsEnabled=true` per STEG 13c) men
+anti-regression-skydd saknas.
+
+**Föreslagen åtgärd:** Utöka existing `HttpsRedirectionEnabledProductionFactory`-
+test (eller addera ny) som asserterar:
+
+```csharp
+response.Headers.Should().Contain("Strict-Transport-Security");
+response.Headers.GetValues("Strict-Transport-Security").First()
+    .ShouldContain("max-age=31536000")
+    .ShouldContain("includeSubDomains");
+```
+
+Alternativt: ny test i samma fil för `HttpsRedirectionDisabled` som
+asserterar att HSTS-header **inte** sätts (anti-regression åt andra hållet).
+
+**Beroenden:** Inga blockare. ~30 raders extension till TD-31:s testfil.
+Kan köras parallellt med TD-43 (frontend) eller A4 (infra).
+
+---
+
 ## Adresseringsstrategi
 
 - Items i kategorierna a11y, UX och observability adresseras
