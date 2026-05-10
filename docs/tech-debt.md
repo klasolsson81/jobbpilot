@@ -303,7 +303,20 @@ Exempel-test (idag inaktiv): `DeleteResumeVersion_WhenTailoredVersionReferencedB
 
 ---
 
-### TD-15 — Resume-formulär: koppla Zod-issue path till `aria-invalid` per fält
+### TD-15 — Resume-formulär: koppla Zod-issue path till `aria-invalid` per fält ✓ STÄNGD Fas 1 Block A1 (2026-05-10)
+
+**Status:** **STÄNGD** 2026-05-10 via Fas 1 Block A1 (sub-block A1).
+- Helper `fieldA11y(path)` + `FieldError`-typ implementerade
+- `aria-invalid` + `aria-describedby` spread:at på 16 fält
+- Focus-flytt till första fel-fält via `useEffect` + `pathToElementId`-mappning (M1 från design-review)
+- Suffix `(fält: ...)` borttaget — `aria-describedby` + focus gör det redundant (n1 från design-review)
+- Verifierat: tsc ren, Vitest 65/65 grön
+- Reviews: design-reviewer APPROVE-WITH-FIXES (M1+n1 fixade in-block, m1+m2 lyfta till TD-39+TD-40), code-reviewer APPROVE
+- Originalbeskrivning bevaras nedan för audit-trail
+
+---
+
+**Originalbeskrivning (TD-15 design-review STEG 7b 2026-05-08):**
 
 **Kategori:** Accessibility (WCAG 2.1 AA SC 3.3.1, 4.1.3)
 **Fas:** 1 (a11y-pass)
@@ -1176,6 +1189,51 @@ Filplats: `tests/JobbPilot.Api.IntegrationTests/Configuration/UseHttpsRedirectio
 **Beroenden:** Inga blockare. Adresseras opportunistiskt vid nästa Api-test-skrivning
 eller som del av STEG 13c (när ADR 0026-trigger uppfylls och flag flippas — då
 behövs anti-regression mest).
+
+---
+
+## TD-39: Error-summary-mönster för stora formulär (Resume + framtida)
+
+**Kategori:** Accessibility / UX
+**Fas:** 2+ (eller vid faktisk användarsignal)
+**Prioritet:** Låg
+**Källa:** design-review Fas 1 Block A1 2026-05-10 (Minor m2)
+
+`ResumeContentForm` visar endast första `parsed.error.issues[0]` när Zod-validering
+fallerar. För 20+-fälts-formulär ger detta klick-validera-fix-klick-validera-fix-loop
+om användaren har fler än ett fel samtidigt.
+
+`jobbpilot-design-a11y` §10 beskriver ett "error summary"-mönster: lista alla fel
+i en samlad `<div role="alert">` med ankarlänkar till respektive fält. Skalar
+bättre för stora formulär.
+
+**Bedömning Fas 1:** acceptabelt att skjuta upp tills faktisk användarsignal
+finns. Kräver multi-path state, ankarlänkar, fokus-strategi.
+
+**Föreslagen åtgärd:** vid faktisk friktion-rapport — implementera error summary
+ovanför submit-knappen, behåll per-fält `aria-invalid` (TD-15-arvet).
+
+---
+
+## TD-40: Path-equality i `fieldA11y` — saknar regression-bevakning vid parent-path-refines
+
+**Kategori:** Accessibility / Robustness
+**Fas:** 1 a11y-pass-completion (samma som TD-1, TD-2)
+**Prioritet:** Låg
+**Källa:** design-review Fas 1 Block A1 2026-05-10 (Minor m1)
+
+`ResumeContentForm.fieldA11y` använder strikt `serverError?.path === path`-jämförelse.
+Schemat i `resume-schemas.ts` lägger idag alla `.refine()`-fel på barn-path
+(t.ex. `experiences.0.endDate`), så strikt match fungerar för dagens output.
+
+**Risk:** om framtida `.refine()` på `z.object()` lämnar path tomt eller
+pekar på array-rot (`experiences.0` utan fält-suffix), hamnar felet på
+toppnivå-`<p>` utan `aria-invalid`-flaggat fält. Skärmläsare hör då
+felmeddelandet via `role="alert"` men kan inte navigera till specifik fält.
+
+**Föreslagen åtgärd:** lägg till regression-test som validerar att alla
+`.refine()` i `resume-schemas.ts` pekar på leaf-path. Ingen kodändring i
+formuläret krävs idag — bevakning räcker.
 
 ---
 
