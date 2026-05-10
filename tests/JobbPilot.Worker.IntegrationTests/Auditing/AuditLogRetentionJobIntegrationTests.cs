@@ -89,8 +89,14 @@ public class AuditLogRetentionJobIntegrationTests(WorkerTestFixture fixture)
         await CreatePartitionIfMissingAsync(oldPartitionA, "1999-01-01", "1999-01-02", ct);
         await CreatePartitionIfMissingAsync(oldPartitionB, "1999-05-01", "1999-05-02", ct);
 
-        // Bootstrap-partitions från migrationen finns redan kring real-now
-        // Default-partitionen finns alltid
+        // Skapa en "recent" partition (efter cutoff) som vi själva kontrollerar.
+        // Tidigare assert litade på migration-bootstrap-partitions kring real-now,
+        // men RunAsync_EndToEnd-testet kan ha droppat dem (cutoff = fixed-clock - 90d
+        // = ~2029-12-15, vilket är > bootstrap 2026-05-XX) om den körts först. Test-
+        // ordering är icke-deterministisk i xunit → fragil. Egen recent-partition
+        // gör testet oberoende av andra testers påverkan.
+        const string recentPartition = "audit_log_20251201";
+        await CreatePartitionIfMissingAsync(recentPartition, "2025-12-01", "2025-12-02", ct);
 
         var cutoff = new DateTimeOffset(2000, 1, 1, 0, 0, 0, TimeSpan.Zero);
 
@@ -109,11 +115,12 @@ public class AuditLogRetentionJobIntegrationTests(WorkerTestFixture fixture)
         (await PartitionExistsAsync("audit_log_default", ct)).ShouldBeTrue(
             "default-partitionen får aldrig droppas av retention-jobbet");
 
-        // Bootstrap-partitions kring real-now ska inte heller droppas (alla nyare än 2000-01-01)
-        // Vi stickprovar morgondagens namn
-        var tomorrow = $"audit_log_{DateTime.UtcNow.AddDays(1):yyyyMMdd}";
-        (await PartitionExistsAsync(tomorrow, ct)).ShouldBeTrue(
-            "bootstrap-partitions kring real-now får inte droppas");
+        // Recent partition (efter cutoff 2000-01-01) ska inte droppas.
+        (await PartitionExistsAsync(recentPartition, ct)).ShouldBeTrue(
+            "partitions efter cutoff får inte droppas");
+
+        // Cleanup
+        await DropPartitionIfExistsAsync(recentPartition, ct);
     }
 
     [Fact]
