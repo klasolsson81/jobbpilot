@@ -1,7 +1,7 @@
 # JobbPilot — STEG-tracker
 
-> **Version:** 1.14
-> **Senast uppdaterad:** 2026-05-11 (**FAS 1 MILESTONE-STÄNGD.** Admin-audit-vy levererad. BUILD.md §18 Fas 1-milestone uppfylld. 5 reviews APPROVED + CTO-triage + 12 in-block-fixar + 6 nya TDs (TD-50 till TD-55) + ADR 0028. Backend 585/585 + Frontend 150/150 grönt.)
+> **Version:** 1.15
+> **Senast uppdaterad:** 2026-05-11 efm (**VÄG C FAS 1.5 HOUSEKEEPING LEVERERAD.** Stationär-CC-session efter Fas 1-stängning levererade TD-55 PagedResult retro-fit + TD-48 Mono.Cecil arch-test + TD-47 GH Actions CA-bundle-cron + TD-50 admin-bootstrap runbook. 6 commits. 2 agent-reviews APPROVED (code-reviewer + dotnet-architect) med 3 Minor in-block-fixade. Ny TD-56 (ListJobAds Fas 2-paginering) lyft. Backend 594/594 + Frontend 150/150 grönt.)
 > **Roll:** permanent översikt över STEG- och fas-progression.
 
 Kompletteras av:
@@ -89,6 +89,7 @@ Cleanup-passningar, disciplin-uppgraderingar och dokumentations-arbete som inte 
 | Period | Beskrivning | Källor | Status |
 |--------|-------------|--------|--------|
 | 2026-05-07 | Upptakt: ADR 0019 etablerad (solo direct-push), CLAUDE.md uppgraderad (§9.4 discovery, §9.5 web-search, §9.2 utökad), tech-debt.md etablerad, hook-vakt fix:ad för Agent SDK-läget, precompact-rapporter exkluderade från versionshantering | Webb-chats: ADR 0019-chatt + Moment 1-5-chatt | Pågående (Moment 5 = denna tracker) |
+| 2026-05-11 efm | **Väg C Fas 1.5 housekeeping** efter Fas 1-milestone-stängning. 4 TDs stängda i samlad batch: TD-55 (PagedResult retro-fit, runtime typ-skew identifierat + stängt), TD-48 (Mono.Cecil arch-test för Trust=true-läckage), TD-47 (GH Actions cron för CA-bundle-rotation), TD-50 (admin-bootstrap runbook). 6 commits (`c2f539e` → `a9ca126`). CTO-beslut entydigt motiverat: Alt 3 commit-strategi + Alt A2 Mono.Cecil + seriell A→B→C-ordning. 2 agent-reviews APPROVED med alla 3 Minor in-block-fixade. Ny TD-56 (ListJobAds Fas 2-paginering) lyft som scope-deferral. Backend 594/594 + Frontend 150/150 grönt. | docs/sessions/2026-05-11-1200-vag-c-fas15-housekeeping.md | ✓ Klart |
 
 ## 5. Aktuellt
 

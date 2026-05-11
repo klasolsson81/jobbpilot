@@ -1450,12 +1450,19 @@ reviews: (1) `fieldA11y`-helper duplicerad mellan forms — kandidat för framti
 
 ---
 
-## TD-47: RDS CA-bundle-rotation-bevakning (cron-diff mot AWS upstream)
+## TD-47: ~~RDS CA-bundle-rotation-bevakning~~ — STÄNGD 2026-05-11
 
 **Kategori:** Operations / Security
 **Fas:** 1 (eller pre-staging) — operativ skuld, inte feature-blocker
 **Prioritet:** Låg-medium
 **Källa:** security-auditor S-Minor-1, Fas 1 Block A4 review (2026-05-11)
+**Status:** **STÄNGD 2026-05-11 (Väg C Block B.2).** GitHub Actions workflow
+`.github/workflows/rds-ca-bundle-check.yml` levererad. Månatlig hash-diff
+(`sha256sum`) mot `https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem`.
+Vid diff → öppnar GitHub-issue (labels: td-47, security) med rotation-procedur
+(kopia av runbook §"RDS CA-bundle-rotation"). Idempotent — skippar om öppet
+issue redan finns. Manuell trigger via workflow_dispatch tillgängligt.
+Commit: `f9313af`.
 
 `infra/certs/rds-global-bundle.pem` committat 2026-05-11 (TD-38). Bundle:n är
 nuvarande G1 (täcker eu-north-1 fram till 2061/2121), men AWS kan introducera
@@ -1481,12 +1488,22 @@ Inga blockare. Adresseras opportunistiskt eller pre-staging.
 
 ---
 
-## TD-48: Architecture-test för `Trust Server Certificate=true`-läckage
+## TD-48: ~~Architecture-test för Trust Server Certificate=true-läckage~~ — STÄNGD 2026-05-11
 
 **Kategori:** Testing / Security
 **Severity:** Minor
 **Fas:** 1 (pre-staging önskvärt)
 **Källa:** dotnet-architect Mindre 2, Fas 1 Block A4 review (2026-05-11)
+**Status:** **STÄNGD 2026-05-11 (Väg C Block B.1).** CTO-beslut: Alt A2
+(Mono.Cecil IL string-table-scan) över A1 (reflection-on-fields, missar inline
+strings) eller A3 (Roslyn, bryter assembly-baserad arch-test-konvention).
+Nytt arch-test `tests/JobbPilot.Architecture.Tests/ConnectionStringLeakageTests.cs`
+scannar alla Ldstr-instruktioner i Api/Worker/Infrastructure-assemblies via
+Mono.Cecil. Migrate exkluderad (ForMigrate har Trust=true by design) — separat
+sanity-test asserterar att Migrate faktiskt innehåller Trust=true så
+exkluderingen kvarstår motiverad. Mono.Cecil 0.11.5 lagt till
+Directory.Packages.props (test-only, transitiv via NetArchTest redan).
+Commit: `9f33897`.
 
 `ConnectionStringFactory` (TD-38) har unit-test som verifierar att
 `ForPersisted` inte innehåller `Trust Server Certificate=true`. Det är
@@ -1547,10 +1564,15 @@ också saknar dedikerad test-coverage.
 
 ---
 
-## TD-50: Prod-konfig-källa för `AdminBootstrap__InitialAdminEmail` dokumenteras
+## TD-50: ~~Prod-konfig-källa för AdminBootstrap__InitialAdminEmail dokumenteras~~ — STÄNGD 2026-05-11
 **Kategori:** Operations / Documentation
 **Severity:** Sec-Minor (defense-in-depth)
 **Källa:** security-auditor, 2026-05-11 (Fas 1-stängning admin-audit)
+**Status:** **STÄNGD 2026-05-11 (Väg C Block C).** Ny `docs/runbooks/admin-bootstrap.md`
+dokumenterar prod-konfig-flödet: AWS Secrets Manager + KMS + ECS task-def
+env-var-mapping + IAM grants + rotation-procedur + lokal dev-bypass via
+appsettings.Local.json. AdminBootstrapOptions.cs får utökad <remarks>-sektion
+som förbjuder appsettings.json-källa i prod. Commit: `a9ca126`.
 
 `IdempotentAdminRoleSeeder` läser email från `AdminBootstrapOptions` som
 binds från config-sektion `AdminBootstrap`. I dev är default `""` (säkert).
@@ -1663,27 +1685,57 @@ projektbrett a11y-token-audit. Bryter projektbredd a11y-disciplin → egen TD.
 
 ---
 
-## TD-55: Hardening-pass för PagedResult + ApplicationsQuery paged-shape
+## TD-55: ~~Hardening-pass för PagedResult + ApplicationsQuery paged-shape~~ — STÄNGD 2026-05-11
 **Kategori:** Architecture / Consistency
-**Severity:** Minor (housekeeping)
+**Severity:** Minor (housekeeping) → uppgraderad till runtime-bug under impl
 **Källa:** dotnet-architect, 2026-05-11 (Fas 1-stängning admin-audit)
+**Status:** **STÄNGD 2026-05-11 (Väg C Block A).** Stationär-CC-session levererade
+backend-retro-fit (commit `c2f539e`) + frontend-konsumtion (`0b0886d`) + in-block-
+fixar från reviews (`5784120`). Backend 594/594 + Frontend 150/150 grönt.
 
-`GetAuditLogEntriesQuery` returnerar nytt `PagedResult<T>` med korrekt
-`TotalCount` exponerat. `GetApplicationsQuery` (STEG 5) returnerar `IReadOnlyList<T>`
-utan totalCount — klienten kan inte rendera korrekt paginerings-UI.
+Discovery avslöjade att problemet inte var housekeeping utan en faktisk
+runtime typ-skew: frontend `GetApplicationsResult` förväntade
+`{items,totalCount,page,pageSize}` men backend returnerade bare array.
+TypeScript-cast utan runtime-validering dolde buggen.
 
-**Berörda queries:**
-- `GetApplicationsQuery` (Applications/Queries/GetApplications/)
-- `GetResumesQuery` (Resumes/Queries/GetResumes/)
-- `ListJobAdsQuery` (JobAds/Queries/ListJobAds/)
+**Levererat:**
+- `GetApplicationsQuery` + `GetResumesQuery` returnerar `PagedResult<T>` med
+  separat count-query (CLAUDE.md §3.6)
+- `ListJobAdsQuery` defererad till Fas 2 (TD-56) — fick `.Take(500)` hard cap
+  som defense-in-depth mot DoS-vektor under tiden
+- Architecture-test `PagedResultContractTests` låser kontraktet (queries med
+  `Page/PageNumber + PageSize`-semantik MÅSTE returnera `PagedResult<T>`)
+- Frontend generisk `isPagedResult<T>` i `lib/types/paged.ts` förebygger
+  framtida per-endpoint duplikerings-mönster
+- Integration-tester uppdaterade till PagedResult-shape (JsonValueKind.Object
+  + items/totalCount/page/pageSize-properties)
+- Reviews: code-reviewer APPROVE + dotnet-architect APPROVE-WITH-FIXES,
+  alla 3 Minor in-block-fixade
+
+---
+
+## TD-56: ListJobAdsQuery full paginering (Fas 2 JobTech-integration)
+**Kategori:** Architecture
+**Severity:** Minor
+**Fas:** 2 (JobTech Integration)
+**Källa:** TD-55-CTO-beslut, 2026-05-11
+
+`ListJobAdsQueryHandler` är opaginerad idag med `.Take(500)` hard cap som
+temporär defense-in-depth. Vid Fas 2 JobTech-integration ska den retro-fittas
+till full `PagedResult<JobAdDto>` med query-params och URL-kontrakt som matchar
+JobTech-API:t.
 
 **Föreslagen åtgärd:**
-1. Refactor till `PagedResult<T>` per query
-2. Uppdatera frontend-konsumenter (`web/jobbpilot-web/src/lib/api/applications.ts`, m.fl.)
-3. Uppdatera typer i `web/jobbpilot-web/src/lib/types/*.ts`
+1. Lyft `MaxItems = 500`-konstant från handler till `JobAdOptions`-record
+   bunden via `IOptions<JobAdOptions>` (CLAUDE.md §5.1)
+2. Refactor `ListJobAdsQuery` → `PagedResult<JobAdDto>` med PageNumber/PageSize
+3. Bestäm anonym-vs-auth-policy för publik JobAd-katalog
+4. Anpassa URL-kontrakt mot JobTech-API:s sök-params
 
-**Scope:** Housekeeping-pass när någon av berörda queries ändå touch:as.
-Trigger för opportunistic fix.
+**Scope:** > 4h CC-tid när det görs (kriterium 3) — kräver design-arbete mot
+JobTech-spec. Defereras till Fas 2 där JobTech-integration är primärt fokus.
+
+**Trigger:** Fas 2-uppstart, ADR 0005 (go-to-market) eller JobTech-integration.
 
 ---
 
