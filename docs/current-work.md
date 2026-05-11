@@ -1,6 +1,6 @@
 # Current work — JobbPilot
 
-**Status:** **VÄG B — a11y-pass LEVERERAD 2026-05-11 sen efm.** TD-54 + TD-42 stängda i samlad batch (4 commits) ovanpå Väg C-housekeeping. Ny TD-57 (native form-controls divergerar från Input-primitive) lyft som konsekvens av TD-42-design-review. **Stängda TDs totalt:** TD-15, TD-31, TD-38, TD-42, TD-43, TD-44, TD-45, TD-46, TD-47, TD-48, TD-50, TD-54, TD-55. **Aktiva TDs:** TD-39, TD-40, TD-41, TD-49, TD-51, TD-52, TD-53, TD-56, TD-57. **Nästa fas:** Fas 2 (JobTech Integration) — blockerad till ADR 0005 go-to-market + kostnadsskydd.
+**Status:** **VÄG E — TDs-cleanup LEVERERAD 2026-05-11 ~15:30.** TD-40 (test) + TD-49 (docs-stängning) stängda ovanpå Väg B-a11y-pass. Test-only-batch (3 nya frontend-tester) + docs-only (TD-49 var redan löst via befintlig `HstsOptionsTests.cs` från STEG 13c). **Stängda TDs totalt:** TD-15, TD-31, TD-38, TD-40, TD-42, TD-43, TD-44, TD-45, TD-46, TD-47, TD-48, TD-49, TD-50, TD-54, TD-55. **Aktiva TDs:** TD-39, TD-41, TD-51, TD-52, TD-53, TD-56, TD-57. **Nästa fas:** Fas 2 (JobTech Integration) — blockerad till ADR 0005 go-to-market + kostnadsskydd.
 **Senast uppdaterad:** 2026-05-11
 **Långsiktig bana:** `docs/steg-tracker.md` — single source of truth för STEG/fas-progression
 **Tech debt:** `docs/tech-debt.md`
@@ -9,13 +9,85 @@
 
 ## Aktivt nu
 
-**Stationär-CC-session 2026-05-11 sen efm — VÄG B a11y-PASS.** Bundle:
-TD-54 (text-text-tertiary kontrast-fix för funktionell text, WCAG AA 1.4.3) +
-TD-42 (touch-target-uppgradering till skill-doc-defaults: h-9 default + h-11
-critical CTAs). Skill-doc-konformitet snarare än multi-approach-val:
-kod-baseline var drift från `jobbpilot-design-components` + `jobbpilot-design-a11y`-skills.
+**Stationär-CC-session 2026-05-11 ~15:30 — VÄG E TDs-cleanup.** Bundle:
+TD-40 (leaf-path regression-bevakning för `resume-schemas` refines) +
+TD-49 (docs-only-stängning — `HstsOptionsTests.cs` var redan implementerad
+vid STEG 13c, dotnet-architect-reviewen som lyfte TD-49 missade befintlig
+test-fil eftersom den letade efter `JobbPilot.Api.UnitTests/`-projekt
+istället för `JobbPilot.Api.IntegrationTests/Configuration/`-pattern).
+**Inget produktionskod-touch** — test-only + docs-only.
 
 ### Sub-block-summary
+
+| Block | Scope | Commit | Status |
+|-------|-------|--------|--------|
+| Discovery | TD-40 path-helpers + schemats refines + TD-49 grep-fynd `HstsOptionsTests.cs` redan finns | (no commit) | ✓ |
+| Block A Commit | TD-40 3 nya tester i `resume-schemas.test.ts` + code-reviewer Minor in-block-fix (`findIssueAtPath`-helper) + review-rapport | `6b8f087` | ✓ |
+| Block A review | code-reviewer APPROVE (0/0/1/1) — Minor + Nit in-block-fixade | (rapport) | ✓ |
+| Block B Commit | TD-49 stängd i tech-debt.md med audit-trail mot `HstsOptionsTests.cs` + STEG 13c-historik | `954fe1e` | ✓ |
+
+### Nya commits (denna session)
+
+| SHA | Beskrivning |
+|-----|-------------|
+| `6b8f087` | test(web): TD-40 — leaf-path regression-bevakning för resume-schemas refines |
+| `954fe1e` | docs: TD-49 stängd som redan-implementerad pre-TD-skapande |
+
+### Discovery-fynd som ändrade scope
+
+**TD-49 var redan löst.** Discovery via grep `EnsureSafeForEnvironment`
+över `tests/`-trädet hittade `tests/JobbPilot.Api.IntegrationTests/
+Configuration/HstsOptionsTests.cs` (143 rader, skapad vid STEG 13c
+2026-05-10) som täcker samtliga 6 TD-49-cases. Lärdom: TD-skapande ska
+verifiera test-existens via grep + Glob över ALLA test-projekt, inte
+anta projekt-namn. Block B blev därför docs-only-stängning.
+
+### Reviews i Block A (TD-40)
+
+| Reviewer | Verdict | Fynd | Status |
+|----------|---------|------|--------|
+| code-reviewer | APPROVE | 0/0/1/1 | Minor (path-prefix-match) + Nit (titel-konsistens) in-block-fixade |
+
+**In-block-fixar applicerade (4h-regel):**
+1. Minor: `findIssueAtPath`-helper söker via path-prefix istället för
+   message-string-match. Path är invarianten vi skyddar; copy-tweaks
+   ska inte rödna testet.
+2. Nit: it-titel "experiences.N.endDate" → "experiences.0.endDate"
+   (alltid 0 i de första 2 testen, konsistens med faktiskt input).
+
+### Aktiva TDs efter denna session (7)
+
+- **TD-39:** Error-summary-mönster för stora formulär (Fas 2+ deferral)
+- **TD-41:** Select-komponent-konvention native vs shadcn (kräver design-beslut)
+- **TD-51:** Admin-läs-aktioner audit-logging (Fas 6 GDPR Art. 30)
+- **TD-52:** Admin-endpoint dedikerad rate-limit-policy (Fas 6)
+- **TD-53:** Frontend API-resultatformat kind-union standardisering (>4h scope)
+- **TD-56:** ListJobAdsQuery full paginering (Fas 2 JobTech-integration)
+- **TD-57:** Native form-controls divergerar från Input-primitive
+
+### Tester (full svit grön)
+
+- **Backend:** 594/594 oförändrat (ingen backend-touch i Väg E)
+- **Frontend Vitest:** 150 → 153 (+3 nya TD-40 regression-tester)
+
+### Föregående session-summary (referens)
+
+**Stationär-CC 2026-05-11 sen efm:** Väg B a11y-pass. TD-54 + TD-42
+stängda. TD-57 ny. HEAD = `7ee9948` vid session-start för Väg E.
+
+---
+
+## Föregående session — Väg B a11y-pass (referens)
+
+### Tidigare aktivt — Väg B a11y-PASS
+
+Bundle: TD-54 (text-text-tertiary kontrast-fix för funktionell text, WCAG AA
+1.4.3) + TD-42 (touch-target-uppgradering till skill-doc-defaults: h-9
+default + h-11 critical CTAs). Skill-doc-konformitet snarare än
+multi-approach-val: kod-baseline var drift från `jobbpilot-design-components`
++ `jobbpilot-design-a11y`-skills.
+
+### Sub-block-summary (Väg B)
 
 | Block | Scope | Commits | Status |
 |-------|-------|---------|--------|
