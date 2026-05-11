@@ -1739,6 +1739,45 @@ JobTech-spec. Defereras till Fas 2 där JobTech-integration är primärt fokus.
 
 ---
 
+## TD-57: Native form-controls divergerar från Input-primitive
+**Kategori:** Architecture / Consistency
+**Severity:** Minor (cosmetic + a11y-attribute-gap)
+**Fas:** 1 a11y-pass-completion
+**Källa:** design-reviewer + code-reviewer Fas 1.5 a11y-pass 2026-05-11 (TD-42 M3 / Minor 1)
+
+Native form-controls (datetime-local i `add-follow-up-form.tsx:60` + native
+language-select i `me-profile-form.tsx:116`) styled manuellt och saknar
+Input-primitive-defaults:
+
+| Attribut | Input-primitive | Native form-controls |
+|---|---|---|
+| `rounded-*` | `rounded-sm` | `rounded-md` |
+| `py-*` | `py-1` | `py-2` |
+| `text-*` | `text-base md:text-sm` | `text-sm` eller `text-base` |
+| `aria-invalid-styling` | ✓ | saknas |
+| `dark-mode-styling` | ✓ | saknas |
+| `disabled bg-färg` | `disabled:bg-input/50` | saknas |
+
+Höjden alignar nu (h-9 via TD-42), men övriga defaults divergerar.
+Pre-existing inkonsekvens som blev synlig när skill-doc:en blev
+auktoritativ för field-height.
+
+**Föreslagen åtgärd (kräver design-beslut):**
+1. **Variant A:** Lyft `inputBaseClasses` till `lib/forms/input-base.ts`
+   och referera från native-element via `cn(inputBaseClasses, ...)`
+2. **Variant B:** Skapa wrapper-komponenter `<NativeInput>` / `<NativeSelect>`
+   som inheritar Input.tsx-klasser
+3. **Variant C:** Ersätt native med shadcn-pendang (Input type="datetime-local"
+   där möjligt, shadcn Select där meningsfullt — kräver eventuellt 3rd-party
+   datepicker)
+
+**Scope:** ~2-3h CC-tid (kriterium 3: ej >4h men kräver design-beslut). Kan
+lyftas in i nästa a11y-pass eller paras med eventuell datepicker-introduktion.
+
+**Trigger:** Nästa a11y-pass eller designgenomgång av form-system.
+
+---
+
 ## Adresseringsstrategi
 
 - Items i kategorierna a11y, UX och observability adresseras
