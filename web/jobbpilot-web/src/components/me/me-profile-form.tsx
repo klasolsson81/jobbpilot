@@ -10,6 +10,7 @@ import {
   type UpdateMyProfileInput,
 } from "@/lib/actions/me-schemas";
 import { updateMyProfileAction } from "@/lib/actions/me";
+import { pathToElementId } from "@/lib/forms/me-path-routing";
 import type { JobSeekerProfileDto } from "@/lib/types/me";
 
 interface MeProfileFormProps {
@@ -26,21 +27,6 @@ type FormValues = {
 type FieldError = { path: string | null; message: string };
 
 const ERROR_ID = "me-profile-form-error";
-
-function pathToElementId(path: string): string | null {
-  switch (path) {
-    case "displayName":
-      return "me-displayName";
-    case "language":
-      return "me-language";
-    case "emailNotifications":
-      return "me-emailNotifications";
-    case "weeklySummary":
-      return "me-weeklySummary";
-    default:
-      return null;
-  }
-}
 
 function normalizeLanguage(language: string): "sv" | "en" {
   return language === "en" ? "en" : "sv";
