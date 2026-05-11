@@ -1,194 +1,98 @@
 # Current work — JobbPilot
 
-**Status:** **VÄG E — TDs-cleanup LEVERERAD 2026-05-11 ~15:30.** TD-40 (test) + TD-49 (docs-stängning) stängda ovanpå Väg B-a11y-pass. Test-only-batch (3 nya frontend-tester) + docs-only (TD-49 var redan löst via befintlig `HstsOptionsTests.cs` från STEG 13c). **Stängda TDs totalt:** TD-15, TD-31, TD-38, TD-40, TD-42, TD-43, TD-44, TD-45, TD-46, TD-47, TD-48, TD-49, TD-50, TD-54, TD-55. **Aktiva TDs:** TD-39, TD-41, TD-51, TD-52, TD-53, TD-56, TD-57. **Nästa fas:** Fas 2 (JobTech Integration) — blockerad till ADR 0005 go-to-market + kostnadsskydd.
+**Status:** **ARCH-AUDIT FAS 1 DISCOVERY LEVERERAD 2026-05-11 ~12:15.** Retrospektiv arkitekturell audit av STEG 1–14 + Fas 1 Block A + Fas 1 Milestone via dotnet-architect-agenten. **Verdict: clean — 0 Blocker / 0 Major / 4 Minor / 3 Nit.** Ingen kod-ändring, ingen TD lyft. **Väntar Klas-review av rapporten innan Fas 2-djup beslutas.** Rapport: `docs/reviews/2026-05-11-arch-audit-discovery.md`.
 **Senast uppdaterad:** 2026-05-11
 **Långsiktig bana:** `docs/steg-tracker.md` — single source of truth för STEG/fas-progression
 **Tech debt:** `docs/tech-debt.md`
 
 ---
 
-## Aktivt nu
+## Aktivt nu — Arch-audit Fas 1 Discovery
 
-**Stationär-CC-session 2026-05-11 ~15:30 — VÄG E TDs-cleanup.** Bundle:
-TD-40 (leaf-path regression-bevakning för `resume-schemas` refines) +
-TD-49 (docs-only-stängning — `HstsOptionsTests.cs` var redan implementerad
-vid STEG 13c, dotnet-architect-reviewen som lyfte TD-49 missade befintlig
-test-fil eftersom den letade efter `JobbPilot.Api.UnitTests/`-projekt
-istället för `JobbPilot.Api.IntegrationTests/Configuration/`-pattern).
-**Inget produktionskod-touch** — test-only + docs-only.
+**Stationär-CC-session 2026-05-11 ~12:15 — Två-fas-approach Fas 1 levererad.** Klas valde efter Fas 1-stängning att kör en retrospektiv arkitekturell audit (STEG 1-14 + Fas 1 Block A + Milestone) eftersom CTO-rollen formaliserades först 2026-05-11 vid admin-audit-stängningen. Hypotesen: tidiga STEG saknar CTO-decision-maker-validering och kunde innehålla shortcuts eller SOLID/DRY/SoC-brott som inte triggade dotnet-architect-trösklar.
 
-### Sub-block-summary
+**Resultat:** ingen significant rotting. dotnet-architect-agenten verifierade Clean Arch-isolering, DDD-invariant-skydd, CQRS-pipeline-disciplin, SOLID/DRY/SoC-status över 6 src-projekt + 24 architecture-tester. CLAUDE.md §5.1 anti-pattern-katalogen gav **noll Grep-träffar** i `src/`.
 
-| Block | Scope | Commit | Status |
+### Audit-leverans
+
+| Block | Scope | Output | Status |
 |-------|-------|--------|--------|
-| Discovery | TD-40 path-helpers + schemats refines + TD-49 grep-fynd `HstsOptionsTests.cs` redan finns | (no commit) | ✓ |
-| Block A Commit | TD-40 3 nya tester i `resume-schemas.test.ts` + code-reviewer Minor in-block-fix (`findIssueAtPath`-helper) + review-rapport | `6b8f087` | ✓ |
-| Block A review | code-reviewer APPROVE (0/0/1/1) — Minor + Nit in-block-fixade | (rapport) | ✓ |
-| Block B Commit | TD-49 stängd i tech-debt.md med audit-trail mot `HstsOptionsTests.cs` + STEG 13c-historik | `954fe1e` | ✓ |
+| Discovery | dotnet-architect läste ADRs + spot-check kod + arch-tester | Rapport `docs/reviews/2026-05-11-arch-audit-discovery.md` | ✓ |
+| Klassning | 22 STEG-rader klassade grön/gul/röd | I rapport §2 | ✓ |
+| Hot spots | 4 Minor + 3 Nit dokumenterade med fil-ref + scope-rek | I rapport §3 | ✓ |
+| Strukturella spärrar | 14 mekanismer som fångar regressions dokumenterade | I rapport §4 | ✓ |
+| Fas 2-rek | In-block-fix-ordning + TD-deferral-lista + accept-lista | I rapport §5 | ✓ |
+
+### Hot spots (utan brådska — alla "förbättring")
+
+**Minor (4):**
+- **H-1:** `IAccountHardDeleter` blandar 3 ansvar (ISP-split, defer till Fas 6 admin-impersonation)
+- **H-2:** "Resolve JobSeekerId from user"-duplikat i ~13 handlers (ICurrentJobSeeker-port, defer till impersonation)
+- **H-3:** SessionAuthenticationHandler gör role-fetch (move till IClaimsTransformation, ~1h)
+- **H-4:** Paging-property-namn inkonsistens (`Page` vs `PageNumber`, ~30min rename)
+
+**Nit (3):**
+- **N-1:** `Application.SoftDelete` raisar inget domain event (medan `Resume.SoftDelete` gör det) — välj riktning
+- **N-2:** `IdempotentAdminRoleSeeder` catch:ar `42P01` även i prod (potential safety-net-svaghet)
+- **N-3:** `Resume.MasterVersion` kastar `InvalidOperationException` istället för `DomainException`
+
+### Strukturella spärrar som FUNGERAT (motvikt mot "allt är problem"-bias)
+
+24 arch-tester + ADR-disciplin + agent-reviews-pipeline har låst minst 14 distinkta läckage-vektorer — Domain-isolering hermetisk, IL-skannad Trust=true-läckage, Worker-HTTP-isolering, pipeline-ordning single-source-of-truth, audit-bypass-port konsument-allowlist, soft-delete query-filter med medveten IgnoreQueryFilters-användning, xmin concurrency-token. **CTO:s frånvaro under STEG 1–11 har inte gett synlig kvalitets-regression** — disciplinen från arch-tester + agent-reviews + ADR-flöde har täckt CTO-rollen retroaktivt.
+
+### Audit-metod-not
+
+dotnet-architect-agentens tool-config var read-only (saknar `Write`/`Edit`) — rapporten levererades verbatim i agent-output och materialiserades till disk av parent-CC. Discovery-uppdraget (read-only granskning av kod + ADRs + session-loggar) är fullt utfört. CC-tid totalt: ~65 minuter discovery + rapport-syntes.
+
+### Förbud denna session (alla hållna)
+
+- **INGA kod-ändringar** ✓
+- **INGA TDs lyfts** ✓
+- **INTE påbörja Fas 2 utan Klas-GO** ✓ (väntar)
+- Ändra inte BUILD.md / CLAUDE.md / DESIGN.md ✓
 
 ### Nya commits (denna session)
 
 | SHA | Beskrivning |
 |-----|-------------|
-| `6b8f087` | test(web): TD-40 — leaf-path regression-bevakning för resume-schemas refines |
-| `954fe1e` | docs: TD-49 stängd som redan-implementerad pre-TD-skapande |
-
-### Discovery-fynd som ändrade scope
-
-**TD-49 var redan löst.** Discovery via grep `EnsureSafeForEnvironment`
-över `tests/`-trädet hittade `tests/JobbPilot.Api.IntegrationTests/
-Configuration/HstsOptionsTests.cs` (143 rader, skapad vid STEG 13c
-2026-05-10) som täcker samtliga 6 TD-49-cases. Lärdom: TD-skapande ska
-verifiera test-existens via grep + Glob över ALLA test-projekt, inte
-anta projekt-namn. Block B blev därför docs-only-stängning.
-
-### Reviews i Block A (TD-40)
-
-| Reviewer | Verdict | Fynd | Status |
-|----------|---------|------|--------|
-| code-reviewer | APPROVE | 0/0/1/1 | Minor (path-prefix-match) + Nit (titel-konsistens) in-block-fixade |
-
-**In-block-fixar applicerade (4h-regel):**
-1. Minor: `findIssueAtPath`-helper söker via path-prefix istället för
-   message-string-match. Path är invarianten vi skyddar; copy-tweaks
-   ska inte rödna testet.
-2. Nit: it-titel "experiences.N.endDate" → "experiences.0.endDate"
-   (alltid 0 i de första 2 testen, konsistens med faktiskt input).
-
-### Aktiva TDs efter denna session (7)
-
-- **TD-39:** Error-summary-mönster för stora formulär (Fas 2+ deferral)
-- **TD-41:** Select-komponent-konvention native vs shadcn (kräver design-beslut)
-- **TD-51:** Admin-läs-aktioner audit-logging (Fas 6 GDPR Art. 30)
-- **TD-52:** Admin-endpoint dedikerad rate-limit-policy (Fas 6)
-- **TD-53:** Frontend API-resultatformat kind-union standardisering (>4h scope)
-- **TD-56:** ListJobAdsQuery full paginering (Fas 2 JobTech-integration)
-- **TD-57:** Native form-controls divergerar från Input-primitive
-
-### Tester (full svit grön)
-
-- **Backend:** 594/594 oförändrat (ingen backend-touch i Väg E)
-- **Frontend Vitest:** 150 → 153 (+3 nya TD-40 regression-tester)
-
-### Föregående session-summary (referens)
-
-**Stationär-CC 2026-05-11 sen efm:** Väg B a11y-pass. TD-54 + TD-42
-stängda. TD-57 ny. HEAD = `7ee9948` vid session-start för Väg E.
+| (pending) | docs(reviews): arch-audit Fas 1 discovery — rapport + session-logg + current-work |
 
 ---
 
-## Föregående session — Väg B a11y-pass (referens)
+## När nästa session startar — Klas:s val för Fas 2-djup
 
-### Tidigare aktivt — Väg B a11y-PASS
+Audit-rapporten är klar att läsa. Klas:s beslut avgör Fas 2-scope:
 
-Bundle: TD-54 (text-text-tertiary kontrast-fix för funktionell text, WCAG AA
-1.4.3) + TD-42 (touch-target-uppgradering till skill-doc-defaults: h-9
-default + h-11 critical CTAs). Skill-doc-konformitet snarare än
-multi-approach-val: kod-baseline var drift från `jobbpilot-design-components`
-+ `jobbpilot-design-a11y`-skills.
+### Alternativ 1 — Hoppa över Fas 2 (rek om Klas vill fortsätta features)
 
-### Sub-block-summary (Väg B)
+Inga Blocker/Major finns. Discipline är intakt. Defer H-1 + H-2 till Fas 6 (naturlig fix-tid), defer Minor/Nit som TDs eller acceptera.
 
-| Block | Scope | Commits | Status |
-|-------|-------|---------|--------|
-| Discovery | TD-54 16 träffar i 9 filer + TD-42 5 komponenter | (no commit) | ✓ |
-| Skill-läsning | tokens/a11y/components — alla 3 bekräftade entydiga | (no commit) | ✓ |
-| Block A Commit 1 | TD-54 kontextuell mapping (10 funktionell → secondary, 5 dekorativ kvar tertiary) | `8cfbde4` | ✓ |
-| Block A reviews | code-reviewer (APPROVE 0/0/0/0) + design-reviewer (APPROVE 0/0/4/2) parallellt | (rapporter) | ✓ |
-| Block A Commit 2 | In-block-fix N1 (cursor-not-allowed pagination disabled) + review-rapporter | `52f3b45` | ✓ |
-| Block B Commit 1 | TD-42 primitives: input/button/select + 2 native-form-controls | `f2b179a` | ✓ |
-| Block B reviews | code-reviewer (APPROVE 0/0/1/1) + design-reviewer (APPROVE-WITH-FIXES 0/3/2/0) | (rapporter) | ✓ |
-| Block B Commit 2 | In-block-fixar M1+M2 (Avbryt h-7→h-9 + page-header CTAs sm→default) + TD-57 lyft + review-rapporter | `1b0b9ec` | ✓ |
+Fortsätt med Fas 2 (JobTech Integration, ADR 0005-blockad) eller Fas 1 features.
 
-### Discovery-fynd som påverkade scope
+### Alternativ 2 — Polish-block (~3h CC-tid)
 
-**TD-54 var inte multi-approach-val.** Skill-doc `jobbpilot-design-tokens`
-säger explicit att `text-text-tertiary` är för "Disabled, placeholder", och
-`jobbpilot-design-a11y` §4 säger "text-tertiary fails for body text on
-surface-secondary — only use it for decorative/non-essential text". Hela
-användningen var dokumentations-drift, inte design-val. Kontextuell
-mapping (funktionell → secondary, separatorer → tertiary) följde befintliga
-skill-docs.
+Kör in-block-fixes i ordning: N-1 + H-4 + N-3 + N-2 + H-3. Får 100% clean före Fas 2-feature-arbete.
 
-**TD-42 var inte multi-approach-val.** Skill-doc `jobbpilot-design-components`
-säger "Input/Textarea/Select Height: 36px (h-9) default, 32px (h-8) for dense
-contexts". Skill-doc `jobbpilot-design-a11y` §9 säger "Button (default,
-h-9 = 36px) — Use lg (h-11 = 44px) for critical CTAs". Kod-baseline (h-8
-default + h-9 lg) var pure drift från skill-docs. Bytet är skill→kod-konvergens.
+### Alternativ 3 — Split polish (~1.25h + ~2h)
 
-**TD-42 M2 fynd:** Page-header primary-CTAs ("Ny ansökan", "Nytt CV") använde
-`size="sm"` (h-7 = 28px) — inkonsekvent mot form-submit-CTAs (h-9). Pre-existing
-problem som blev tydligare efter default-uppgradering. In-block-fix tillämpad.
+- Sub-block A: N-1 + H-4 + N-3 (~1.25h, kosmetiska + DDD-konsistens)
+- Sub-block B: N-2 + H-3 (~2h, prod-safety-net + SoC-refactor)
 
-### Reviews i Block A (TD-54)
+### Alternativ 4 — TDs först
 
-| Reviewer | Verdict | Fynd | Status |
-|----------|---------|------|--------|
-| code-reviewer | APPROVE | 0/0/0/0 | Inga åtgärder behövs |
-| design-reviewer | APPROVE | 0/0/4/2 | N1 (cursor-not-allowed) fixad in-block, övriga acceptabla observations |
+Lyft H-3 + H-4 + N-1/N-2/N-3 som TDs i `docs/tech-debt.md` om Klas vill ha dem dokumenterade utan att fixa nu. Defer för senare batch.
 
-### Reviews i Block B (TD-42)
-
-| Reviewer | Verdict | Fynd | Status |
-|----------|---------|------|--------|
-| code-reviewer | APPROVE | 0/0/1/1 | Minor = TD-57 (lyft) |
-| design-reviewer | APPROVE-WITH-FIXES | 0/3/2/0 | M1+M2 fixade in-block, M3 lyft som TD-57 |
-
-**In-block-fixar applicerade (4h-regel):**
-1. TD-54 N1: `cursor-not-allowed` på pagination disabled-spans
-2. TD-42 M1: `/ansokningar/ny` Avbryt-button size="sm" → default
-3. TD-42 M2: `/ansokningar/page.tsx` + `/cv/page.tsx` page-header CTAs size="sm" → default
-
-### Nya commits (denna session)
-
-| SHA | Beskrivning |
-|-----|-------------|
-| `1b0b9ec` | fix(web): TD-42 — in-block-fixar från design-review + TD-57 lyft |
-| `f2b179a` | feat(web): TD-42 — touch-target-uppgradering till skill-doc-defaults |
-| `52f3b45` | fix(web): TD-54 — in-block-fix N1 + review-rapporter |
-| `8cfbde4` | fix(web): TD-54 — text-text-tertiary kontrast-fix för funktionell text |
-
-### Aktiva TDs efter denna session (9)
-
-- **TD-39:** Error-summary-mönster för stora formulär
-- **TD-40:** Path-equality regression-bevakning
-- **TD-41:** Select-komponent-konvention native vs shadcn
-- **TD-49:** HstsOptions unit-test (blockerad — kräver JobbPilot.Api.UnitTests-projekt)
-- **TD-51:** Admin-läs-aktioner audit-logging (Fas 6 GDPR Art. 30)
-- **TD-52:** Admin-endpoint dedikerad rate-limit-policy (Fas 6)
-- **TD-53:** Frontend API-resultatformat kind-union standardisering (>4h scope)
-- **TD-56:** ListJobAdsQuery full paginering (Fas 2 JobTech-integration)
-- **TD-57:** Native form-controls divergerar från Input-primitive — NY
-
-### Tester (full svit grön)
-
-- **Backend:** 594/594 oförändrat (ingen backend-touch i Väg B)
-- **Frontend Vitest:** 150/150 oförändrade efter samtliga 4 commits
-
-### Föregående session-summary (referens)
-
-**Stationär-CC 2026-05-11 ~12:00 efm:** Väg C Fas 1.5-housekeeping. TD-47/48/50/55
-stängda. HEAD = `acf2b28` vid session-start för Väg B.
+**Min rek:** Klas läser rapporten själv och bestämmer. Audit-uppdraget var discovery — Fas 2-beslut tillhör Klas.
 
 ---
 
-## Föregående session — Väg C Fas 1.5 housekeeping (referens)
+## Föregående session-summary (referens) — VÄG E TDs-cleanup
 
-### Stängda TDs totalt (kumulativt)
+**Stationär-CC-session 2026-05-11 ~15:30 (föregående dag):** Väg E TDs-cleanup. TD-40 (test) + TD-49 (docs) stängda. Inget produktionskod-touch — test-only + docs-only. Backend 594/594 + Frontend 150 → 153.
 
-- TD-15 (Resume-formulär a11y) — Fas 1 Block A1
-- TD-31 (UseHttpsRedirection env-gate-test) — Fas 1 Block A3
-- TD-38 (Trust Server Certificate hardening) — Fas 1 Block A4
-- TD-42 (Touch-target projektbrett) — **denna session, Block B**
-- TD-43 (komponent-tests för LoginForm + MeProfileForm + ResumeContentForm)
-- TD-44 (HSTS-header anti-regression-test)
-- TD-45 (LoginForm focus-flytt vid state.error)
-- TD-46 (extrahera pathToElementId per-domän)
-- TD-47 (RDS CA-bundle-rotation-bevakning) — Väg C Block B.2
-- TD-48 (Architecture-test för Trust=true-läckage) — Väg C Block B.1
-- TD-50 (Prod-konfig-källa för AdminBootstrap__InitialAdminEmail) — Väg C Block C
-- TD-54 (text-text-tertiary kontrast-fix för funktionell text) — **denna session, Block A**
-- TD-55 (PagedResult retro-fit) — Väg C Block A
+**Stängda TDs totalt:** TD-15, TD-31, TD-38, TD-40, TD-42, TD-43, TD-44, TD-45, TD-46, TD-47, TD-48, TD-49, TD-50, TD-54, TD-55.
+
+**Aktiva TDs (oförändrat efter denna audit — discovery lyfter ingenting):** TD-39, TD-41, TD-51, TD-52, TD-53, TD-56, TD-57.
 
 ---
 
@@ -203,27 +107,18 @@ stängda. HEAD = `acf2b28` vid session-start för Väg B.
 
 ---
 
-## När nästa session startar
+## Tester (full svit grön)
 
-### Alternativ framåt
+- **Backend:** 594/594 (ingen backend-touch i denna session)
+- **Frontend Vitest:** 153/153 (ingen frontend-touch i denna session)
 
-**Väg A — Fas 2-prereq (ADR 0005 + kostnadsskydd):** Strategiska val med webb-Claude.
-Inte primärt kod. Fas 2-blockerare. Föredragen approach.
+---
 
-**Väg E — Mer TDs-cleanup:** Återstående aktiva TDs:
-- TD-57 (native form-controls divergerar) — kan paras med eventuell datepicker
-- TD-39 (error-summary) + TD-40 (path-equality regression) — parade
-- TD-41 (Select-konvention) + TD-53 (kind-union) — kräver design-beslut
-
-**Väg D — Wire-shape integration-test** (PagedResult-kontraktet) — kan deferas.
-
-**Min rek:** Väg A med webb-Claude för strategi — TDs-listan är nu trimmad nog
-att Fas 2-uppstart är högsta värde-aktion.
-
-### Workflow-disciplin (oförändrad)
+## Workflow-disciplin (oförändrad)
 
 Per CLAUDE.md §9.2 + §9.6:
-1. Discovery först — alltid (rapportera fil-state, befintliga patterns)
+
+1. Discovery först — alltid (denna session ÄR discovery)
 2. Multi-approach-val → senior-cto-advisor auto-invokeras (entydigt → direkt impl)
 3. STOPP-rapport till Klas innan implementation om CTO osäker / fas-strategiskt
 4. Agent-reviews parallellt vid relevant scope
