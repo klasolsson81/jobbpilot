@@ -1,7 +1,7 @@
 # JobbPilot — STEG-tracker
 
-> **Version:** 1.13
-> **Senast uppdaterad:** 2026-05-11 (**FAS 1 BLOCK A KOD-FAS KOMPLETT.** A1+A2+A3+A4 + parallell TD-43 pushade. TD-15, TD-31, TD-43 stängda. 9 nya follow-up-TDs lyfta (TD-39 till TD-48). Apply-fas A4 (TD-38) väntar Klas-GO.)
+> **Version:** 1.14
+> **Senast uppdaterad:** 2026-05-11 (**FAS 1 MILESTONE-STÄNGD.** Admin-audit-vy levererad. BUILD.md §18 Fas 1-milestone uppfylld. 5 reviews APPROVED + CTO-triage + 12 in-block-fixar + 6 nya TDs (TD-50 till TD-55) + ADR 0028. Backend 585/585 + Frontend 150/150 grönt.)
 > **Roll:** permanent översikt över STEG- och fas-progression.
 
 Kompletteras av:
@@ -26,7 +26,7 @@ Mellan-arbete (upptakter, cleanup-passningar, disciplin-uppgraderingar) är inte
 | Fas | Namn | Tidsuppskattning | Milstolpe | Status |
 |-----|------|------------------|-----------|--------|
 | Fas 0 | Foundation | ~2 v | Registrera + logga in på dev.jobbpilot.se | **Klar 2026-05-10** ¹ |
-| Fas 1 | Core Domain | ~3 v | CV manuellt + "fake" ansökningar i admin-audit | Pågående |
+| Fas 1 | Core Domain | ~3 v | CV manuellt + "fake" ansökningar i admin-audit | **Klar 2026-05-11** ³ |
 | Fas 2 | JobTech Integration | ~2 v | Söka jobb på Platsbanken via appen, spara sökningar | Planerad² |
 | Fas 3 | Application Management | ~2 v | Fullständig ansökningshantering (utan AI) | Planerad |
 | Fas 4 | AI Layer | ~3-4 v | Alla AI-features end-to-end + 14 dagar dogfood | Planerad |
@@ -41,6 +41,8 @@ Mellan-arbete (upptakter, cleanup-passningar, disciplin-uppgraderingar) är inte
 ¹ Fas 0 fullt klar 2026-05-10 efter STEG 14c. Alla milstolpar uppfyllda: Clean Arch-solution + Identity + Next.js + design system + AWS-infrastruktur (VPC/RDS/Redis/ALB/ECS/ECR) + Container-pipeline + DNS + TLS (HTTPS aktiverat med HSTS) + GitHub OIDC-baserad CI/CD + first formal tag-deploy `v0.1.0-dev` end-to-end PASS + Bootstrap-IAM-user raderad. Live på `https://dev.jobbpilot.se/api/ready`.
 
 ² Fas 2 är blockerad till ADR 0005 (go-to-market) är beslutad och kostnadsskydd implementerat (Budget Actions, `registrations_open`-flagga, rate limiting, runbook `docs/runbooks/aws-cost-recovery.md`) per BUILD.md §18.
+
+³ Fas 1 fullt klar 2026-05-11. Milestonestängning levererad i stationär-CC-session: admin-roll-infrastruktur (per-request claims A1 + IdempotentAdminRoleSeeder B1) + GET /api/v1/admin/audit-log + frontend `/admin/granskning` med Server Components + zero client-JS för core-flöde. 5 parallella agent-reviews APPROVED (code-reviewer + security-auditor + dotnet-architect + design-reviewer × 2 frontiers). CTO-triage med 12 in-block-fixar applicerade per 4-timmarsregeln + 6 nya TDs (TD-50 till TD-55) + ADR 0028 (admin-authorization defense-in-depth, marker-interface + HTTP-policy dubbel-gate).
 
 ## 3. STEG-historik
 

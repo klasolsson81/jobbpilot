@@ -1547,6 +1547,146 @@ också saknar dedikerad test-coverage.
 
 ---
 
+## TD-50: Prod-konfig-källa för `AdminBootstrap__InitialAdminEmail` dokumenteras
+**Kategori:** Operations / Documentation
+**Severity:** Sec-Minor (defense-in-depth)
+**Källa:** security-auditor, 2026-05-11 (Fas 1-stängning admin-audit)
+
+`IdempotentAdminRoleSeeder` läser email från `AdminBootstrapOptions` som
+binds från config-sektion `AdminBootstrap`. I dev är default `""` (säkert).
+I prod ska värdet komma från AWS Secrets Manager via ECS task-def env-var
+men det är **inte dokumenterat** i runbook eller kod-kommentar.
+
+**Risk:** Framtida Klas eller medarbetare sätter värdet i `appsettings.json`
+direkt och commit:ar admin-email till git.
+
+**Föreslagen åtgärd:**
+1. Lägg kommentar i `src/JobbPilot.Infrastructure/Identity/AdminBootstrapOptions.cs`:
+   `// Prod: läs ALDRIG via appsettings.json — alltid via AWS Secrets Manager + ECS task-def env-var.`
+2. Skapa `docs/runbooks/admin-bootstrap.md` som dokumenterar prod-konfig-flödet.
+3. Adressera vid nästa runbook-svep (när STEG 14 prod-deploy närmar sig).
+
+**Scope:** ~30 min docs-arbete. TD-kandidat eftersom det är runbook-skrivande,
+inte kod-fix.
+
+---
+
+## TD-51: Admin-läs-aktioner ska audit-loggas (GDPR Art. 30)
+**Kategori:** GDPR compliance / Audit
+**Severity:** Sec-Minor (Fas 6-utbyggnad)
+**Källa:** security-auditor, 2026-05-11 (Fas 1-stängning admin-audit)
+
+GET `/api/v1/admin/audit-log` skriver INGEN audit-rad — Fas 1-modellen
+auditerar bara success-mutationer (ADR 0022). Men admin-läs-aktioner mot
+PII-innehållande data (audit-trail med IP/UA) är i sig en behandlingsaktivitet
+per GDPR Art. 30 (record of processing).
+
+När impersonation och admin-suspend införs i Fas 6 bör samma ADR-revision
+lägga till `IAuditableQuery`-mönster så admin → audit-rad `Admin.AuditLogViewed`
+skrivs.
+
+**Föreslagen åtgärd:** Lyfts vid Fas 6 ADR-extension. Inte STEG-fix för Fas 1.
+
+**Scope:** Hör till annan fas (kriterium 1 i 4-timmarsregeln).
+
+---
+
+## TD-52: Admin-endpoint saknar dedikerad rate-limit-policy
+**Kategori:** Security (DoS-skydd)
+**Severity:** Sec-Minor (Fas 6-utbyggnad)
+**Källa:** security-auditor, 2026-05-11 (Fas 1-stängning admin-audit)
+
+`AdminEndpoints` har `.RequireAuthorization(AuthorizationPolicies.Admin)`
+men ingen `.RequireRateLimiting(...)`. För Fas 1 (en admin = Klas) ingen
+praktisk DoS-vektor. För Fas 6 när admin-roll kan utvidgas till support-personal
+eller om en admin-session kompromitteras bör en separat `AdminLoosePolicy`
+(t.ex. 60/min per UserId-partition) införas.
+
+**Föreslagen åtgärd:**
+1. Skapa `AdminLoosePolicy` med 60/min per UserId
+2. Applicera på `/api/v1/admin/*`-group i `AdminEndpoints.cs`
+
+**Scope:** Hör till Fas 6 admin-yta-utbyggnad (kriterium 1).
+
+---
+
+## TD-53: Frontend API-resultatformat — kind-union vs `T | null` standardisering
+**Kategori:** Code consistency / Frontend
+**Severity:** Minor
+**Källa:** code-reviewer, 2026-05-11 (Fas 1-stängning admin-audit)
+
+Nya `web/jobbpilot-web/src/lib/api/admin.ts` använder diskriminerat union:
+```ts
+type AuditLogResponse =
+  | { kind: "ok"; data: AuditLogPagedResult }
+  | { kind: "forbidden" }
+  | { kind: "unauthorized" }
+  | { kind: "error" };
+```
+
+Befintliga `lib/api/applications.ts` och `lib/api/me.ts` använder `T | null`
+som blandar auth-fel + backend-nere + tomt-resultat. Detta gör att UI:t inte
+kan skilja mellan "Du saknar behörighet" och "Backend nere" — vilket är två
+helt olika user-actions.
+
+**Föreslagen åtgärd:**
+1. Beslut: standardisera på kind-union (rekommenderat) eller `T | null`
+2. Om kind-union: refactor `applications.ts` + `me.ts` + alla konsumenter
+3. Eventuellt: skapa ADR som dokumenterar pattern-valet
+4. Eventuell: invokera senior-cto-advisor för formell pattern-validering
+
+**Scope:** > 4h CC-tid (kriterium 3 i 4-timmarsregeln). Refactor över flera
+api-moduler + alla konsumenter + tests.
+
+---
+
+## TD-54: `text-text-tertiary` på empty-state sekundärtext bryter WCAG AA
+**Kategori:** Accessibility (WCAG 2.1 AA 1.4.3 Contrast)
+**Severity:** Minor (replikerat pattern)
+**Källa:** design-reviewer, 2026-05-11 (Fas 1-stängning admin-audit)
+
+`text-text-tertiary` (#8A8A85) på `bg-surface-secondary` (#F7F7F5) ≈ 2.9:1.
+WCAG AA kräver 4.5:1 för body text.
+
+**Berörda filer (replikerat pattern):**
+- `web/jobbpilot-web/src/app/(app)/ansokningar/page.tsx:48`
+- `web/jobbpilot-web/src/app/(admin)/admin/granskning/audit-log-table.tsx:20`
+- Potentiellt fler — projektbrett audit krävs
+
+**Föreslagen åtgärd:**
+1. Projektbrett grep efter `text-text-tertiary` i empty-state/help-text-kontekster
+2. Byt till `text-text-secondary` (#5A5A5A ≈ 6.0:1) för funktionell text
+3. Behåll `text-text-tertiary` ENDAST för dekorativ/icke-essentiell text
+
+**Scope:** Bör buntas med TD-42 (touch-target projektbredd) eller egen
+projektbrett a11y-token-audit. Bryter projektbredd a11y-disciplin → egen TD.
+
+---
+
+## TD-55: Hardening-pass för PagedResult + ApplicationsQuery paged-shape
+**Kategori:** Architecture / Consistency
+**Severity:** Minor (housekeeping)
+**Källa:** dotnet-architect, 2026-05-11 (Fas 1-stängning admin-audit)
+
+`GetAuditLogEntriesQuery` returnerar nytt `PagedResult<T>` med korrekt
+`TotalCount` exponerat. `GetApplicationsQuery` (STEG 5) returnerar `IReadOnlyList<T>`
+utan totalCount — klienten kan inte rendera korrekt paginerings-UI.
+
+**Berörda queries:**
+- `GetApplicationsQuery` (Applications/Queries/GetApplications/)
+- `GetResumesQuery` (Resumes/Queries/GetResumes/)
+- `ListJobAdsQuery` (JobAds/Queries/ListJobAds/)
+
+**Föreslagen åtgärd:**
+1. Refactor till `PagedResult<T>` per query
+2. Uppdatera frontend-konsumenter (`web/jobbpilot-web/src/lib/api/applications.ts`, m.fl.)
+3. Uppdatera typer i `web/jobbpilot-web/src/lib/types/*.ts`
+
+**Scope:** Housekeeping-pass när någon av berörda queries ändå touch:as.
+Trigger för opportunistic fix.
+
+---
+
 ## Adresseringsstrategi
 
 - Items i kategorierna a11y, UX och observability adresseras

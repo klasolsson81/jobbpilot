@@ -1,6 +1,6 @@
 # Current work — JobbPilot
 
-**Status:** **FAS 1 BLOCK A + 3 follow-up-TDs KOMPLETT 2026-05-11.** Block A (A1+A2+A3+A4+TD-43) klart sedan tidigare. **Laptop-CC-session 2026-05-11 0540→0940 stängde TD-44 + TD-45 + TD-46.** Infra-tillägg: ny `senior-cto-advisor`-agent (decision-maker vid multi-approach) + CLAUDE.md §9.6 (4-timmarsregel för in-scope-fix vs TD-skapande). **Stängda TDs totalt:** TD-15, TD-31, TD-38, TD-43, TD-44, TD-45, TD-46. **Aktiva TDs:** TD-39/40/41/42/47/48/49. **Nästa:** Block B (Application Management / Dashboard / JobTech-förstudie) eller fortsatt TDs-cleanup.
+**Status:** **FAS 1 MILESTONE-STÄNGD 2026-05-11 (admin-audit-vy LEVERERAD).** BUILD.md §18 Fas 1-milestone "CV manuellt + 'fake' ansökningar + se i admin-audit" är nu uppfylld. Stationär-CC-session 2026-05-11 0940→efm levererade: admin-roll-infrastruktur (A1 per-request claims + IdempotentAdminRoleSeeder), GET /api/v1/admin/audit-log endpoint, frontend (admin)/admin/granskning route, 5 parallella agent-reviews APPROVED, CTO-triage med 12 in-block-fixar + 6 nya TDs, ADR 0028 (admin-authorization defense-in-depth). **Stängda TDs totalt:** TD-15, TD-31, TD-38, TD-43, TD-44, TD-45, TD-46. **Nya TDs:** TD-50 till TD-55. **Aktiva TDs:** TD-39, TD-40, TD-41, TD-42, TD-47, TD-48, TD-49, TD-50, TD-51, TD-52, TD-53, TD-54, TD-55. **Nästa fas:** Fas 2 (JobTech Integration) — blockerad till ADR 0005 go-to-market + kostnadsskydd. Alternativ: TDs-cleanup eller Fas 1.5-housekeeping.
 **Senast uppdaterad:** 2026-05-11
 **Långsiktig bana:** `docs/steg-tracker.md` — single source of truth för STEG/fas-progression
 **Tech debt:** `docs/tech-debt.md`
@@ -9,7 +9,47 @@
 
 ## Aktivt nu
 
-**Laptop-CC-session 2026-05-11 0540→0940 — TDs-cleanup KLAR.** 3 TDs stängda (TD-44/45/46) + 1 infra-tillägg (senior-cto-advisor + 4h-policy). 4 commits, alla pushade till `main`. HEAD = `09ef399`.
+**Stationär-CC-session 2026-05-11 0940→ — FAS 1 MILESTONE-STÄNGD.** Admin-audit-vy implementerad + reviewad + in-block-fixar applicerade. HEAD efter commit-batch = TBD (uppdateras vid push).
+
+### Fas 1-stängning sub-block-summary
+
+| Steg | Scope | Status |
+|------|-------|--------|
+| Discovery | Audit-log-schema + auth-roll-modell + frontend-route | ✓ Klart |
+| CTO-beslut #1 | A1 (per-request roll-fetch) över A2/A3 | ✓ |
+| CTO-beslut #2 | B1 (IdempotentAdminRoleSeeder IHostedService) över B2 | ✓ |
+| CTO-beslut #3 | `/admin/granskning` (svensk slug per §4.4) | ✓ |
+| Backend impl | A1 + B1 + AuthZ-policy + AdminEndpoints + 7 integration-tester | ✓ |
+| Frontend impl | (admin)/granskning + 3 komponenter + 17 komponent-tester | ✓ |
+| 5 agent-reviews parallellt | code-reviewer + security-auditor + dotnet-architect + design-reviewer × 2 fronts | ✓ Alla APPROVED |
+| CTO-triage | 12 in-block-fixar + 6 nya TDs + ADR 0028 (separat docs-commit) | ✓ |
+| In-block-fixar applied | Viktigt #1/#2, M1/M2/M4, Sec-Minor-2, FE-M2/M3/M4/M5/Mi2, N2/M7 | ✓ |
+| ADR 0028 | Admin authorization defense-in-depth | ✓ |
+| Tester | Backend 585/585 + Frontend 150/150 grönt | ✓ |
+
+### Nya TDs (denna session)
+
+- **TD-50:** Prod-konfig-källa för AdminBootstrap__InitialAdminEmail — docs-task
+- **TD-51:** Admin-läs-aktioner audit-logging (Fas 6 GDPR Art. 30)
+- **TD-52:** Admin-endpoint dedikerad rate-limit-policy (Fas 6)
+- **TD-53:** Frontend API-resultatformat kind-union standardisering (>4h scope)
+- **TD-54:** text-text-tertiary kontrast-brott projektbrett
+- **TD-55:** PagedResult retro-fit för GetApplicationsQuery + GetResumesQuery + ListJobAdsQuery
+
+### Aktiva TDs efter denna session
+
+- **TD-39:** Error-summary-mönster
+- **TD-40:** Path-equality regression
+- **TD-41:** Select-komponent-konvention
+- **TD-42:** Touch-target projektbrett
+- **TD-47:** RDS CA-bundle-rotation
+- **TD-48:** Architecture-test för Trust=true
+- **TD-49:** HstsOptions unit-test (blockerad)
+- **TD-50/51/52/53/54/55:** Se ovan (nya 2026-05-11)
+
+### Föregående session (referens)
+
+Laptop-CC 2026-05-11 0540→0940 stängde TD-44 + TD-45 + TD-46 + infra (senior-cto-advisor + 4h-policy). HEAD = `3cc6d65` vid session-start.
 
 ### TDs-cleanup-session-summary
 
