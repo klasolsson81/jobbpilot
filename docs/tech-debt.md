@@ -1922,29 +1922,76 @@ mitigerat av integration-test). 0 nya TDs lyfta.
 
 ---
 
-## TD-61: Audit-trail-evidence-test för `IdempotentAdminRoleSeeder`
+## TD-61: Audit-trail-evidence-test för `IdempotentAdminRoleSeeder` — STÄNGD 2026-05-11
+
+**Status:** STÄNGD 2026-05-11 (Väg B) — original-premiss var felgrundad,
+korrigerad + verifierad mot rätt observability-spår.
+
 **Kategori:** Testing / Observability
 **Severity:** Minor
-**Fas:** 1.5 polish / Fas 6
+**Fas:** 1.5 polish (stängd) — vidare audit-port-arkitektur defereras till Fas 6
 **Källa:** security-auditor 2026-05-11 Block B Minor 2
 
-Seederns XML-doc (rad 19-22) hävdar: "operationer går via samma
+Seederns XML-doc (rad 19-22) hävdade: "operationer går via samma
 Identity-pipeline som /auth/register, vilket gör seeding observerbar via samma
-audit-log som admin-vyn själv granskar". Inget verifierar att audit-händelse
+audit-log som admin-vyn själv granskar". Inget verifierade att audit-händelse
 faktiskt skapas vid bootstrap-tilldelning.
 
-Om audit-log-write hänger på ett separat Mediator-event utanför
-`UserManager.AddToRoleAsync`, sker första Admin-tilldelningen utan audit-spår.
+**Discovery 2026-05-11 (Väg B):** Premissen är *provably false*.
+`AuditBehavior` (`src/JobbPilot.Application/Common/Auditing/AuditBehavior.cs`) är
+en Mediator-pipeline-behavior som ENDAST auditerar commands markerade med
+`IAuditableCommand<TResponse>`. Seedern anropar `UserManager.AddToRoleAsync`
+direkt utanför Mediator-pipelinen. `RegisterCommand` implementerar inte
+`IAuditableCommand` och `IAuthAuditLogger` skriver bara strukturerad logg —
+ADR 0022 §Kontext rad 11 bekräftar explicit: "skriver bara strukturerad logg,
+inte till databas". Admin-vyns `GetAuditLogEntriesQueryHandler` läser
+`AuditLogEntries`-tabellen, dit varken seedern eller `/auth/register` skriver.
 
-**Föreslagen åtgärd:** Integration-test som efter `EnsureUserIsAdminAsync` läser
-audit-loggen och asserterar att en `AuditLogEntry` finns med relevant
-operation-typ för Admin-role-add.
+**senior-cto-advisor-triage 2026-05-11 Väg B:** multi-approach
+(A) korrigera XML-doc + test mot rätt sink (ILogger) /
+(B) lägg till `AuditLogEntry`-skrivning i seedern utanför Mediator-pipelinen /
+(C) defer till Fas 6.
 
-**Scope:** ~1h CC-tid (kriterium 3). Defereras till Fas 6 admin-impersonation
-eller dedikerat observability-pass där audit-evidence-tester gör en bredare
-sweep.
+**CTO-beslut: Alt A.** Motivering mot Robert C. Martin 2017 (SRP), Martin 2008
+(Clean Code kap. 4 — comments that lie are defects), Fowler 2018 (Refactoring
+kap. 3 — code smells), Ford/Parsons/Kua 2017 (Building Evolutionary
+Architectures kap. 2 — fitness functions skyddar arkitekt-portar mot
+smyg-erosion), Cohn 2009 (Test Pyramid), Twelve-Factor §XI (Logs as event
+streams), ADR 0022 immutable-policy.
 
-**Trigger:** Fas 6 admin-impersonation eller GDPR-audit-evidence-pass.
+Alt B avvisad: bryter SRP (seeder får två change-reasons), introducerar ny
+audit-skrivnings-port utanför ADR 0022:s etablerade Mediator-pipeline →
+kräver dedikerad ADR, inte TD-stängning. "Smyg-in arkitekturbeslut via
+TD-fix" är anti-pattern (Ford/Parsons/Kua). Alt C avvisad: CLAUDE.md §9.6
+anti-pattern "spara TD så scope inte växer" — evidence-kravet kan uppfyllas
+nu inom 1h mot rätt sink (ILogger).
+
+**Levererad åtgärd:**
+
+1. **XML-doc korrigerad** (`src/JobbPilot.Infrastructure/Identity/IdempotentAdminRoleSeeder.cs`
+   rad 17-31): ärlig formulering — observability via `LogAdminAssigned`
+   EventId=2 → ILogger → Serilog → Seq (dev) / CloudWatch Logs (prod).
+   Explicit anti-claim att seedern INTE populerar `audit_log`-tabellen +
+   hänvisning till ADR 0022 + Fas 6 admin-impersonation-ADR-kandidatur för
+   dedikerad bootstrap-audit-port.
+2. **Integration-test levererat** (`tests/JobbPilot.Application.UnitTests/IdentityBootstrap/IdempotentAdminRoleSeederAuditEvidenceTests.cs`):
+   3 testfall med CapturingLogger + InMemory Identity-store (AddIdentityCore-
+   pattern matchar Worker-DI). Verifierar:
+   - Happy path: matchande user → EventId=2 (LogAdminAssigned) emit:as exakt 1×
+   - Idempotens: user redan Admin → INGEN EventId=2, men EventId=3
+     (LogAdminAlreadyAssigned) emit:as som no-op-bevis
+   - Saknad user: ingen matchande user → INGEN EventId=2, men EventId=4
+     (LogAdminUserNotFound) emit:as som warning-bevis
+
+**Tester:** Application.UnitTests 201 → 204 (+3). Full svit 612 → 615.
+
+**Faktisk CC-tid:** ~2h (discovery + CTO-triage + implementation). Inom
+4h-regeln per CLAUDE.md §9.6.
+
+**0 nya TDs lyfta.** Bootstrap-audit-port-frågan (om DB-persistent audit
+för Identity-side-effects någonsin ska finnas) hör till Fas 6 admin-
+impersonation-ADR-arbete — inte en defekt i nuvarande system så länge
+XML-doc:en är ärlig om vad evidence-spåret faktiskt är.
 
 ---
 
