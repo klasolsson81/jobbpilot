@@ -1702,24 +1702,37 @@ exhaustiveness-rationale via `never`-typ.
 
 ---
 
-## TD-53b: Frontend kind-union — list-endpoints
+## TD-53b: ~~Frontend kind-union — list-endpoints~~ — STÄNGD 2026-05-11
 **Kategori:** Code consistency / Frontend
 **Severity:** Minor
 **Fas:** 1
 **Källa:** TD-53 split per senior-cto-advisor-triage 2026-05-11
+**Status:** **STÄNGD 2026-05-11 (commit `aac9b2f`).** ADR 0030-migration
+färdig över hela frontend-API-ytan (7 endpoints, 5+ konsumenter).
 
-Färdigställer kind-union-konsistens på list-endpoints:
-- `getPipeline()` — refactor från `PipelineGroupDto[]` (tom-fallback) till `ApiResult<PipelineGroupDto[]>`
-- `getApplications(page, pageSize, status?)` — refactor från `T | null`
-- `getResumes(page, pageSize)` — refactor från `T | null`
+Levererat:
+- 4 endpoints refactorade till `Promise<ApiResult<T>>` med explicit return-type:
+  `getPipeline`, `getApplications`, `getResumes`, `getAuditLog`
+- Lokala `AuditLogResponse`-typen raderad från `admin.ts` (ad-hoc-union
+  ersatt med generisk `ApiResult`)
+- 3 konsumenter med exhaustive switch + `assertNever`:
+  `ansokningar/page.tsx`, `cv/page.tsx`, `admin/granskning/page.tsx`
+- `responseToResult` används unconditionally (grep `parseResponse` i
+  `lib/api/` = 0 träffar)
 
-Konsumenter: `app/(app)/ansokningar/page.tsx`, `app/(app)/cv/page.tsx`.
+CTO-beslut (senior-cto-advisor 2026-05-11):
+- Variant A för `getApplications` (refactora ändå trots inga konsumenter —
+  ADR 0030-trohet + CCP per Martin 2017 kap. 13)
+- Variant Y för test-scope (helper redan testad, DRY i test-kod, tsc +
+  assertNever täcker exhaustiveness statiskt — Fowler 2012, Cohn 2009)
 
-**Scope:** ~4-6h CC-tid. Lyfts efter TD-53a är pushed.
+Reviews:
+- code-reviewer: 0 Blocker/Major, 4 Minor (informativa), 1 Nit
+- design-reviewer: 1 Major (`role="alert"`-borttagning i admin ErrorBlock,
+  konsekvens med TD-53a-policy) + 1 Minor (kommentar om dead notFound-case)
+  fixade in-block
 
-**Beroenden:** TD-53a (helper + ADR 0030) måste vara klart först.
-
-**Trigger:** Efter TD-53a-stängning.
+Tester: 217/217 oförändrat (Variant Y). tsc --noEmit grönt.
 
 ---
 
