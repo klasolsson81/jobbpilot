@@ -1432,30 +1432,21 @@ Vitest 5/5 grön. design-reviewer noterade ärvt touch-target-problem på `Input
 
 ---
 
-## TD-46: Exportera `pathToElementId` för isolated unit-test
+## TD-46: Exportera `pathToElementId` för isolated unit-test — **STÄNGD 2026-05-11**
 
 **Kategori:** Testing / Architecture
 **Severity:** Minor
-**Fas:** 1 eller 2 (opportunistisk, bake in vid form-refactor)
+**Fas:** 1
 **Källa:** code-reviewer M3, TD-43-review (2026-05-11)
-
-`pathToElementId` lever idag som privat function i `me-profile-form.tsx` och
-`resume-content-form.tsx`. TD-43-test:erna täcker den via komponent-tests
-(submit → fail → focus), men en isolated unit-test skulle:
-
-- Täcka alla branches (path → id-mappning) utan att kämpa mot jsdom-quirks
-  (HTML5-constraint-validation på `type="email"`/`type="date"` blockerar
-  submit utan `removeAttribute('required')`-tricks)
-- Vara billigare att köra (ingen render, ingen user-event)
-- Göra path-routing-konventionen tydligare som första-klass-API
-
-**Föreslagen åtgärd:** Extrahera `pathToElementId` till
-`src/lib/forms/path-routing.ts` (eller motsv.) med named export, skriv
-parametriserade unit-tests. Komponent-tester kan då fokusera på
-flödet (submit → state-uppdatering → DOM-reaktion), inte path-detaljer.
-
-**Beroenden:** Inga blockare. Touch på 2 form-filer + 1 ny utility-fil + 1 ny
-testfil. ~50 rader netto.
+**Status:** STÄNGD 2026-05-11 — Discovery upptäckte att functions INTE var dubbletter
+(olika dataformer: me-form switch-statement, resume-form regex-cascade). Klas valde
+**Approach B (per-domän filer)** över ursprungliga Approach A (1 fil) efter
+SOLID/SoC-analys. Skapat: `src/lib/forms/me-path-routing.ts` + `resume-path-routing.ts`
++ två parameteriserade test-filer (`it.each`). 35 nya unit-tests grön (12 me + 23 resume
+inklusive negativ-fall som låser regex-kontraktet). 11/11 grön befintliga komponent-
+tester (regression-check). code-reviewer + design-reviewer APPROVED. Bonus-fynd från
+reviews: (1) `fieldA11y`-helper duplicerad mellan forms — kandidat för framtida TD,
+(2) `src/lib/`-org-konvention (purpose-folder vs domain-folder) — kandidat för ADR.
 
 ---
 

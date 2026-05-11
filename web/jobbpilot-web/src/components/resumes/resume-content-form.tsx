@@ -13,6 +13,7 @@ import {
   emptySkill,
 } from "@/lib/resumes/content-utils";
 import { updateMasterContentAction } from "@/lib/actions/resumes";
+import { pathToElementId } from "@/lib/forms/resume-path-routing";
 import type { ResumeContentDto } from "@/lib/types/resumes";
 
 interface ResumeContentFormProps {
@@ -138,23 +139,6 @@ function toRawPayload(values: FormValues): RawContentPayload {
 type FieldError = { path: string | null; message: string };
 
 const ERROR_ID = "content-form-error";
-
-function pathToElementId(path: string): string | null {
-  if (path.startsWith("personalInfo.")) {
-    return `pi-${path.slice("personalInfo.".length)}`;
-  }
-  if (path === "summary") return "summary";
-  const exp = path.match(/^experiences\.(\d+)\.(.+)$/);
-  if (exp) return `exp-${exp[1]}-${exp[2]}`;
-  const edu = path.match(/^educations\.(\d+)\.(.+)$/);
-  if (edu) return `edu-${edu[1]}-${edu[2]}`;
-  const skill = path.match(/^skills\.(\d+)\.(.+)$/);
-  if (skill) {
-    const field = skill[2] === "yearsExperience" ? "years" : skill[2];
-    return `skill-${skill[1]}-${field}`;
-  }
-  return null;
-}
 
 export function ResumeContentForm({
   resumeId,
