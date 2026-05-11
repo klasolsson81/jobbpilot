@@ -1394,3 +1394,120 @@ ljuger om verkligheten.
 **Reviews:** code-reviewer + design-reviewer Approved Batch C. Inga ändringar krävdes — bevakning bedömd tillräcklig.
 
 ---
+
+## TD-3: Tom-state-copy "Inga roller tilldelade" saknar next-action ✓ STÄNGD 2026-05-11
+**Kategori:** UX
+**Severity:** Minor
+**Fas:** 1 UX-pass /mig
+**Källa:** design-reviewer, 2026-05-07 (Turn 2)
+**Status:** **STÄNGD 2026-05-11 (Batch D)** — Variant (a) stum tom-state.
+
+På /mig visades "Inga roller tilldelade" om `user.roles` var tom array.
+Användaren fick ingen vägledning om vad det betyder eller om de behövde
+agera. Skapade kognitiv friktion utan informationsvärde för 99% av
+användarna (vanlig user har `roles: []`).
+
+**Leverans (Batch D):**
+
+Hela `<dt>Roller</dt> + <dd>...</dd>`-paret wrappat i conditional:
+```tsx
+{user.roles && user.roles.length > 0 && (
+  <div className="flex flex-col gap-1">
+    <dt className="text-body-sm text-text-secondary">Roller</dt>
+    <dd className="text-body text-text-primary">{user.roles.join(", ")}</dd>
+  </div>
+)}
+```
+
+Tom-state rendering = ingenting. Inkonsistent fält-uppsättning mellan
+user-typer accepterad: civic-utility visar bara det som är relevant
+för aktuell user.
+
+**CTO-beslut (senior-cto-advisor 2026-05-11):** Variant (a) över (b).
+Motivering: NN/g Heuristics #6 (Recognition vs Recall) + #8 (Aesthetic
++ Minimalist), GOV.UK Design Principles #2 "Do less", YAGNI (Hunt/Thomas
+1999). Variant (b) "kontakta support om du förväntade dig roller här"
+avvisad som cargo-cult-helpfulness — skapar oro där ingen ska finnas.
+
+**Reviews:**
+- code-reviewer: 0 Blocker / 0 Major / 0 Minor. Approved.
+- design-reviewer: Approved. Civic-utility-konsekvent (GOV.UK/1177/Digg-pattern).
+
+**Tester:** ingår i Batch D-svit (Vitest 226/226 + tsc grön).
+
+---
+
+## TD-4: userId visas i UI utan tydligt användarbehov ✓ STÄNGD 2026-05-11
+**Kategori:** UX / Privacy hygiene
+**Severity:** Minor
+**Fas:** 1 UX-pass /mig
+**Källa:** security-auditor, 2026-05-07 (Turn 2)
+**Status:** **STÄNGD 2026-05-11 (Batch D)** — Variant (a) ta bort fältet.
+
+mig/page.tsx visade `user.userId` (GUID, font-mono) som första fält i
+Kontoinformation-Card. Slutanvändare hade inget direkt behov av Guid.
+Möjligt support-värde — men då skulle syftet behöva kommuniceras
+tydligt (vilket variant (b) "Support-ID" föreslog).
+
+**Leverans (Batch D):**
+
+Hela `<dt>Användar-id</dt> + <dd>{user.userId}</dd>`-paret borttaget.
+Kontoinformation-Card visar nu E-postadress + ev. Roller.
+
+**CTO-beslut (senior-cto-advisor 2026-05-11):** Variant (a) över (b).
+Motivering: GDPR Art. 5(1)(c) data minimisation, NN/g #8 Aesthetic +
+Minimalist, GOV.UK/1177-pattern (tekniska IDs visas vid felanmälan/support,
+inte som default i profilvy). Variant (b) "Support-ID (för felanmälningar)"
+avvisad som cargo-cult-transparens — löser ett problem användare inte har
+idag (inget felanmälningsflöde i Fas 1) och skapar UI-element som varken
+är actionable eller informativt. YAGNI.
+
+Om support i framtiden behöver userId: exponera via dedikerat "Felanmäl"-
+flow med explicit UX (kopiera-knapp, kontext) i Fas 2+.
+
+**Reviews:**
+- code-reviewer: 0 Blocker / 0 Major / 0 Minor. Approved. GDPR-rensning korrekt utförd.
+- design-reviewer: Approved. Card-bredd `max-w-lg` bevarad för visuell rytm.
+
+**Tester:** ingår i Batch D-svit. Inga test-träffar på "Användar-id"-label eller `userId`-UI-rendering.
+
+---
+
+## TD-5: Redundant getServerSession-anrop på /mig ✓ STÄNGD 2026-05-11
+**Kategori:** Code hygiene
+**Severity:** Minor
+**Fas:** 1 UX-pass /mig
+**Källa:** security-auditor, 2026-05-07 (Turn 2)
+**Status:** **STÄNGD 2026-05-11 (Batch D)** — Variant (a) no-op + dokumentera pattern.
+
+Både `(app)/layout.tsx:12` och `mig/page.tsx:15` anropade
+`getServerSession()`. Funktionellt OK — funktionen är `React.cache()`-
+wrappad så andra anropet träffar cache. Men kodflödet var otydligare
+än nödvändigt — framtida läsare kunde tolka det som duplicering och
+föreslå "fix".
+
+**Discovery-fynd (Batch D):** ALLA 7 (app)-sidor anropar `getServerSession()`
+direkt — det är etablerad pattern. Att specialfälla just /mig vore
+arkitektoniskt inkonsekvent. Variant (b) (layout-prop-passing via Server
+Component-context-trick) avvisad som scope-skred + KISS-brott.
+
+**Leverans (Batch D):**
+
+JSDoc tillagd ovan `getServerSession`-export i `lib/auth/session.ts`
+som förklarar `React.cache()`-semantiken, att flera anrop per request
+är intentional och cache-hit, och att layout-prop-passing avvisades
+för SoC-konsistens med övriga (app)-sidor. Inkluderar TD-referens +
+datum för granskningstrail.
+
+**CTO-beslut (senior-cto-advisor 2026-05-11):** Variant (a) över (b)/(c).
+Motivering: DRY tillämpad korrekt (Hunt/Thomas 1999 — `React.cache()` ÄR
+knowledge piece), SoC (Dijkstra 1974), KISS, konsistens (Fowler 2018,
+*Refactoring* kap. 3 "Bad Smells").
+
+**Reviews:**
+- code-reviewer: Approved. JSDoc-kvalitet föredömlig — "inline ADR för mikrobeslut".
+- design-reviewer: ej tillämpligt (ingen UI-impact).
+
+**Tester:** ingår i Batch D-svit.
+
+---

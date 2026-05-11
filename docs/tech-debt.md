@@ -19,9 +19,6 @@ tidsbegränsning per touch — fas-tillhörighet styr. Default = fixa in-block.
 |---|---|---|---|---|
 | TD-13 | Encryption av PII-kolumner | **Major** | 2 | Säkerhet/GDPR |
 | TD-26 | AI-kostnadstak: token-limit + per-user spend-cap | **Major** | 4 (AI) | Säkerhet/Kostnad |
-| TD-3 | Tom-state-copy "Inga roller tilldelade" saknar next-action | Minor | 1 | UX |
-| TD-4 | userId visas i UI utan tydligt användarbehov | Minor | 1 | UX/Privacy |
-| TD-5 | Redundant getServerSession-anrop på /mig | Minor | 1 | Code hygiene |
 | TD-6 | Logout-backend-call utan fel-loggning | Minor | 1 | Observability |
 | TD-12 | Saknad integration-test för cross-user isolation | Minor | 1 | Säkerhet/Test |
 | TD-28 | Frontend typed-confirmation-UX + re-auth-prompt på DELETE /me | Minor | 1 | UX/Säkerhet |
@@ -152,54 +149,6 @@ för cost-cap-design när AI-features designas.
 
 
 ## Minor — Fas 1
-
-## TD-3: Tom-state-copy "Inga roller tilldelade" saknar next-action
-**Kategori:** UX
-**Severity:** Minor
-**Källa:** design-reviewer, 2026-05-07 (Turn 2)
-
-På /mig visas "Inga roller tilldelade" om `user.roles` är tom array.
-Användaren får ingen vägledning om vad det betyder eller om de
-behöver agera.
-
-**Föreslagen åtgärd:** Antingen (a) gör tom-state stum — visa inte
-fältet alls om listan är tom — eller (b) ge context: "Inga roller
-tilldelade än — kontakta support om du förväntade dig roller här."
-Beslut hör hemma i Fas 1 UX-pass när roles-konceptet konkretiseras
-produktmässigt.
-
----
-
-## TD-4: userId visas i UI utan tydligt användarbehov
-**Kategori:** UX / Privacy hygiene
-**Severity:** Minor
-**Källa:** security-auditor, 2026-05-07 (Turn 2)
-
-mig/page.tsx visar `user.userId` (Guid) som första fält. Slutanvändare
-har inget direkt behov av Guid. Möjligt support-värde — men då bör
-syftet kommuniceras tydligt ("Support-id för felanmälningar").
-
-**Föreslagen åtgärd:** Antingen ta bort fältet ur UI eller omformulera
-label så syftet är klart. Beslut i Fas 1 UX-pass.
-
----
-
-## TD-5: Redundant getServerSession-anrop på /mig
-**Kategori:** Code hygiene
-**Severity:** Minor
-**Källa:** security-auditor, 2026-05-07 (Turn 2)
-
-Både (app)/layout.tsx och mig/page.tsx anropar getServerSession().
-Funktionellt OK — funktionen är `React.cache()`-ad så andra anropet
-träffar cache. Men kodflödet är otydligare än nödvändigt.
-
-**Föreslagen åtgärd:** Förmodligen acceptera duplikationen som
-dokumenterad pattern (cache är billig, läsbarhet vinner) snarare
-än att fixa. Alternativ: refaktorera så att layout passerar `user`
-via context eller layout-prop. Inte trivialt i Server Components
-— pragmatiskt rätt är troligen "no-op + dokumentera pattern".
-
----
 
 ## TD-6: Logout-backend-call utan fel-loggning
 **Kategori:** Observability
@@ -949,6 +898,9 @@ ADR-cross-references och granskningsbevis.
 | TD-1 | Skip-link saknas i (app)-layout | 2026-05-11 | Batch C |
 | TD-2 | CardTitle renderas utan heading-tag | 2026-05-11 | Batch C |
 | TD-40 | Path-equality i `fieldA11y` — saknar regression-bevakning | 2026-05-11 (retroaktivt) | Batch C |
+| TD-3 | Tom-state-copy "Inga roller tilldelade" saknar next-action | 2026-05-11 | Batch D |
+| TD-4 | userId visas i UI utan tydligt användarbehov | 2026-05-11 | Batch D |
+| TD-5 | Redundant getServerSession-anrop på /mig | 2026-05-11 | Batch D |
 
 ---
 
