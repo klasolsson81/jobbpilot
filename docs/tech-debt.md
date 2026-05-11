@@ -1311,30 +1311,44 @@ Beslut behöver tas innan A3 så framtida formulär följer en linje.
 
 ---
 
-## TD-42: Touch-target projektbrett under WCAG 2.5.5 (44×44 px)
+## TD-42: ~~Touch-target projektbrett under WCAG 2.5.5 (44×44 px)~~ — STÄNGD 2026-05-11
 
 **Kategori:** Accessibility / WCAG 2.1 AAA
 **Fas:** 1 a11y-pass-completion
 **Prioritet:** Medium
 **Källa:** design-review Fas 1 Block A2 2026-05-10 (Minor Mi1)
+**Status:** **STÄNGD 2026-05-11 (Väg B a11y-pass).** Stationär-CC-session
+levererade primitive-uppgradering (commit `f2b179a`) + in-block-fixar från
+design-review (commit `1b0b9ec`). Backend oförändrad + Frontend 150/150 grönt.
 
-WCAG 2.5.5 (Target Size, AAA) rekommenderar 44×44 px för interaktiva
-element. JobbPilot:s default är `h-8` (32px) på Input/Button + `size-4`
-(16px) på checkboxes. Detta är **inte WCAG 2.1 AA-blocker** (2.5.5 är AAA),
-men under modern usability-baseline (Apple HIG, Material Design, GOV.UK).
+**Levererat:**
+- `input.tsx` h-8 → h-9 (32→36px). `file:h-6` → `file:h-7` för proportion.
+- `button.tsx` default h-8 → h-9, lg h-9 → h-11 (kritiska CTAs nu WCAG 2.5.5
+  AAA-höjd), icon size-8 → size-9, icon-lg size-9 → size-11. Dense-context
+  varianter (xs/sm/icon-xs/icon-sm) bevarade.
+- `select.tsx` data-[size=default]:h-8 → h-9. sm-variant bevarad.
+- `me-profile-form.tsx` native language-select h-8 → h-9 (matchar Input).
+- `add-follow-up-form.tsx` datetime-local h-8 → h-9.
+- In-block-fixar från reviews (commit `1b0b9ec`):
+  - `/ansokningar/ny` Avbryt-button size="sm" → default (matchar /cv/ny pattern)
+  - `/ansokningar/page.tsx` "Ny ansökan"-CTA size="sm" → default
+  - `/cv/page.tsx` "Nytt CV"-CTA size="sm" → default
+- Checkboxes (`size-4`) bevarade — hit-area via row-pattern (items-start +
+  gap-3 + cursor-pointer på label).
 
-**Berörda komponenter:**
-- `web/jobbpilot-web/src/components/ui/input.tsx` — `h-8`
-- `web/jobbpilot-web/src/components/ui/button.tsx` — default size `h-8`
-- `web/jobbpilot-web/src/components/ui/select.tsx` — `data-[size=default]:h-8`
-- `web/jobbpilot-web/src/components/me/me-profile-form.tsx` — checkboxes `size-4`
+**Konvention dokumenterad:**
+- `h-9` (36px) = default (skill-doc `jobbpilot-design-components`)
+- `h-11` (44px) = critical CTAs (skill-doc `jobbpilot-design-a11y` §9)
+- `h-7` (28px) = sm, dense-context
+- WCAG 2.5.5 är AAA — JobbPilots civic-utility-densitet kompromissar mot
+  h-9 default + h-11 critical CTAs (matchar Stripe Dashboard / GOV.UK).
 
-**Föreslagen åtgärd:** projektbrett pass (separat block, inte in-block-fix)
-för att höja default till `h-9` (36px) eller `h-10` (40px). Kompromiss
-mellan civic-utility-densitet och touch-target-rekommendation. Checkboxes
-behöver större hit-area (gap + padding runt så hela rad-klick triggar).
+**Reviews:**
+- code-reviewer: APPROVE (1 Minor + 1 Nit — Minor lyft som TD-57)
+- design-reviewer: APPROVE-WITH-FIXES (3 Major + 2 Minor — M1+M2 fixade
+  in-block per 4h-regel, M3 lyft som TD-57)
 
-Inte A2-introducerad regression — befintligt mönster.
+**Follow-up:** TD-57 (native form-controls divergerar från Input-primitive).
 
 ---
 
@@ -1662,26 +1676,43 @@ api-moduler + alla konsumenter + tests.
 
 ---
 
-## TD-54: `text-text-tertiary` på empty-state sekundärtext bryter WCAG AA
+## TD-54: ~~`text-text-tertiary` på empty-state sekundärtext bryter WCAG AA~~ — STÄNGD 2026-05-11
 **Kategori:** Accessibility (WCAG 2.1 AA 1.4.3 Contrast)
 **Severity:** Minor (replikerat pattern)
 **Källa:** design-reviewer, 2026-05-11 (Fas 1-stängning admin-audit)
+**Status:** **STÄNGD 2026-05-11 (Väg B a11y-pass).** Stationär-CC-session
+levererade kontextuell mapping (commit `8cfbde4`) + in-block-fix från
+design-review (commit `52f3b45`). Frontend 150/150 grönt.
 
-`text-text-tertiary` (#8A8A85) på `bg-surface-secondary` (#F7F7F5) ≈ 2.9:1.
-WCAG AA kräver 4.5:1 för body text.
+Discovery hittade 16 träffar i 9 filer. Kontextuell mapping applicerad:
 
-**Berörda filer (replikerat pattern):**
-- `web/jobbpilot-web/src/app/(app)/ansokningar/page.tsx:48`
-- `web/jobbpilot-web/src/app/(admin)/admin/granskning/audit-log-table.tsx:20`
-- Potentiellt fler — projektbrett audit krävs
+**Funktionell text (10 träffar) → `text-text-secondary` (7.2:1, AA):**
+- `components/resumes/resume-card.tsx` (timestamp)
+- `components/applications/application-card.tsx` (timestamp)
+- `app/(app)/ansokningar/page.tsx` (empty-state)
+- `app/(app)/ansokningar/[id]/page.tsx` (id-fragment + note-datum)
+- `app/(app)/cv/[id]/page.tsx` (resume-name)
+- `app/(app)/cv/page.tsx` (empty-state)
+- `app/(admin)/admin/granskning/audit-log-pagination.tsx` (disabled-link-text)
+- `app/(admin)/admin/granskning/audit-log-table.tsx` (sekundärtext + actor)
 
-**Föreslagen åtgärd:**
-1. Projektbrett grep efter `text-text-tertiary` i empty-state/help-text-kontekster
-2. Byt till `text-text-secondary` (#5A5A5A ≈ 6.0:1) för funktionell text
-3. Behåll `text-text-tertiary` ENDAST för dekorativ/icke-essentiell text
+**Dekorativa separatorer (5 träffar) → KVAR `text-text-tertiary`:**
+- Breadcrumb `/` (× 2)
+- Aggregate-separator ` · `
+- Em-dash placeholders `—` (× 2)
 
-**Scope:** Bör buntas med TD-42 (touch-target projektbredd) eller egen
-projektbrett a11y-token-audit. Bryter projektbredd a11y-disciplin → egen TD.
+Per a11y-skill §4: "decorative/non-essential text" är undantaget från
+4.5:1-kravet. Per components-skill: Breadcrumb-separator är dokumenterat
+för `text-text-tertiary`.
+
+**In-block-fix (commit `52f3b45`):**
+- `cursor-not-allowed` på pagination disabled-spans (design-reviewer N1)
+  för att stärka sighted-user-affordance utan att bryta civic-utility-ton.
+
+**Reviews:**
+- code-reviewer: APPROVE (0 blocker, 0 major, 0 minor, 0 nit)
+- design-reviewer: APPROVE (0 blocker, 0 major, 4 minor, 2 nit) — N1
+  fixad in-block, övriga acceptabla observations
 
 ---
 

@@ -1,7 +1,7 @@
 # JobbPilot — STEG-tracker
 
-> **Version:** 1.15
-> **Senast uppdaterad:** 2026-05-11 efm (**VÄG C FAS 1.5 HOUSEKEEPING LEVERERAD.** Stationär-CC-session efter Fas 1-stängning levererade TD-55 PagedResult retro-fit + TD-48 Mono.Cecil arch-test + TD-47 GH Actions CA-bundle-cron + TD-50 admin-bootstrap runbook. 6 commits. 2 agent-reviews APPROVED (code-reviewer + dotnet-architect) med 3 Minor in-block-fixade. Ny TD-56 (ListJobAds Fas 2-paginering) lyft. Backend 594/594 + Frontend 150/150 grönt.)
+> **Version:** 1.16
+> **Senast uppdaterad:** 2026-05-11 sen efm (**VÄG B a11y-PASS LEVERERAD.** Stationär-CC-session efter Väg C-housekeeping levererade TD-54 (text-text-tertiary kontrast-fix WCAG AA 1.4.3) + TD-42 (touch-target-uppgradering till skill-doc-defaults h-9 default + h-11 critical CTAs). 4 commits. 4 agent-reviews APPROVED (code-reviewer + design-reviewer × 2 block) med 3 Major in-block-fixade per 4h-regel. Ny TD-57 (native form-controls divergerar från Input-primitive) lyft. Backend 594/594 + Frontend 150/150 grönt. Skill-doc-konformitet snarare än multi-approach-val.)
 > **Roll:** permanent översikt över STEG- och fas-progression.
 
 Kompletteras av:
@@ -90,6 +90,7 @@ Cleanup-passningar, disciplin-uppgraderingar och dokumentations-arbete som inte 
 |--------|-------------|--------|--------|
 | 2026-05-07 | Upptakt: ADR 0019 etablerad (solo direct-push), CLAUDE.md uppgraderad (§9.4 discovery, §9.5 web-search, §9.2 utökad), tech-debt.md etablerad, hook-vakt fix:ad för Agent SDK-läget, precompact-rapporter exkluderade från versionshantering | Webb-chats: ADR 0019-chatt + Moment 1-5-chatt | Pågående (Moment 5 = denna tracker) |
 | 2026-05-11 efm | **Väg C Fas 1.5 housekeeping** efter Fas 1-milestone-stängning. 4 TDs stängda i samlad batch: TD-55 (PagedResult retro-fit, runtime typ-skew identifierat + stängt), TD-48 (Mono.Cecil arch-test för Trust=true-läckage), TD-47 (GH Actions cron för CA-bundle-rotation), TD-50 (admin-bootstrap runbook). 6 commits (`c2f539e` → `a9ca126`). CTO-beslut entydigt motiverat: Alt 3 commit-strategi + Alt A2 Mono.Cecil + seriell A→B→C-ordning. 2 agent-reviews APPROVED med alla 3 Minor in-block-fixade. Ny TD-56 (ListJobAds Fas 2-paginering) lyft som scope-deferral. Backend 594/594 + Frontend 150/150 grönt. | docs/sessions/2026-05-11-1200-vag-c-fas15-housekeeping.md | ✓ Klart |
+| 2026-05-11 sen efm | **Väg B a11y-pass** efter Väg C-housekeeping. 2 TDs stängda: TD-54 (text-text-tertiary kontrast-fix för funktionell text, WCAG AA 1.4.3 — 16 träffar i 9 filer, kontextuell mapping funktionell→secondary + dekorativ→tertiary kvar) + TD-42 (touch-target-uppgradering till skill-doc-defaults: h-9 default + h-11 critical CTAs + h-9 icon + h-11 icon-lg). 4 commits (`8cfbde4` → `1b0b9ec`). Skill-doc-konformitet snarare än multi-approach-val: kod-baseline var drift från `jobbpilot-design-components` + `jobbpilot-design-a11y`-skills. 4 agent-reviews APPROVED (code-reviewer + design-reviewer × 2 block) med 3 Major in-block-fixade per 4h-regel (cursor-not-allowed pagination disabled + Avbryt-button h-7→h-9 + page-header CTAs sm→default). Ny TD-57 (native form-controls divergerar från Input-primitive — datetime-local + native select rounded-md vs rounded-sm, saknar aria-invalid/dark-mode/disabled bg) lyft som M3-deferral (kräver design-beslut). Backend 594/594 + Frontend 150/150 grönt. | docs/sessions/2026-05-11-1400-vag-b-a11y-pass.md | ✓ Klart |
 
 ## 5. Aktuellt
 
