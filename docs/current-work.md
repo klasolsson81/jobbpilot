@@ -1,102 +1,81 @@
 # Current work — JobbPilot
 
-**Status:** **FAS 2 POLISH-BLOCK LEVERERAD 2026-05-11 ~16:30 — väntar Klas-diff-granskning innan push.** 5 audit-fynd fixade in-block (N-1 + N-3 + H-4 + N-2 + H-3), 4 TDs lyfta (TD-58/59/60/61). Backend 594 → 607. Inget pushed ännu — 4 commits redo per Conventional Commits.
+**Status:** **VÄG A TD-60 ADR 0029 LEVERERAD 2026-05-11 ~18:00 — väntar Klas-diff-granskning innan push.** ADR 0029 (HTTP-auth-pipeline + IClaimsTransformation-disciplin) + 5 integration-tester. Backend 607 → 612. TD-60 stängd. 0 nya TDs lyfta.
 **Senast uppdaterad:** 2026-05-11
 **Långsiktig bana:** `docs/steg-tracker.md` — single source of truth för STEG/fas-progression
 **Tech debt:** `docs/tech-debt.md`
 
 ---
 
-## Aktivt nu — Fas 2 Polish-block (pending push)
+## Aktivt nu — Väg A: TD-60 ADR 0029 (pending push)
 
-**Stationär-CC-session 2026-05-11 ~16:30 — arch-audit-fynd-fix.** Klas valde Alt 2 (polish-block) efter audit Fas 1 Discovery levererad 2026-05-11 ~12:15. Audit klassade 0 Blocker / 0 Major / 4 Minor / 3 Nit. Klas-val: kör 5 in-block-fix i en session.
+**Stationär-CC-session 2026-05-11 ~17:00 — TD-60-stängning via dedikerat docs-pass.** Klas valde Väg A efter Fas 2 polish-block pushad. Original-scope: ~45 min pure docs. Faktisk scope: ~2.5h efter agent-review-driven in-block-fix av Major-fynd.
 
-### Block-leverans
+### Leverans
 
-| Block | Scope | Output | Status |
-|-------|-------|--------|--------|
-| A | N-1 events + N-3 DomainException + H-4 paging-rename | Domain-events + Domain.Common.DomainException + Page-konvention | ✓ Klart |
-| B | N-2 IdempotentAdminRoleSeeder env-gate | IHostEnvironment-gated catch + 5 unit-tests + prod-bubble anti-regression | ✓ Klart |
-| C | H-3 role-fetch → IClaimsTransformation | SessionRoleClaimsTransformation + sentinel-claim + arch-test allowlist | ✓ Klart |
-| D | TDs + docs + commits | TD-58/59/60/61 + session-logg + steg-tracker | ✓ Klart (pending push) |
+| Artefakt | Output | Status |
+|----------|--------|--------|
+| ADR 0029 | `docs/decisions/0029-auth-pipeline-and-claims-transformation.md` — 4 beslut: pipeline-ordning, claim-placering, per-request-fetch, allowlist | ✓ Klart |
+| Index | `docs/decisions/README.md` — rad för 0029 insorterad efter 0028 | ✓ Klart |
+| Integration-tester | `tests/JobbPilot.Api.IntegrationTests/Auth/SessionRoleClaimsTransformationTests.cs` — 5 tester | ✓ Klart |
+| TD-60 stängd | `docs/tech-debt.md` rad 1891 — status: STÄNGD | ✓ Klart |
 
-### CTO-beslut tagna (3 entydiga)
+### ADR 0029 — 4 beslut
 
-- **N-1 Riktning A** (events uppåt): Evans 2003 + Vernon 2013 kap. 8 + Martin 2017 kap. 13 CCP. Domain events är historiska fakta; frånvaro av subscriber idag är inte argument mot raise. GDPR-cascade-bevis kräver event-trail.
-- **N-3 Alt A** (DomainException i Domain.Common): CLAUDE.md §2.1 dependency rule + Martin 2017 kap. 8 OCP. Alt B (Application-placering) bryter dep-rule; Alt C (per-aggregate) bryter OCP; Alt D (lämna) bryter §3.4 + §5.1.
-- **N-2 Alt A** (env-gate): CLAUDE.md §3.4 fail-loud + Twelve-Factor §10 dev/prod parity + Martin 2017 kap. 13 CCP. Alt B (fixture-refactor) bryter 4h-regel; Alt C (log-level) bevarar fail-silent.
+1. **HTTP-pipeline-ordning explicit:** `UseAuthentication` → `IClaimsTransformation` → `UseAuthorization` formaliserad som JobbPilot-specifik single source of truth. Komplementär till ADR 0008/0022/0028 (Mediator-pipeline är separat).
+2. **Claim-placerings-regel:** auth-handler emit:ar bara protokoll-claims (`NameIdentifier`, `Sub`, `session_id_prefix`); claims-transformation emit:ar claims som kräver extern lookup (`ClaimTypes.Role`, framtida impersonation/IdP/tenant).
+3. **Per-request-fetch utan cache i Fas 1:** security-first över micro-prestanda. Sentinel-claim `jobbpilot:roles_resolved` för idempotens. Trigger för omvärdering: >1000 req/s sustained eller federerat IdP.
+4. **Konsument-allowlist via `ClaimsTransformationAllowlistTests`:** strukturell spärr analogt med ADR 0024 D1 audit-bypass-port-pattern. Ny transformation bryter build:en.
 
-### Agent-review-leverans
+ADR 0029 är **komplementär** till ADR 0028 — supersedas inte. ADR 0028:s kärnbeslut (A1, defense-in-depth, marker, bootstrap, konstant-separation) är oförändrade; bara claim-placering har flyttats (H-3 SoC-split).
 
-**3 Major fixade in-block** per CLAUDE.md §9.6 (kvalitet > tempo):
+### Agent-reviews (2 parallella + 1 CTO-triage)
 
-1. **Block B security-auditor Major:** test-fixture-removal-blindzon. Fix: separat `ProdSeederBubbleFactory` som BEHÅLLER seedern + skipar Identity-migration → bevisar 42P01-bubbling i Production E2E (inte bara predicate-funktionen isolerat).
-2. **Block C security-auditor Major:** `CancellationToken.None` på `GetRolesAsync` = resurs-läckage-risk. Fix: inject `IHttpContextAccessor` + använd `HttpContext?.RequestAborted`.
-3. **Block C dotnet-architect Minor (uppgraderad till Major in-block):** `HasClaim(Role)`-idempotency-guard otillförlitlig vid mid-session-promotion. Fix: sentinel-claim `jobbpilot:roles_resolved` sätts post-fetch.
-
-Alla Minor fixade in-block per 4h-regel (test-naming, XML-doc-remarks, defensiv cast, kommentar-justering, arch-test för IClaimsTransformation-allowlist).
-
-### TDs lyfta (4)
-
-| ID | Område | Defer-fas | Scope |
-|----|--------|-----------|-------|
-| TD-58 | H-1 IAccountHardDeleter ISP-split | Fas 6 admin-impersonation | ~2h |
-| TD-59 | H-2 ICurrentJobSeeker user→JobSeekerId-port | Fas 6 impersonation | ~2-3h |
-| TD-60 | ADR auth-pipeline-ordning + IClaimsTransformation-disciplin | Docs-pass | ~45 min |
-| TD-61 | Audit-trail-evidence-test för seeder | Observability-pass / Fas 6 | ~1h |
-
-**Aktiva TDs efter denna session:** TD-39, TD-41, TD-51, TD-52, TD-53, TD-56, TD-57, **TD-58, TD-59, TD-60, TD-61**.
+| Agent | Fynd | Åtgärd |
+|-------|------|--------|
+| code-reviewer | 2 Major + 1 Minor | Alla fixade in-block: M-1 prefix 8→6, M-2 falsk test-coverage-claim → Alt B integration-tester, Min-1 ADR 0028-path-fotnot |
+| dotnet-architect | 0 Blocker / 0 Major / 3 Minor / 1 Nit | Approved as-is. 3 Minor avvisade som TD per CTO-rek (NetArchTest-stil cosmetic, sentinel-pattern-ADR YAGNI Rule-of-Three, pipeline-ordnings-arch-test mitigerat av integration-test) |
+| senior-cto-advisor | M-2 multi-approach-val (Alt A/B/C) | Beslut: Alt B (integration-test i Api.IntegrationTests täcker både M-2 + dotnet-architect Minor 3). Motiverat mot Martin 2017 (REP/CCP, SRP), Cohn 2009 (Test Pyramid), Hunt/Thomas 1999 (YAGNI), Fowler 2018 (Rule of Three), Ford/Parsons/Kua 2017 (ADR append-only). 0 nya TDs lyfta. |
 
 ### Tester (full svit grön — pending push)
 
-- Domain.UnitTests: **163** (+6 från Block A)
-- Application.UnitTests: **201** (+5 från Block B)
-- Architecture.Tests: **32** (+1 från Block C)
-- Migrate.UnitTests: **6**
-- Api.IntegrationTests: **179** (+1 från Block B prod-bubble-test)
-- Worker.IntegrationTests: **26**
-- **Total: 607** (+13 från Block A+B+C)
+- Domain.UnitTests: **163** (oförändrat)
+- Application.UnitTests: **201** (oförändrat)
+- Architecture.Tests: **32** (oförändrat)
+- Migrate.UnitTests: **6** (oförändrat)
+- Api.IntegrationTests: **184** (+5 från SessionRoleClaimsTransformationTests)
+- Worker.IntegrationTests: **26** (oförändrat)
+- **Total: 612** (+5 från Väg A)
 
-### Pending commits (4, väntar Klas-diff-granskning)
+### Pending commits (1, väntar Klas-diff-granskning)
 
-| Commit | Scope | Filer (huvudsakliga) |
-|--------|-------|-----------------------|
-| 1 | `refactor(domain): N-1 + N-3 + H-4 — domain event-konsistens + DomainException + paging-rename` | Domain + Application/Queries + Api/Program.cs catch + tester (Block A) |
-| 2 | `fix(infra): N-2 — IdempotentAdminRoleSeeder prod-gate-hardening` | Infrastructure/Identity + csproj InternalsVisibleTo + tester (Block B) |
-| 3 | `refactor(auth): H-3 — SoC-split role-fetch till IClaimsTransformation` | Infrastructure/Auth + DI + arch-test (Block C) |
-| 4 | `docs: Fas 2 polish-block session-end — TD-58/59/60/61 + session-logg + steg-tracker` | docs/tech-debt + docs/current-work + docs/steg-tracker + docs/sessions (Block D) |
+| Commit | Scope | Filer |
+|--------|-------|-------|
+| 1 | `docs(adr): 0029 — HTTP-auth-pipeline + IClaimsTransformation-disciplin + integration-tester` | `docs/decisions/0029-*.md` + `docs/decisions/README.md` + `docs/tech-debt.md` + `tests/.../SessionRoleClaimsTransformationTests.cs` + `docs/current-work.md` + `docs/sessions/` + `docs/steg-tracker.md` + `STARTPROMPT-STATIONAR-2026-05-11.md` (raderas) |
 
-**OBS:** `ConnectionStringLeakageTests.cs` har en harmlös `dotnet format`-driven reindentation av nested foreach. Inkluderas i Block A-commit som format-disciplin (inga semantiska ändringar).
+Single bundled commit: docs-pass-natur med integration-test som essentiell del av ADR-claim. CTO-godkänt scope.
 
 ---
 
 ## När nästa session startar
 
-Klas reviewar diff per CLAUDE.md §6.3 punkt 4 (manuell diff-granskning). Vid GO: 4 commits + push.
+Klas reviewar diff per CLAUDE.md §6.3 punkt 4. Vid GO: 1 commit + push.
 
 Sedan optionell väg:
 
-- **Väg A:** TD-60 (auth-pipeline-ADR) som dedikerat docs-pass (~45 min)
 - **Väg B:** TD-61 (audit-trail-evidence-test) som observability-pass (~1h)
-- **Väg C:** Fortsätt feature-arbete — Fas 2 JobTech-integration (blockerad till ADR 0005) eller annan icke-blockerad Fas 1-feature
-- **Väg D:** Pausa, ny session
+- **Väg C:** Fortsätt feature-arbete (Fas 2 JobTech blockerad till ADR 0005)
+- **Väg D:** Pausa
 
-Inga aktiva TDs blockerar Väg C. Polish-block levererar "100% clean" före Fas 2-feature-arbete.
+Aktiva TDs: TD-39, TD-41, TD-51, TD-52, TD-53, TD-56, TD-57, TD-58, TD-59, TD-61. (TD-60 stängd.)
+
+Inga aktiva TDs blockerar feature-arbete.
 
 ---
 
-## Föregående session-summary (referens) — Arch-audit Fas 1 Discovery
+## Föregående session-summary (referens) — Fas 2 Polish-block
 
-**Stationär-CC-session 2026-05-11 ~12:15:** dotnet-architect-agenten verifierade Clean Arch-isolering, DDD-invariant-skydd, CQRS-pipeline-disciplin, SOLID/DRY/SoC-status över 6 src-projekt + 24 architecture-tester. CLAUDE.md §5.1 anti-pattern-katalogen gav noll Grep-träffar i `src/`. 22 STEG-rader klassade grön/gul. 4 Minor + 3 Nit dokumenterade med fil-ref + scope-rek. Rapport: `docs/reviews/2026-05-11-arch-audit-discovery.md`.
-
-**Audit-fynd som denna polish-block adresserade:**
-- N-1 ✓ stängd (events uppåt på Application + JobSeeker SoftDelete)
-- N-3 ✓ stängd (DomainException + Resume.MasterVersion-guard)
-- H-4 ✓ stängd (PageNumber → Page i 2 queries)
-- N-2 ✓ stängd (env-gate på 42P01-catch)
-- H-3 ✓ stängd (IClaimsTransformation SoC-split)
-- H-1 → TD-58 (Fas 6 admin-impersonation)
-- H-2 → TD-59 (Fas 6 impersonation)
+**2026-05-11 ~16:30:** 5 audit-fynd fixade in-block (N-1 + N-3 + H-4 + N-2 + H-3), 4 TDs lyfta (TD-58/59/60/61). Backend 594 → 607. 4 commits pushade (`ff3704f`, `a683ae1`, `35b9dc0`, `c0ada25`). H-3 SoC-split levererade `SessionRoleClaimsTransformation` — vilket triggade TD-60 som denna session stängde.
 
 ---
 
@@ -116,8 +95,8 @@ Inga aktiva TDs blockerar Väg C. Polish-block levererar "100% clean" före Fas 
 Per CLAUDE.md §9.2 + §9.6:
 
 1. Discovery först
-2. Multi-approach-val → senior-cto-advisor auto-invokeras (3 CTO-beslut denna session: N-1 Riktning A, N-3 Alt A, N-2 Alt A — alla entydigt motiverade mot källor)
-3. STOPP-rapport till Klas innan implementation om CTO osäker / fas-strategiskt (denna session: Klas gav "kör utan stanna" så block-flödet körde sammanhängande)
-4. Agent-reviews parallellt vid relevant scope (5 reviews denna session: dotnet-architect×2, code-reviewer×2, security-auditor×2)
-5. In-block-fix-default per 4h-regel (3 Major fixade in-block)
+2. Multi-approach-val → senior-cto-advisor auto-invokeras (denna session: M-2 Alt A/B/C-val, CTO valde Alt B entydigt motiverat mot Martin/Cohn/Hunt/Thomas/Fowler/Ford-Parsons-Kua)
+3. STOPP-rapport till Klas innan implementation om CTO osäker / fas-strategiskt (denna session: ingen STOPP behövd — CTO-rek entydigt + användar-mode "kör utan att stanna")
+4. Agent-reviews parallellt vid relevant scope (2 reviews + 1 CTO-triage)
+5. In-block-fix-default per 4h-regel (alla agent-fynd hanterade in-block, 0 nya TDs)
 6. Commit + push efter Klas-diff-granskning (direct-push till main per ADR 0019)

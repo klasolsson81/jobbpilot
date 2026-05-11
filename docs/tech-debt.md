@@ -1889,6 +1889,7 @@ där JobSeekerId-resolutionen naturligt behöver utvidgas med
 ---
 
 ## TD-60: ADR för auth-pipeline-ordning + `IClaimsTransformation`-disciplin
+**Status:** STÄNGD 2026-05-11 — ADR 0029 levererad.
 **Kategori:** Documentation / Architecture
 **Severity:** Minor
 **Fas:** 1.5 polish / framtida auth-changes
@@ -1901,17 +1902,23 @@ låser konsument-listan strukturellt. Men auth-pipeline-ordning
 
 Future-Klas eller annan agent som rör auth-stacken har ingen ADR att läsa.
 
-**Föreslagen åtgärd:** Ny ADR-rad som dokumenterar:
-1. Pipeline-ordning + extension-punkter (Auth-handler → IClaimsTransformation → Auth-policy)
-2. Var nya security-kritiska claims läggs till (transformation vs handler)
-3. Per-request-fetch vs cache-modell (CTO A1-beslut 2026-05-11)
-4. Konsument-allowlist-mönstret (arch-test som låsning)
+**Levererad åtgärd (Väg A docs-pass 2026-05-11):**
+ADR 0029 (`docs/decisions/0029-auth-pipeline-and-claims-transformation.md`)
+dokumenterar fyra beslut: (1) HTTP-pipeline-ordning explicit, (2) claim-placerings-regel
+auth-handler vs transformation, (3) per-request-fetch-disciplin utan cache i Fas 1,
+(4) konsument-allowlist-mönstret via `ClaimsTransformationAllowlistTests`. Komplementär
+till ADR 0028 (supersedas inte). Plus 5 nya integration-tester i
+`SessionRoleClaimsTransformationTests` som verifierar transformation-beteendet
+end-to-end (607 → 612).
 
-**Scope:** ~45 min CC-tid — pure docs, ingen kod. Defereras till nästa
-auth-ändring eller dedikerat docs-pass.
+**Faktisk CC-tid:** ~2.5h (utöver original 45 min docs-scope — agent-review-driven
+in-block-fix av M-1 prefix-längd, Min-1 path-fotnot, M-2 saknade tester via
+Alt B-integration-test-strategi per senior-cto-advisor-triage).
 
-**Trigger:** Nästa auth-relaterad ändring (impersonation, federerat IdP,
-session-cache-introduktion) eller manuellt vid docs-städning.
+**Reviews:** code-reviewer (2 Major + 1 Minor — alla fixade in-block per 4h-regeln),
+dotnet-architect (0 Blocker / 0 Major / 3 Minor / 1 Nit — 3 Minor avvisade som TD per
+CTO-rek: NetArchTest-stil cosmetic, sentinel-pattern-ADR YAGNI, pipeline-ordnings-arch-test
+mitigerat av integration-test). 0 nya TDs lyfta.
 
 ---
 

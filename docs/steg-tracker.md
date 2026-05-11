@@ -1,7 +1,7 @@
 # JobbPilot — STEG-tracker
 
-> **Version:** 1.17
-> **Senast uppdaterad:** 2026-05-11 ~15:30 (**VÄG E TDs-CLEANUP LEVERERAD.** Stationär-CC-session efter Väg B-a11y-pass levererade TD-40 (leaf-path regression-bevakning för resume-schemas refines, 3 nya Vitest-tester) + TD-49 stängd som redan-implementerad pre-TD-skapande (discovery fann att `HstsOptionsTests.cs` redan täcker alla 6 cases). 2 commits — test-only + docs-only. 1 agent-review APPROVED (code-reviewer) med Minor in-block-fixad per 4h-regel. Backend 594/594 + Frontend 150 → 153 grönt. Inget produktionskod-touch.)
+> **Version:** 1.18
+> **Senast uppdaterad:** 2026-05-11 ~18:00 (**VÄG A TD-60 ADR 0029 LEVERERAD.** Stationär-CC-session efter Fas 2 polish-block-pushen levererade ADR 0029 (HTTP-auth-pipeline + IClaimsTransformation-disciplin, komplementär till 0028 — supersedas inte) + 5 integration-tester i `SessionRoleClaimsTransformationTests`. TD-60 stängd. 1 commit (docs + tester bundlat per CTO-rek REP/CCP). 2 agent-reviews + 1 CTO-triage; 0 nya TDs lyfta — alla Major/Minor fixade in-block per 4h-regel inkl. M-2 (falsk test-coverage-claim) löst via Alt B integration-test-strategi. Backend 607 → 612 grönt. Scope: ~2.5h (vs original 45 min docs-pass — agent-review-driven utökning).)
 > **Roll:** permanent översikt över STEG- och fas-progression.
 
 Kompletteras av:
