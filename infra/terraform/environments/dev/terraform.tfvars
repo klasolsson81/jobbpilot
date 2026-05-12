@@ -32,3 +32,14 @@ migrate_image_tag = "14b-9113bed-fix3"
 # ---------------------------------------------------------------------------
 secops_alert_email            = ""
 failed_access_alarm_threshold = 50
+
+# ---------------------------------------------------------------------------
+# F2-P3 — Cost controls (Budget Actions, ADR 0005 second amendment 2026-05-12)
+#
+# cost_anomaly_alert_email lämnas tom vid first apply — Klas kan lägga till
+# senare och re-applya. Confirmation-mail från AWS måste opt-in:as manuellt.
+# baseline_budget_name pekar på "jobbpilot-monthly" som ägs av prod/baseline-
+# stacken (modules/budgets/aws_budgets_budget.monthly).
+# ---------------------------------------------------------------------------
+cost_anomaly_alert_email = ""
+baseline_budget_name     = "jobbpilot-monthly"
