@@ -1,7 +1,7 @@
 # Current work — JobbPilot
 
-**Status:** **F2-P3 (Budget Actions terraform) komplett 2026-05-12 ~11:30. JobbPilotBedrockDeny + APPLY_IAM_POLICY Budget Action live i AWS dev (STANDBY). ADR 0005 second amendment (ECS-stop → manuell runbook) accepterad. Nästa: F2-P4 (runbook-utbyggnad) → F2-P6 (readiness-probe) → JobTech-features.**
-**Senast uppdaterad:** 2026-05-12 (session-end efter F2-P3)
+**Status:** **F2-P3 + F2-P4 + F2-P6 komplett 2026-05-12 ~13:30. Alla Fas 2-prereqs avklarade: Budget Actions live i AWS, full cost-recovery-runbook + PowerShell-scripts, strict readiness-probe-split (TD-29 stängd). JobTech-features (P7 paginering + P8 integration) får nu startas.**
+**Senast uppdaterad:** 2026-05-12 (session-end efter F2-P3 + F2-P4 + F2-P6)
 **Långsiktig bana:** `docs/steg-tracker.md` — single source of truth för STEG/fas-progression
 **Tech debt:** `docs/tech-debt.md` (aktiva) + `docs/tech-debt-archive.md` (stängda)
 
@@ -71,16 +71,58 @@ F2-P3 designval krävde tre senior-cto-advisor-ronder pga successivt verifierade
 |---|---|---|
 | ~~F2-P1~~ | `registrations_open`-flagga | ✓ F2-P0e |
 | ~~F2-P2~~ | Rate-limit-policies | ✓ F2-P0e |
-| ~~F2-P3~~ | Budget Actions terraform + dev-apply | ✓ **F2-P3 idag** |
-| **F2-P4** | Runbook `aws-cost-recovery.md` full utbyggnad | Stub klar — full TODO-lista i runbook |
-| **F2-P6** | TD-29 readiness-probe-split (`/api/live` + `/api/ready` med DB+Redis-check) | Kvar |
+| ~~F2-P3~~ | Budget Actions terraform + dev-apply | ✓ |
+| ~~F2-P4~~ | Runbook `aws-cost-recovery.md` full utbyggnad | ✓ (`09cd1b9`) |
+| ~~F2-P6~~ | TD-29 readiness-probe-split | ✓ (`a25cbbb`) |
 
-Efter F2-P4 + F2-P6 → Fas 2 JobTech-features får startas (P7 paginering + P8 JobTech-integration).
+**Alla Fas 2-prereqs avklarade.** JobTech-features (P7 paginering + P8 JobTech-integration) får nu startas.
+
+### F2-P4-leverans (cost-recovery-runbook full utbyggnad)
+
+**Commit:** `09cd1b9` — docs(runbook): aws-cost-recovery full utbyggnad + PowerShell-scripts
+
+`docs/runbooks/aws-cost-recovery.md`:
+- Decision-tree (ASCII) för incident-klassificering
+- 5-stegs procedur: Klassificera → Bedrock-validering → Baseline-verifiering → Forensik → Incident-rapport
+- Manuell ECS scale-down + Återställning R1-R5
+- Post-mortem-template (GDPR Art. 33-bedömning inkluderad)
+- Test-procedur (säker utan att brännas $50)
+- Severity-tabell + SNS-subscription-flöde
+
+`infra/scripts/cost-recovery/`:
+- `stop-ecs-services.ps1` — one-knapps desired_count=0 + 60s verify
+- `restore-ecs-services.ps1` — detach deny (idempotent) + scale-up + 90s verify
+- `README.md`
+
+Båda scripts: `$ErrorActionPreference = "Stop"`, exit-code-verifiering, inga credentials hårdkodade.
+
+### F2-P6-leverans (strict readiness-probe-split, TD-29 stängd)
+
+**Commit:** `a25cbbb` — feat(api): F2-P6 — strict readiness-probe-split (TD-29 stängd)
+
+**Kod:**
+- `Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore` 10.0.7 tillagt
+- `src/JobbPilot.Api/HealthChecks/RedisHealthCheck.cs` — custom IHealthCheck (IsConnected + PingAsync, undviker Xabaril-dep)
+- `/api/live` (Predicate `_ => false`): liveness, alltid 200
+- `/api/ready` (Predicate `Tags.Contains("ready")`): strict readiness, 503 tills DB+Redis OK
+- Legacy `/health` borttagen
+
+**Tester (6 nya, 217 → 223 i Api.IntegrationTests):**
+- ApiLive_ReturnsHealthy_WhenProcessIsUp
+- ApiReady_ReturnsHealthy_WhenDatabaseAndRedisAreReachable
+- ApiLive_DoesNotEvaluateRegisteredChecks (<500ms anti-regression)
+- ApiReady_IsAnonymouslyAccessible + ApiLive_IsAnonymouslyAccessible
+- LegacyHealthEndpoint_IsRemoved (404-verifiering)
+
+**ALB-konsekvens:** target-group health-check-path är redan `/api/ready` (modules/alb/variables.tf default). Ingen Terraform-ändring krävs.
+
+**TD-status:** TD-29 stängd. Aktiva: 17 (var 18, -1 idag).
 
 ### Pending operativt (Klas)
 
 - (Valfritt) Sätt `cost_anomaly_alert_email` i `terraform.tfvars` + re-apply + AWS-mail-opt-in. Idag är SNS-topic skapad men inga subscriptions.
 - (Senare) Drift-reconcile på `module.ecs.aws_ecs_service.api/worker` (task-def revisions :5 → :2 / :4 → :1) och `module.rds.aws_db_parameter_group` (rds.force_ssl apply_method) — undveks via `-target=module.budget_actions` vid F2-P3-apply.
+- (Vid nästa deploy) Tag-deploy med `v0.2.0-dev` triggar F2-P6-readiness-probe live mot ALB target-group. Under första cold-start kommer `/api/ready` returnera 503 i ~10-30s innan DB+Redis OK — exakt det önskade beteendet TD-29 motiverade.
 
 ---
 
