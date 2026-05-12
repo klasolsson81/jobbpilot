@@ -13,11 +13,11 @@ import { type Page } from "@playwright/test";
  *   icke-localhost / icke-staging-URL. Skyddar mot misskonfigurerade
  *   CI-pipelines som råkar köra E2E mot prod.
  */
-const TEST_PASSWORD =
+export const TEST_PASSWORD =
   process.env.TEST_USER_PASSWORD ?? "E2eTestPass123!Dev";
 const TEST_EMAIL_DOMAIN = "e2e.jobbpilot.test";
 
-function testEmail(runId: number): string {
+export function testEmail(runId: number): string {
   return `test-e2e-${runId}@${TEST_EMAIL_DOMAIN}`;
 }
 
