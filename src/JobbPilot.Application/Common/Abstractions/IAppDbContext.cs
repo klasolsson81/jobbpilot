@@ -1,7 +1,9 @@
 using JobbPilot.Domain.Auditing;
+using JobbPilot.Domain.Invitations;
 using JobbPilot.Domain.JobAds;
 using JobbPilot.Domain.JobSeekers;
 using JobbPilot.Domain.Resumes;
+using JobbPilot.Domain.Waitlist;
 using Microsoft.EntityFrameworkCore;
 
 namespace JobbPilot.Application.Common.Abstractions;
@@ -18,5 +20,7 @@ public interface IAppDbContext
     DbSet<DomainApplication> Applications { get; }
     DbSet<Resume> Resumes { get; }
     DbSet<AuditLogEntry> AuditLogEntries { get; }
+    DbSet<Invitation> Invitations { get; }
+    DbSet<WaitlistEntry> WaitlistEntries { get; }
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
