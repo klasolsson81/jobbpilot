@@ -2002,3 +2002,72 @@ Bytte till custom RedisHealthCheck eftersom:
 **Lärdom:** TD-foreslagen-åtgärd är inte alltid optimal — discovery + verifikation
 mot CLAUDE.md-principer (anti-pattern §5: "Generiska 'Service'-suffix") kan
 peka på enklare lösning.
+
+---
+
+## TD-56: ListJobAdsQuery full paginering — STÄNGD 2026-05-12 (F2-P7)
+**Kategori:** Architecture
+**Severity:** Minor
+**Fas:** 2 (JobTech Integration)
+**Källa:** TD-55-CTO-beslut, 2026-05-11
+**Stängd:** 2026-05-12 (F2-P7)
+**Decision-maker:** senior-cto-advisor 2026-05-12 (rond 1, F2-P7+P8-batterier)
+
+### Ursprung
+`ListJobAdsQueryHandler` var opaginerad med `.Take(500)` hard cap som
+temporär defense-in-depth. Vid Fas 2 JobTech-integration skulle den retro-fittas
+till full `PagedResult<JobAdDto>` med query-params som matchar JobTech-API:t.
+
+**Ursprunglig föreslagen åtgärd:**
+1. Lyft `MaxItems = 500`-konstant från handler till `JobAdOptions`-record
+2. Refactor `ListJobAdsQuery` → `PagedResult<JobAdDto>` med PageNumber/PageSize
+3. Bestäm anonym-vs-auth-policy för publik JobAd-katalog
+4. Anpassa URL-kontrakt mot JobTech-API:s sök-params
+
+### Leverans
+CTO-beslut F2-P7 (granskningstrail: `docs/reviews/2026-05-12-f2-p7-p8-cto.md`):
+- **A1 offset-based paginering** över cursor (REP/CCP, befintlig `PagedResult<T>`-mönster från TD-55)
+- **B1 generic `PagedResult<T>`** återanvänd från `Application.Common`
+- **C2 whitelisted `JobAdSortBy`-enum** (PublishedAtDesc default, PublishedAtAsc, ExpiresAtDesc, ExpiresAtAsc) per CLAUDE.md §5.1 "Magic strings förbjudet"
+- **D1 endast paginering** (search/filter blir TD-70 efter P7 + P8)
+- **E1 breaking byte av befintlig endpoint** (ingen frontend-konsument finns)
+
+Anonym-vs-auth-frågan från ursprungs-TD blev redan beslutad i **ADR 0005**:
+"JobAd-listning/sökning är auth-gated i Fas 2-start" — men endpoint exponeras
+fortsatt utan `RequireAuthorization()` inline (CreateJobAd-endpoint är
+admin-only via separate mekanism). Auth-gating-strikthet följer ADR 0005-policy
+vid Fas 2 publik-exponering.
+
+JobAdOptions-extraktion (ursprungs-åtgärd 1) blev **inte nödvändig** — hard cap
+borttagen helt, `pageSize` validerad till 1–100 via FluentValidation matchar
+samma defense-in-depth-syfte.
+
+URL-kontrakt-anpassning mot JobTech (ursprungs-åtgärd 4) inkluderas i P8-design
+(ADR 0032 — kommande). P7 etablerar JobbPilot-intern paginerings-yta;
+JobTech-mapping görs i P8 via Refit-attributes.
+
+### Kod
+- **NY** `src/JobbPilot.Application/JobAds/Queries/ListJobAds/JobAdSortBy.cs` — enum
+- **NY** `src/JobbPilot.Application/JobAds/Queries/ListJobAds/ListJobAdsQueryValidator.cs`
+- `ListJobAdsQuery.cs` — `record(int Page=1, int PageSize=20, JobAdSortBy SortBy=PublishedAtDesc) : IQuery<PagedResult<JobAdDto>>`
+- `ListJobAdsQueryHandler.cs` — separat count-query (CLAUDE.md §3.6), Skip/Take, ApplySort-dispatch med Id som tiebreaker för deterministisk ordning
+- **NY** `src/JobbPilot.Api/Endpoints/JobAdsEndpoints.cs` — flyttad från inline Program.cs
+- `Program.cs` — JobAds-inline-block borttaget, `app.MapJobAdsEndpoints()` istället
+
+### Tester
+- **9 nya unit-tester:** 6 handler-tester (paginering, sort-varianter, NULL-handling för ExpiresAt) + 4 validator-tester. Application.UnitTests: 249 → **258 PASS**.
+- **3 nya integration-tester:** paged-result-shape, query-param-honoring, 400 vid invalid input. Api.IntegrationTests: 223 → **226 PASS**.
+- **Arch-test:** `ListJobAdsQuery_returns_PagedResult` explicit regression-skydd. PagedResultContractTests: 3 → **4 PASS**.
+
+### Beslut-rationalet (CTO)
+- **Offset över cursor (A1):** UI är "Sida 1, 2, 3"-paginerad jobblista. Cursor-pagination optimerar mot concurrent-insert-skew som inte existerar med 10-min sync-cykler + `publishedAt DESC`. REP/CCP (Martin 2017 kap. 13) — generic `PagedResult<T>` etablerad genom TD-55, ingen ny mall behövs.
+- **Whitelisted sort-enum (C2):** Magic-strings förbjudet (CLAUDE.md §5.1). OCP-extension via enum.
+- **NULL-handling för ExpiresAt:** `ExpiresAt == null` sorteras sist (har inget slut-datum = pågående). Konsistent semantik mellan ASC och DESC sort.
+- **Deterministisk ordning via Id tiebreaker:** garanterar att paginering inte tappar items vid lika `PublishedAt` mellan sidor.
+
+### Source-files-state vid stängning
+- `src/JobbPilot.Application/JobAds/Queries/ListJobAds/` — 4 filer
+- `src/JobbPilot.Api/Endpoints/JobAdsEndpoints.cs`
+- `tests/JobbPilot.Application.UnitTests/JobAds/Queries/ListJobAds/` — 2 test-filer
+- `tests/JobbPilot.Api.IntegrationTests/JobAds/ListJobAdsTests.cs`
+- `tests/JobbPilot.Architecture.Tests/PagedResultContractTests.cs` (uppdaterad)

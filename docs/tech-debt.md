@@ -23,7 +23,6 @@ tidsbegränsning per touch — fas-tillhörighet styr. Default = fixa in-block.
 | TD-23 | RedisSessionStore atomicitet via MULTI/EXEC eller Lua | Minor | 2 | Säkerhet/Robusthet |
 | TD-24 | DeleteAccountCommand cascade-paginering vid power-user | Minor | 2 | Skalbarhet |
 | TD-27 | EmailHash → HMAC med roterande nyckel | Minor | 2 | Säkerhet/GDPR |
-| TD-56 | ListJobAdsQuery full paginering (Fas 2 JobTech-integration) | Minor | 2 | Architecture |
 | TD-62 | OpenAPI-codegen som supersession av manuella Zod-DTO-schemas | Minor | 2+ | Architecture/Tooling |
 | TD-63 | ActionResult kind-union för writes (ADR 0030-symmetri) | Minor | 2+ | Architecture |
 | TD-64 | i18n-migration av inline svenska error-strängar | Minor | Trigger | i18n |
@@ -290,32 +289,6 @@ korrelations-fönster).
    är etablerat (Fas 4+)
 
 **Beroenden:** TD-13 (KMS-integration). Bör adresseras tillsammans.
-
----
-
-## TD-56: ListJobAdsQuery full paginering (Fas 2 JobTech-integration)
-**Kategori:** Architecture
-**Severity:** Minor
-**Fas:** 2 (JobTech Integration)
-**Källa:** TD-55-CTO-beslut, 2026-05-11
-
-`ListJobAdsQueryHandler` är opaginerad idag med `.Take(500)` hard cap som
-temporär defense-in-depth. Vid Fas 2 JobTech-integration ska den retro-fittas
-till full `PagedResult<JobAdDto>` med query-params och URL-kontrakt som matchar
-JobTech-API:t.
-
-**Föreslagen åtgärd:**
-1. Lyft `MaxItems = 500`-konstant från handler till `JobAdOptions`-record
-   bunden via `IOptions<JobAdOptions>` (CLAUDE.md §5.1)
-2. Refactor `ListJobAdsQuery` → `PagedResult<JobAdDto>` med PageNumber/PageSize
-3. Bestäm anonym-vs-auth-policy för publik JobAd-katalog
-4. Anpassa URL-kontrakt mot JobTech-API:s sök-params
-
-**Scope:** > 4h CC-tid när det görs (kriterium 3) — kräver design-arbete mot
-JobTech-spec. Defereras till Fas 2 där JobTech-integration är primärt fokus.
-
-**Trigger:** Fas 2-uppstart, ADR 0005 (go-to-market) eller JobTech-integration.
-
 
 ---
 
@@ -748,6 +721,7 @@ ADR-cross-references och granskningsbevis.
 | TD-68 | CloudWatch security-alarms för failed_access_attempt-events | 2026-05-12 | `70ca42b` + dev-apply |
 | TD-69 | SesEmailSender (AWS SES) — disciplinretur, lyft + stängd samma dag | 2026-05-12 | F2-P0d disciplinretur (Klas-feedback) |
 | TD-29 | Strict readiness-probe — separera liveness från readiness | 2026-05-12 | F2-P6 (6 nya integration-tester) |
+| TD-56 | ListJobAdsQuery full paginering | 2026-05-12 | F2-P7 (TD-56 stängd, +9 unit + +3 integration-tester) |
 
 ---
 
