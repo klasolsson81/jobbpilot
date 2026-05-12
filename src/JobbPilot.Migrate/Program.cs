@@ -40,7 +40,6 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using Amazon.SecretsManager;
 using Amazon.SecretsManager.Model;
 using Hangfire.PostgreSql;
@@ -293,10 +292,16 @@ static async Task<int> RunBootstrapAsync(ILogger log, CancellationToken ct)
 
     // Step 2: Applicera Identity-migrations med master-creds (har CREATE ON DATABASE,
     // kan köra MigrateAsync utan Npgsql #1770-permission-fel).
+    // Re-fetch master-creds — samma rotation-race-skydd som init Phase A/C
+    // (Sec-Major-2 från security-auditor 2026-05-12 audit). MigrateAsync kan ta
+    // 30-120s vid pending Identity-migrations + AWS Secrets Manager kan rotera
+    // mid-flow → cached creds från Step 1 kan bli stale.
     MigrateLog.BootstrapStep2Start(log);
+    var masterCredsStep2 = await FetchMasterCredsAsync(secretsClient, masterSecretArn, ct);
+    MigrateLog.MasterCredsLoaded(log, masterCredsStep2.Username, "Bootstrap Step 2");
 
     var masterCs = ConnectionStringFactory.ForMigrate(dbHost, dbPort, dbName,
-        masterCreds.Username, masterCreds.Password);
+        masterCredsStep2.Username, masterCredsStep2.Password);
 
     await using var identityContext = new AppIdentityDbContext(
         MigrationsOptionsFactory.BuildIdentityOptions(masterCs));
@@ -547,17 +552,3 @@ static void ValidateIdentifier(string ident)
     }
 }
 
-// JSON-format för AWS-managerad RDS-master-secret (PascalCase per .NET-konvention,
-// mappas till snake_case-JSON via JsonPropertyName).
-sealed record RdsMasterSecret(
-    [property: JsonPropertyName("username")] string Username,
-    [property: JsonPropertyName("password")] string Password);
-
-// Postgres-rolnamn — extraherade till const-block per code-reviewer Minor-1
-// (CLAUDE.md §5.1: "Magic strings — alltid konstanter").
-static class Roles
-{
-    public const string Migrations = "jobbpilot_migrations";
-    public const string App = "jobbpilot_app";
-    public const string Worker = "jobbpilot_worker";
-}

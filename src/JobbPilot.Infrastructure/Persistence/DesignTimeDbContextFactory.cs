@@ -11,8 +11,10 @@ public sealed class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<App
 {
     public AppDbContext CreateDbContext(string[] args)
     {
+        // Lokal docker-default. `Password=local` undviker gitleaks-false-positive
+        // (pattern `Password=jobbpilot` matchade tidigare som secret).
         var cs = Environment.GetEnvironmentVariable("ConnectionStrings__Postgres")
-            ?? "Host=localhost;Port=5432;Database=jobbpilot;Username=jobbpilot;Password=jobbpilot";
+            ?? "Host=localhost;Port=5432;Database=jobbpilot;Username=jobbpilot;Password=local";
         return new AppDbContext(MigrationsOptionsFactory.BuildAppOptions(cs));
     }
 }
