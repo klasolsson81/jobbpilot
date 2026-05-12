@@ -16,6 +16,12 @@ public sealed class JobAd : AggregateRoot<JobAdId>
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset? DeletedAt { get; private set; }
 
+    // ADR 0032 §4 — extern referens för imported JobAds. null för Manual.
+    public ExternalReference? External { get; private set; }
+
+    // ADR 0032 §4 — raw JobTech-payload för debug/replay (jsonb i DB).
+    public string? RawPayload { get; private set; }
+
     // EF Core constructor
     private JobAd() { }
 
@@ -51,27 +57,53 @@ public sealed class JobAd : AggregateRoot<JobAdId>
         DateTimeOffset? expiresAt,
         IDateTimeProvider clock)
     {
-        if (string.IsNullOrWhiteSpace(title))
-            return Result.Failure<JobAd>(
-                DomainError.Validation("JobAd.TitleRequired", "Titel är obligatorisk."));
-        if (title.Length > 300)
-            return Result.Failure<JobAd>(
-                DomainError.Validation("JobAd.TitleTooLong", "Titel får vara max 300 tecken."));
-        if (string.IsNullOrWhiteSpace(description))
-            return Result.Failure<JobAd>(
-                DomainError.Validation("JobAd.DescriptionRequired", "Beskrivning är obligatorisk."));
-        if (string.IsNullOrWhiteSpace(url) || !Uri.TryCreate(url, UriKind.Absolute, out _))
-            return Result.Failure<JobAd>(
-                DomainError.Validation("JobAd.UrlInvalid", "URL måste vara en giltig absolut URL."));
-        if (expiresAt.HasValue && expiresAt.Value <= publishedAt)
-            return Result.Failure<JobAd>(
-                DomainError.Validation("JobAd.InvalidDates", "ExpiresAt måste vara efter PublishedAt."));
+        var validation = ValidateCore(title, description, url, publishedAt, expiresAt);
+        if (validation.IsFailure)
+            return Result.Failure<JobAd>(validation.Error);
 
         var now = clock.UtcNow;
         var id = JobAdId.New();
-        var jobAd = new JobAd(id, title.Trim(), company, description.Trim(),
-                              url, source, publishedAt, expiresAt, now);
+        var jobAd = new JobAd(id, title!.Trim(), company, description!.Trim(),
+                              url!, source, publishedAt, expiresAt, now);
         jobAd.RaiseDomainEvent(new JobAdCreatedDomainEvent(id, title.Trim(), now));
+        return Result.Success(jobAd);
+    }
+
+    // ADR 0032 §4 — factory för imported JobAds. ExternalReference + RawPayload
+    // är obligatoriska. Idempotency hanteras via UNIQUE-index på (Source, ExternalId)
+    // + DbUpdateException-catch i upsert-handler (P8c).
+    public static Result<JobAd> Import(
+        string? title,
+        Company company,
+        string? description,
+        string? url,
+        ExternalReference external,
+        string? rawPayload,
+        DateTimeOffset publishedAt,
+        DateTimeOffset? expiresAt,
+        IDateTimeProvider clock)
+    {
+        ArgumentNullException.ThrowIfNull(external);
+
+        var validation = ValidateCore(title, description, url, publishedAt, expiresAt);
+        if (validation.IsFailure)
+            return Result.Failure<JobAd>(validation.Error);
+
+        if (string.IsNullOrWhiteSpace(rawPayload))
+            return Result.Failure<JobAd>(
+                DomainError.Validation("JobAd.RawPayloadRequired",
+                    "RawPayload är obligatorisk för importerade annonser."));
+
+        var now = clock.UtcNow;
+        var id = JobAdId.New();
+        var jobAd = new JobAd(id, title!.Trim(), company, description!.Trim(),
+                              url!, external.Source, publishedAt, expiresAt, now)
+        {
+            External = external,
+            RawPayload = rawPayload,
+        };
+        jobAd.RaiseDomainEvent(new JobAdImportedDomainEvent(
+            id, external.Source.Value, external.ExternalId, title.Trim(), now));
         return Result.Success(jobAd);
     }
 
@@ -83,6 +115,66 @@ public sealed class JobAd : AggregateRoot<JobAdId>
 
         Status = JobAdStatus.Archived;
         RaiseDomainEvent(new JobAdArchivedDomainEvent(Id, clock.UtcNow));
+        return Result.Success();
+    }
+
+    // ADR 0032 §4 — state-transition vid Stream-update eller Snapshot-upsert
+    // mot redan-existerande JobAd. Refreshar mutable fält + raw_payload.
+    // Inga domain events — sync-job-runs auditeras aggregerat via
+    // JobAdsSyncedDomainEvent (ADR 0032 §8).
+    public Result UpdateFromSource(
+        string? title,
+        string? description,
+        string? url,
+        string? rawPayload,
+        DateTimeOffset? expiresAt)
+    {
+        if (External is null)
+            return Result.Failure(
+                DomainError.Validation("JobAd.NotImported",
+                    "UpdateFromSource får bara anropas på importerade annonser."));
+
+        var validation = ValidateCore(title, description, url, PublishedAt, expiresAt);
+        if (validation.IsFailure)
+            return validation;
+
+        if (string.IsNullOrWhiteSpace(rawPayload))
+            return Result.Failure(
+                DomainError.Validation("JobAd.RawPayloadRequired",
+                    "RawPayload är obligatorisk vid update."));
+
+        Title = title!.Trim();
+        Description = description!.Trim();
+        Url = url!;
+        ExpiresAt = expiresAt;
+        RawPayload = rawPayload;
+
+        return Result.Success();
+    }
+
+    private static Result ValidateCore(
+        string? title,
+        string? description,
+        string? url,
+        DateTimeOffset publishedAt,
+        DateTimeOffset? expiresAt)
+    {
+        if (string.IsNullOrWhiteSpace(title))
+            return Result.Failure(
+                DomainError.Validation("JobAd.TitleRequired", "Titel är obligatorisk."));
+        if (title.Length > 300)
+            return Result.Failure(
+                DomainError.Validation("JobAd.TitleTooLong", "Titel får vara max 300 tecken."));
+        if (string.IsNullOrWhiteSpace(description))
+            return Result.Failure(
+                DomainError.Validation("JobAd.DescriptionRequired", "Beskrivning är obligatorisk."));
+        if (string.IsNullOrWhiteSpace(url) || !Uri.TryCreate(url, UriKind.Absolute, out _))
+            return Result.Failure(
+                DomainError.Validation("JobAd.UrlInvalid", "URL måste vara en giltig absolut URL."));
+        if (expiresAt.HasValue && expiresAt.Value <= publishedAt)
+            return Result.Failure(
+                DomainError.Validation("JobAd.InvalidDates", "ExpiresAt måste vara efter PublishedAt."));
+
         return Result.Success();
     }
 }
