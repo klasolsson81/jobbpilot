@@ -236,13 +236,8 @@ static async Task<int> RunSchemaAsync(ILogger log, CancellationToken ct)
 
     MigrateLog.PhaseEStart(log);
 
-    var options = new DbContextOptionsBuilder<AppDbContext>()
-        .UseNpgsql(appCsResponse.SecretString, npgsql =>
-            npgsql.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName))
-        .UseSnakeCaseNamingConvention()
-        .Options;
-
-    await using var dbContext = new AppDbContext(options);
+    await using var dbContext = new AppDbContext(
+        MigrationsOptionsFactory.BuildAppOptions(appCsResponse.SecretString));
 
     var pending = (await dbContext.Database.GetPendingMigrationsAsync(ct)).ToList();
     MigrateLog.PendingMigrationsCount(log, pending.Count);
@@ -303,12 +298,8 @@ static async Task<int> RunBootstrapAsync(ILogger log, CancellationToken ct)
     var masterCs = ConnectionStringFactory.ForMigrate(dbHost, dbPort, dbName,
         masterCreds.Username, masterCreds.Password);
 
-    var options = new DbContextOptionsBuilder<AppIdentityDbContext>()
-        .UseNpgsql(masterCs, npgsql =>
-            npgsql.MigrationsAssembly(typeof(AppIdentityDbContext).Assembly.FullName))
-        .Options;
-
-    await using var identityContext = new AppIdentityDbContext(options);
+    await using var identityContext = new AppIdentityDbContext(
+        MigrationsOptionsFactory.BuildIdentityOptions(masterCs));
 
     var pending = (await identityContext.Database.GetPendingMigrationsAsync(ct)).ToList();
     MigrateLog.PendingMigrationsCount(log, pending.Count);
