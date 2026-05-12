@@ -182,6 +182,24 @@ module "cloudwatch_security_alarms" {
   tags = var.common_tags
 }
 
+# Budget Actions — F2-P3 / ADR 0005 second amendment 2026-05-12
+# Vid $50/mån-threshold-breach (100% ACTUAL) bifogas JobbPilotBedrockDeny
+# på api-task-role → blockerar all Bedrock-invocation via explicit Deny.
+# Reversibel via auto-detach vid cycle-reset.
+# ECS-stop som automatisk Budget Action har skippats (AWS-API stödjer
+# bara STOP_EC2/STOP_RDS); sekundärskydd via manuell runbook F2-P4.
+module "budget_actions" {
+  source = "../../modules/budget_actions"
+
+  name_prefix      = var.name_prefix
+  budget_name      = var.baseline_budget_name
+  target_role_name = module.iam_ecs.task_api_role_name
+  kms_key_id       = data.aws_kms_alias.master.target_key_arn
+  alert_email      = var.cost_anomaly_alert_email
+
+  tags = var.common_tags
+}
+
 # IAM-roller för ECS — execution + task-role-api + task-role-worker + task-role-migrate (STEG 14b)
 module "iam_ecs" {
   source = "../../modules/iam_ecs"

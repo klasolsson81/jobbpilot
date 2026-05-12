@@ -8,6 +8,11 @@ output "task_api_role_arn" {
   value       = aws_iam_role.task_api.arn
 }
 
+output "task_api_role_name" {
+  description = "Task-role-NAMN för Api-runtime. Används av budget_actions-modulen som target för JobbPilotBedrockDeny APPLY_IAM_POLICY (Budget Action `iam_action_definition.roles` tar namn, inte ARN)."
+  value       = aws_iam_role.task_api.name
+}
+
 output "task_worker_role_arn" {
   description = "Task-role-ARN för Worker-runtime. Används i Worker-task-def `taskRoleArn`."
   value       = aws_iam_role.task_worker.arn

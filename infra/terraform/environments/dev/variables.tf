@@ -166,6 +166,22 @@ variable "dev_subdomain" {
 }
 
 # ---------------------------------------------------------------------------
+# F2-P3 — Cost controls (Budget Actions, ADR 0005-amendment 2026-05-12)
+# ---------------------------------------------------------------------------
+
+variable "cost_anomaly_alert_email" {
+  description = "Email-adress för SNS-subscription av cost-anomaly-events (publiceras vid Budget Action $50/mån-threshold-trigger). Tom sträng = ingen subscription skapas (konfigurera manuellt via console eller separat tf-changeset)."
+  type        = string
+  default     = ""
+}
+
+variable "baseline_budget_name" {
+  description = "Namn på AWS Budget i prod/baseline-stack som F2-P3 Budget Action ska binda mot. Måste matcha `aws_budgets_budget.monthly.name` i modules/budgets/. Default \"jobbpilot-monthly\" (befintlig)."
+  type        = string
+  default     = "jobbpilot-monthly"
+}
+
+# ---------------------------------------------------------------------------
 # TD-68 — Security anomaly detection (ADR 0031)
 # ---------------------------------------------------------------------------
 
