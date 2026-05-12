@@ -1,7 +1,7 @@
 # ADR 0005 — Go-to-market-strategi och kostnadskontroll
 
 **Datum:** 2026-04-18
-**Status:** ACCEPTED 2026-05-12 (med amendment 2026-05-12: invitations + waitlist)
+**Status:** ACCEPTED 2026-05-12 (med amendment 2026-05-12: invitations + waitlist; second amendment 2026-05-12: ECS-stop-tolkning vid Budget Action — F2-P3-leverans)
 
 ## Kontext
 
@@ -246,6 +246,80 @@ direkta kontroll — även för Alternativ A (stängd klassapp):
 - Hur återställa efter hård Budget Action-spärr
 - Kontaktpunkter vid eskalering
 
+## Amendment 2026-05-12 (second) — ECS-stop som manuell runbook-procedur
+
+Under F2-P3-implementationen verifierade CC (web-search mot AWS CLI v2.29.1
+docs, Terraform AWS Provider v5.80, CloudFormation `BudgetsAction
+SsmActionDefinition`-spec) att AWS Budget Actions API har två icke-uppenbara
+begränsningar:
+
+1. Det finns ingen `INVOKE_LAMBDA`-action_type. Budget Actions kan inte direkt
+   trigga en Lambda-funktion.
+2. `RUN_SSM_DOCUMENT` action_type är begränsad till `STOP_EC2_INSTANCES` och
+   `STOP_RDS_INSTANCES` sub-types. Custom SSM Automation Documents stöds inte.
+
+JobbPilot kör ECS Fargate (inte EC2). `STOP_EC2_INSTANCES` är därmed inte
+applicerbart. Föregående amendment-formulering "stoppa ECS-services" som
+automatiserad Budget Action är därmed inte AWS-API-native möjlig utan
+indirekta workarounds.
+
+### Beslut (CTO senior-cto-advisor 2026-05-12, rond 3)
+
+ECS-stop tas bort som automatiserad Budget Action. Kostnadsskydds-mekaniken
+blir:
+
+- **Primärskydd (automatisk):** `APPLY_IAM_POLICY` Budget Action vid 100%
+  ACTUAL av $50/mån-tröskeln bifogar `JobbPilotBedrockDeny`-overlay på
+  api-task-role. Explicit Deny vinner över Allow per IAM-evaluation-logik —
+  blockerar all `bedrock:Invoke*` / `Converse*` direkt. Reversibel via
+  auto-detach när budget-cycle resettar.
+- **Sekundärskydd (manuell):** ECS scale-down via runbook
+  `docs/runbooks/aws-cost-recovery.md` (F2-P4-leverans). Klas eller
+  incident-responder kör `aws ecs update-service --desired-count 0` på
+  `jobbpilot-dev-api` + `jobbpilot-dev-worker` vid behov.
+
+### Motivering
+
+ECS Fargate-baseline är ~$25–30/mån **fast kostnad**, inte en skenrisk. Den
+enda kostnadsaxeln som faktiskt kan blowup:a vid abuse är Bedrock-invocation,
+och den täcks av primärskyddet. Att bygga indirekta workarounds (SNS→Lambda
+via duplicerade budget-resurser eller indirekt IAM-deny på ECS-execution-roll)
+för att skydda en fast $30-post bryter proportionalitets-principen
+(Ford/Parsons/Kua 2017 — Fitness Functions). Manuell ECS-stop via runbook är
+industri-default för dev-miljöer (12-Factor App §IX Disposability).
+
+### Avvisade alternativ (rond 3)
+
+- **Egen budget i dev-stack + SNS→Lambda:** Bryter A4-hybrid-placement,
+  duplicerar billing-yta (två budgetar med samma cap), bygger ~7 extra
+  Terraform-resurser för att skydda fast $30-kostnad. YAGNI-brott.
+- **APPLY_IAM_POLICY-deny på ECR/Secrets-access via execution-roll:** Indirekt
+  mekanism (tasks dör vid naturlig restart, inte direkt). Restart-storm-risk.
+  Bryter principle-of-least-surprise (Saltzer/Schroeder 1975).
+- **Omarbetning Fargate → EC2 för STOP_EC2-stöd:** Avvisas — arkitektur-skifte
+  utan motsvarande värde.
+
+### Konsekvens
+
+Vid budget-blowout-scenario fortsätter ECS-baseline-kostnaden (~$30/mån)
+löpa tills incident-responder manuellt kör `aws ecs update-service
+--desired-count 0`. Acceptabelt eftersom Bedrock-axeln (skenrisken) är
+skyddad automatiskt och ECS-kostnaden är förutsägbar.
+
+### Källor (verifierade 2026-05-12)
+
+- AWS CLI Reference `create-budget-action` v2.29.1
+- Terraform AWS Provider `aws_budgets_budget_action` v5.80
+- AWS CloudFormation `AWS::Budgets::BudgetsAction SsmActionDefinition`
+- Robert C. Martin, *Clean Architecture* (2017) — OCP, SRP
+- Ford/Parsons/Kua, *Building Evolutionary Architectures* (2017) — Fitness Functions
+- Saltzer & Schroeder, "The Protection of Information in Computer Systems" (1975) — least-surprise
+- 12-Factor App §IX Disposability
+
+**Decision-maker:** senior-cto-advisor 2026-05-12 (rond 3).
+**Granskningstrail:** Tre CTO-ronder dokumenterade i session-log
+`docs/sessions/2026-05-12-*-fas2-p3-budget-actions.md`.
+
 ## Konsekvenser
 
 **Positiva:**
@@ -265,6 +339,12 @@ direkta kontroll — även för Alternativ A (stängd klassapp):
 
 ## Revision-historik
 
+- **2026-05-12 (F2-P3-implementation, second amendment):** ECS-stop som
+  automatiserad Budget Action borttagen efter AWS-API-realitet-verifiering
+  (Budget Actions stödjer inte custom SSM-documents eller Lambda-trigger för
+  Fargate-services). Primärskydd kvarstår — APPLY_IAM_POLICY på Bedrock vid
+  100% threshold. Sekundärskydd flyttas till F2-P4-runbook (manuell ECS-stop).
+  Decision-maker: senior-cto-advisor (rond 3). Granskningstrail i session-log.
 - **2026-05-12 (Fas 2-kickoff):** ADR flippad PROPOSED → ACCEPTED. Alternativ C
   vald (invite-only public beta med hård cap). Amendment 2026-05-12 lägger till
   invitations + waitlist-flöde (två aggregates, opaque tokens, SES, admin-CLI
