@@ -1,361 +1,127 @@
 # Current work — JobbPilot
 
-**Status:** **F2-P3 + F2-P4 + F2-P6 komplett 2026-05-12 ~13:30. Alla Fas 2-prereqs avklarade: Budget Actions live i AWS, full cost-recovery-runbook + PowerShell-scripts, strict readiness-probe-split (TD-29 stängd). JobTech-features (P7 paginering + P8 integration) får nu startas.**
-**Senast uppdaterad:** 2026-05-12 (session-end efter F2-P3 + F2-P4 + F2-P6)
-**Långsiktig bana:** `docs/steg-tracker.md` — single source of truth för STEG/fas-progression
+**Status:** **F2-P7 + P8a + P8a.5 + bootstrap komplett 2026-05-12 ~21:10. Dev-deploy GRÖN på `v0.2.1-dev` (`https://dev.jobbpilot.se/api/ready` returnerar 200). 17 commits, 3 nya ADRs (0032/0033/0034), 1 stängd TD (TD-56), 3 nya TDs (72/73/74), 4 parallella post-hoc reviewers + 4 CTO-ronder. Nästa: F2-P8b (Infrastructure — Refit + Resilience + admin-trigger-endpoint).**
+**Senast uppdaterad:** 2026-05-12 (session-end efter F2-P7 + P8a + bootstrap + aggregate-review)
+**HEAD:** `24a7135` (tag `v0.2.1-dev` på samma SHA, deployad)
+**Långsiktig bana:** `docs/steg-tracker.md`
 **Tech debt:** `docs/tech-debt.md` (aktiva) + `docs/tech-debt-archive.md` (stängda)
 
 ---
 
-## Aktivt nu — F2-P3 komplett, F2-P4/P6 nästa
+## Aktivt nu — F2-P8a komplett, P8b nästa
 
-**2026-05-12 fortsatt session** (~10:30–11:30) levererade F2-P3 Budget Actions
-terraform-modul live mot AWS dev. Per ADR 0005 second amendment 2026-05-12
-(ECS-stop som automatisk Budget Action skippad pga AWS-API-begränsning —
-sekundärskydd via manuell runbook F2-P4).
-
-### Levererat F2-P3-batch
+### Levererat denna session (17 commits)
 
 | Commit | Innehåll |
 |---|---|
-| `0d66fe5` | feat(infra): terraform-modul `modules/budget_actions/` + iam_ecs-output + dev-wire |
-| `ce3e013` | docs(adr): ADR 0005 second amendment + aws-cost-recovery runbook-stub |
-| `f7bd9fc` | fix(infra): disciplinretur — em-dash i IAM-role description (AWS IAM regex avvisade U+2014) |
+| `0fc4b76` | feat(jobads): F2-P7 — JobAd-paginering med PagedResult (TD-56 stängd) |
+| `6bdce04` | docs(adr): ADR 0032 utkast — JobTech-integration |
+| `06ee2b3` | docs(adr): ADR 0032 → Accepted |
+| `c5aa089` | feat(jobads): F2-P8a — ExternalReference VO + JobAd.Import + EF migration |
+| `4bb91d8` | feat(migrate): F2-P8a.5 — CLI-mode-dispatch + Phase E (ADR 0033) |
+| `ff136ad` | feat(deploy): F2-P8a.5c — auto-trigga schema-task i deploy-dev.yml |
+| `0fe0ce6` | fix(migrate): Dockerfile Infrastructure-projekt-context |
+| `ad7988f` | fix(infra): ecs:DescribeTasks task-ARN-pattern |
+| `f69308f` | fix(migrate): Dockerfile aspnet-runtime |
+| `daab6ec` | fix(deploy): containerOverrides.command mode-arg |
+| `2c9232a` | fix(migrate): Dockerfile RDS-CA-bundle |
+| `b1f50bf` | feat(migrate): F2-P8a.5e bootstrap-mode + ADR 0034 |
+| `e228b7f` | refactor(infra): MigrationsOptionsFactory single source of truth (DRY) |
+| `baf901b` | fix(api): F2-P7 auth-gate + sort-default-explicit (review-fynd) |
+| `acc6ff3` | fix(migrate): Bootstrap re-fetch + extract types + password-local |
+| `bef983c` | fix(infra): EcsReadOurCluster cluster-condition |
+| `24a7135` | docs(tech-debt+adr): TD-13 utökas + TD-72/73/74 + ADR 0032 §8-amendment |
 
-**AWS dev-state efter apply:**
-- `aws_iam_policy.bedrock_deny` — `JobbPilotBedrockDeny` v1 (deny-overlay)
-- `aws_iam_role.budget_action` — `jobbpilot-dev-budget-action-role` (least-priv Attach/DetachRolePolicy lockad till JobbPilotBedrockDeny + PolicyARN-condition)
-- `aws_sns_topic.cost_anomaly` — `jobbpilot-dev-cost-anomaly` (KMS-encrypted via master-key)
-- `aws_sns_topic_policy.cost_anomaly` — locked-down till budgets.amazonaws.com
-- `aws_budgets_budget_action.attach_bedrock_deny` — `0115c684-4ede-4702-a4a7-fc69529da7bf`, APPLY_IAM_POLICY, 100% ACTUAL, AUTOMATIC, **STANDBY**
+### Granskningstrail
 
-### CTO-konvergens (tre ronder)
+- `docs/reviews/2026-05-12-f2-p7-p8-cto.md` — CTO-rond 1 (P7+P8 designval)
+- `docs/reviews/2026-05-12-f2-p7-p8a-aggregate.md` — 4 parallella reviewers + CTO-rond 4
+- `docs/sessions/2026-05-12-2110-f2-p7-p8a-bootstrap-aggregate-review.md` — session-log
 
-F2-P3 designval krävde tre senior-cto-advisor-ronder pga successivt verifierade AWS-API-begränsningar:
+### ADRs
 
-1. **Rond 1** (`a314494fb60370436`): A4/B1/**C1**/D2/E1/F1 — Hybrid + APPLY_IAM_POLICY + SNS→Lambda + dedikerad topic + 80/100% + AUTOMATIC
-2. **Rond 2** (`ad162f50dacbd0a0a`): C1' (Path γ) — SSM Automation Document istället för Lambda, efter discovery att Budget Actions saknar INVOKE_LAMBDA action_type
-3. **Rond 3** (`a37fedf646b292a84`): **Väg III** — skippa ECS-stop som automatisk Budget Action, manuell via F2-P4-runbook. Efter web-search-verifiering att `RUN_SSM_DOCUMENT` Budget Action endast stödjer `STOP_EC2_INSTANCES`/`STOP_RDS_INSTANCES` — inga custom SSM-documents för Fargate
-
-### Beslut-rationalet (rond 3)
-
-- ECS Fargate ~$30/mån **fast kostnad** — inte skenrisk
-- Bedrock-invocation är enda blowout-vektorn (täckt av primärskydd via APPLY_IAM_POLICY)
-- Att bygga indirekta workarounds (SNS→Lambda via duplicerade budgetar) bryter proportionalitets-principen (Ford/Parsons/Kua 2017 — Fitness Functions)
-- Manuell ECS-stop via runbook är industri-default för dev-miljöer (12-Factor §IX Disposability)
-
-### Disciplinmissar fångade + fixade
-
-1. **Em-dash (U+2014) i IAM-role description** → AWS IAM CreateRole ValidationError → fixad in-block med ASCII-bindestreck. 3 av 6 resurser skapades innan fel; re-apply efter fix kompletterade resterande utan problem.
-
-### TD-status
-
-- Nuvarande aktiva: 18 (oförändrat — ingen TD lyft, allt fixat in-block)
-- F2-P4-runbook-utbyggnad är **egen batch**, inte TD
-
-### API-yta + säkerhetsinvarianter
-
-**Primärskydd (automatisk):**
-- Budget Action triggar vid 100% ACTUAL av jobbpilot-monthly $50-budget
-- Bifogar JobbPilotBedrockDeny på api-task-role via APPLY_IAM_POLICY
-- Explicit Deny vinner över Allow per IAM-eval-logik — blockerar all `bedrock:Invoke*` / `Converse*`
-- Reversibel: Budget Action auto-detachar vid budget-cycle-reset
-
-**Sekundärskydd (manuell):**
-- F2-P4-runbook `docs/runbooks/aws-cost-recovery.md` med manuell ECS scale-down + återställnings-procedur
-- Stub-version levererad i F2-P3; full utbyggnad i F2-P4
-
-### Vad återstår av Fas 2-prereqs
-
-| Batch | Innehåll | Status |
-|---|---|---|
-| ~~F2-P1~~ | `registrations_open`-flagga | ✓ F2-P0e |
-| ~~F2-P2~~ | Rate-limit-policies | ✓ F2-P0e |
-| ~~F2-P3~~ | Budget Actions terraform + dev-apply | ✓ |
-| ~~F2-P4~~ | Runbook `aws-cost-recovery.md` full utbyggnad | ✓ (`09cd1b9`) |
-| ~~F2-P6~~ | TD-29 readiness-probe-split | ✓ (`a25cbbb`) |
-
-**Alla Fas 2-prereqs avklarade.** JobTech-features (P7 paginering + P8 JobTech-integration) får nu startas.
-
-### F2-P4-leverans (cost-recovery-runbook full utbyggnad)
-
-**Commit:** `09cd1b9` — docs(runbook): aws-cost-recovery full utbyggnad + PowerShell-scripts
-
-`docs/runbooks/aws-cost-recovery.md`:
-- Decision-tree (ASCII) för incident-klassificering
-- 5-stegs procedur: Klassificera → Bedrock-validering → Baseline-verifiering → Forensik → Incident-rapport
-- Manuell ECS scale-down + Återställning R1-R5
-- Post-mortem-template (GDPR Art. 33-bedömning inkluderad)
-- Test-procedur (säker utan att brännas $50)
-- Severity-tabell + SNS-subscription-flöde
-
-`infra/scripts/cost-recovery/`:
-- `stop-ecs-services.ps1` — one-knapps desired_count=0 + 60s verify
-- `restore-ecs-services.ps1` — detach deny (idempotent) + scale-up + 90s verify
-- `README.md`
-
-Båda scripts: `$ErrorActionPreference = "Stop"`, exit-code-verifiering, inga credentials hårdkodade.
-
-### F2-P6-leverans (strict readiness-probe-split, TD-29 stängd)
-
-**Commit:** `a25cbbb` — feat(api): F2-P6 — strict readiness-probe-split (TD-29 stängd)
-
-**Kod:**
-- `Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore` 10.0.7 tillagt
-- `src/JobbPilot.Api/HealthChecks/RedisHealthCheck.cs` — custom IHealthCheck (IsConnected + PingAsync, undviker Xabaril-dep)
-- `/api/live` (Predicate `_ => false`): liveness, alltid 200
-- `/api/ready` (Predicate `Tags.Contains("ready")`): strict readiness, 503 tills DB+Redis OK
-- Legacy `/health` borttagen
-
-**Tester (6 nya, 217 → 223 i Api.IntegrationTests):**
-- ApiLive_ReturnsHealthy_WhenProcessIsUp
-- ApiReady_ReturnsHealthy_WhenDatabaseAndRedisAreReachable
-- ApiLive_DoesNotEvaluateRegisteredChecks (<500ms anti-regression)
-- ApiReady_IsAnonymouslyAccessible + ApiLive_IsAnonymouslyAccessible
-- LegacyHealthEndpoint_IsRemoved (404-verifiering)
-
-**ALB-konsekvens:** target-group health-check-path är redan `/api/ready` (modules/alb/variables.tf default). Ingen Terraform-ändring krävs.
-
-**TD-status:** TD-29 stängd. Aktiva: 17 (var 18, -1 idag).
-
-### Pending operativt (Klas)
-
-- (Valfritt) Sätt `cost_anomaly_alert_email` i `terraform.tfvars` + re-apply + AWS-mail-opt-in. Idag är SNS-topic skapad men inga subscriptions.
-- (Senare) Drift-reconcile på `module.ecs.aws_ecs_service.api/worker` (task-def revisions :5 → :2 / :4 → :1) och `module.rds.aws_db_parameter_group` (rds.force_ssl apply_method) — undveks via `-target=module.budget_actions` vid F2-P3-apply.
-- (Vid nästa deploy) Tag-deploy med `v0.2.0-dev` triggar F2-P6-readiness-probe live mot ALB target-group. Under första cold-start kommer `/api/ready` returnera 503 i ~10-30s innan DB+Redis OK — exakt det önskade beteendet TD-29 motiverade.
-
----
-
-## Tidigare session — F2-P0 komplett
-
-**2026-05-12 lång session** (förmiddagen, ~08:00–10:30) levererade hela F2-P0
-invitations/waitlist-batch (sub-batches a–f) per ADR 0005 amendment 2026-05-12.
-
-### Levererat denna session
-
-| Batch | Commit | Innehåll |
-|---|---|---|
-| ADR | `6f0b89d` | ADR 0005 → Accepted + invitations/waitlist amendment + CTO-rapport |
-| F2-P0a | `cbe4163` | Domain: Invitation + WaitlistEntry aggregates (39 nya tester) |
-| F2-P0b | `0c58438` | EF mappings + migration (invitations, waitlist_entries) |
-| F2-P0c | `ebdf1f1` | Application: 5 commands + handlers + validators (24 tester) |
-| F2-P0d | `bcc114d` | ConsoleEmailSender + InvitationTokenGenerator (8 tester) |
-| F2-P0d (disciplinretur) | `34398d1` | AWSSDK.SimpleEmailV2 + SesEmailSender, TD-69 stängd |
-| F2-P0e | `64b7e2a` | 4 endpoints + 2 rate-limits + kill-switch + IFeatureFlags (12 integration-tester) |
-| F2-P0e (gitleaks) | `6d2dcf3` | Fingerprint för DefaultTestPassword |
-| Security | `74b152e` | `.gitignore` för STARTPROMPT + terraform .out |
-| F2-P0f | `b5666d1` | `/vantelista` Next.js publik signup-sida (5 tester) |
-
-**Total testsuite:** Domain 202 (+39), Application 249 (+32), Architecture 32,
-Api.IntegrationTests 217 (+12), Web Vitest 239 (+5). +88 nya tester.
-
-### API-yta live
-
-**Public (anonym):**
-- `POST /api/v1/waitlist` — anonym signup, rate-limit 3/24h/IP, kill-switch
-- `POST /api/v1/auth/redeem-invitation` — token-redemption, rate-limit 5/h/IP, kill-switch
-
-**Admin (SuperAdmin via Postman/curl tills Fas 6 UI):**
-- `POST/GET /api/v1/admin/invitations` + `POST /{id}/revoke`
-- `GET /api/v1/admin/waitlist` + `POST /{id}/approve` + `POST /{id}/reject`
-
-**Frontend:** `/vantelista` (civic-utility-copy, server action, GDPR-notis)
-
-### Säkerhetsinvarianter etablerade
-
-- Kill-switch `FeatureFlags.RegistrationsOpen=false` → 503 på båda public endpoints
-- HMAC-SHA256 opaque token (32 bytes random + server-secret) + single-use via xmin
-- Email kommer från Invitation, inte command body (skydd mot token-stöld)
-- Rate-limits per IP på alla publika endpoints
-- Partial unique index på waitlist_entries.email WHERE status='Pending'
-- Admin-endpoints skyddade av `[Authorize(Roles=SuperAdmin)]` + AdminAuthorizationBehavior
-
-### Disciplinmissar fångade + fixade
-
-1. **TD-69** felaktigt lyft för SES → Klas fångade → disciplinretur, stängd samma dag
-2. **DI splittad från handlers** i F2-P0c → CI fångade → fix-forward i F2-P0d
-3. **`git add -A`** med STARTPROMPT + `secrets.out` → Klas fångade INNAN push → soft-reset + `.gitignore`-fix
-
-### Memory uppdaterat
-
-- `feedback_nonstop_with_pr_reports.md` — non-stop med PR-rapporter
-- `feedback_di_with_handlers_same_commit.md` — DI + handlers samma commit
+- **ADR 0032** Accepted — JobTech-integration (+ §8-amendment för PII-stripping)
+- **ADR 0033** Accepted — Migrate CLI-mode-dispatch (+ amendment för auto-trigga)
+- **ADR 0034** Accepted — DB-role privilege-separation (Saltzer/Schroeder)
 
 ### TD-status
 
-- **TD-69** (SesEmailSender) — stängd samma dag (disciplinretur)
-- Nuvarande aktiva: 18 (oförändrat sedan F2-kickoff)
+- **TD-56** stängd (paginering)
+- **TD-72** (Minor, Trigger) — bootstrap auto-trigga vid Identity-schema-change
+- **TD-73** (Major, Fas 2 P8c-gating) — JobTech raw_payload PII-stripping + retention
+- **TD-74** (Minor, Fas 2 opportunistic) — strikta DML-GRANTs istället för GRANT ALL
+- **TD-13** utökas — `job_ads.raw_payload` tillagd i berörda-kolumner-listan
 
-### Vad återstår av Fas 2-prereqs
+Aktiva: 16 → 18 (TD-56 stängd, TD-72/73/74 lyfta).
 
-| Batch | Innehåll | Status |
-|---|---|---|
-| ~~F2-P1~~ | `registrations_open`-flagga | ✓ levererad i P0e |
-| ~~F2-P2~~ | Rate-limit-policies | ✓ levererad i P0e |
-| **F2-P3** | Terraform Budget Actions $50/mån + Bedrock-IAM-auto-disable + ECS-stop + dev-apply | Kvar |
-| **F2-P4** | Runbook `docs/runbooks/aws-cost-recovery.md` | Kvar |
-| **F2-P6** | TD-29 readiness-probe-split (`/api/live` + `/api/ready` med DB+Redis-check) | Kvar |
+### AWS dev-state efter session
 
-Efter dessa → Fas 2 JobTech-features får startas (P7 paginering + P8 JobTech-integration).
-
-### Pending operativt (Klas)
-
-- Verifiera mottagar-emails i AWS SES-konsolen för klasskamrater (sandbox-mode)
-- DKIM + SPF DNS innan public launch
-- `terraform apply` av Budget Actions efter F2-P3-leverans
-
----
-
-## Tidigare session — Fas 2-kickoff med ADR 0005-design
-
-**2026-05-12 Fas 2-kickoff:** senior-cto-advisor invokerad för ADR 0005-
-designval. CTO-beslut: Alternativ C (invite-only public beta med hård cap) +
-amendment för invitations + waitlist (Klas inputs efter Runda 1). Klas-GO
-mottagen. ADR 0005 flippad PROPOSED → ACCEPTED.
-
-**Granskningstrail:** `docs/reviews/2026-05-12-fas2-cto-adr0005.md` (båda
-CTO-rundor verbatim).
-
-### F2-P0 impl-plan (sub-batches, ~15-20h CC-tid)
-
-| Batch | Innehåll | Status |
-|---|---|---|
-| F2-P0a | Invitation + WaitlistEntry aggregates + tests | Nästa |
-| F2-P0b | EF mappings + migration | Planerad |
-| F2-P0c | 5 commands + validators + tests | Planerad |
-| F2-P0d | `IEmailSender` + `SesEmailSender` + svenska templates | Planerad |
-| F2-P0e | API-endpoints + 3 rate-limit-policies + kill-switch | Planerad |
-| F2-P0f | `/vantelista`-publik sida (Next.js RSC) | Planerad |
-
-Efter F2-P0: F2-P1 (`registrations_open` feature-flag) → F2-P3 (Budget
-Actions terraform) → F2-P4 (runbook) → F2-P6 (readiness-probe) → JobTech-
-integration startar.
-
-### Tidigare session — Fas 1-rensning komplett
-
-Lång CC-session 2026-05-11 ~21:00 → 2026-05-12 ~08:00. Levererade hela
-Fas 1-rensningens återstående batches (B–F) plus disciplinretur + TD-67 +
-TD-25 + TD-68 (med dev-apply).
-
-Se session-log [`2026-05-12-0800-fas1-rensning-komplett-td67-td68.md`](sessions/2026-05-12-0800-fas1-rensning-komplett-td67-td68.md) för full historik.
-
-### Levererat denna session
-
-| Område | Stängda TDs | Notering |
-|---|---|---|
-| Batch B (shadcn-first form-controls) | TD-41, TD-57 | CTO-beslut: shadcn Select + Input-primitive default |
-| Batch C (a11y-pass) | TD-1, TD-2, TD-40 | Skip-link + CardTitle h3 + asChild + Slot.Root |
-| Batch D (UX-pass /mig) | TD-3, TD-4, TD-5 | Stum tom-state + userId borttaget + JSDoc |
-| Batch E (me-flöde fullstack) | TD-6, TD-28 | Klas-Alt1: utöka till fullstack med ny `/auth/verify`-endpoint |
-| Batch F (cross-user-isolation) | TD-12 | 7 integration-tester för Application |
-| Disciplinretur | TD-65, TD-66 | Reparation av disciplinmissar (Playwright E2E + Resume/Me isolation) |
-| TD-67 (ADR 0031) | TD-67 | IFailedAccessLogger + strukturerad logging + ADR 0031 |
-| TD-25 (resilient loop) | TD-25 | HardDeleteAccountsJob per-konto try/catch |
-| TD-68 (CloudWatch) | TD-68 | Terraform-modul + dev-apply genomförd |
-
-**Totalt:** 16 TDs stängda. **45 stängda** totalt, **18 aktiva kvar** (alla Fas 2+ eller Trigger-baserade).
-
-### Fas 1-status
-
-- `docs/steg-tracker.md` Fas 1: "Klar 2026-05-11" (admin-audit) → uppdaterad i denna session med Fas 1-rensningens täckning.
-- **Fas 1 Minor-sektionen i tech-debt.md är TOM.** Alla aktiva TDs är Fas 2+ (PII-encryption, AI-kostnadstak), Fas 4 (AI), Fas 6 (admin-impersonation), Trigger-baserade (i18n, error-summary, paginering), eller Opportunistiska (TD-20).
-- Inga blockers från TD-listan för Fas 2-start.
-
-### Säkerhetsinvarianter etablerade
-
-- Cross-user-isolation maskinellt bevakad: Application + Resume + JobSeeker
-  (16 integration-tester totalt)
-- BOLA-enumeration-detektering live i dev (CloudWatch metric filter + SNS-alarm)
-- Defense-in-depth re-auth före DELETE /me (POST /auth/verify)
-- Resilient hard-delete-job (per-konto try/catch)
-- GDPR Art. 17 + Art. 32 implementationsbevisad i tester
+- 10 EF-migrations applicerade på public-schema (InitialCreate till Fas2P8aJobAdExternalReference)
+- 2 Identity-migrations applicerade på identity-schema (InitialIdentity, AddAuthProviderToUser)
+- identity-schema skapad med jobbpilot_app GRANT USAGE/CREATE/ALL on tables
+- API + Worker live på `v0.2.1-dev`, smoke-test `HTTP 200` mot `/api/ready`
+- IAM policy `jobbpilot-github-actions-deploy-dev` version 5 (med `EcsRunMigrateTaskInDevCluster` + `EcsReadOurCluster.cluster-condition`)
 
 ### Tester (full svit grön)
 
-| Suite | Antal |
-|-------|-------|
-| Backend Domain.UnitTests | 163 |
-| Backend Application.UnitTests | 217 |
-| Backend Architecture.Tests | 32 |
-| Backend Api.IntegrationTests | +21 nya (VerifyCredentials, Apps/Resumes/Me isolation) |
-| Frontend Vitest | 234 |
-| tsc --noEmit | grön |
-| dotnet format | ren |
+- Domain.UnitTests: 202 → **218** (+16)
+- Application.UnitTests: 249 → **258** (+9)
+- Architecture.Tests: 32 → **33** (+1 ListJobAdsQuery_returns_PagedResult)
+- Api.IntegrationTests: ~226+ (uppdaterade för auth-gate)
+- Migrate.UnitTests: 6 (oförändrat)
 
-### AWS-deploy denna session
+### Sessions disciplinmissar fångade + fixade
 
-| Resurs | Status |
-|---|---|
-| `jobbpilot-dev-secops-anomaly` SNS-topic | Live (KMS-encrypted) |
-| `failed_access_attempt` metric filter | Live (api log-group) |
-| `jobbpilot-dev-failed-access-anomaly` alarm | INSUFFICIENT_DATA (väntar data) |
-| `jobbpilot-dev-api-log-pipeline-health` alarm | INSUFFICIENT_DATA (väntar data) |
+1. Migrate-Dockerfile saknade transitiva Project-references → fixat
+2. IAM `ecs:DescribeTasks` saknade task-ARN-pattern → fixat
+3. Dockerfile runtime-image saknade ASP.NET-framework → fixat
+4. `containerOverrides.command` skickade hela kedjan istället för bara mode-arg → fixat
+5. Migrate-Dockerfile saknade RDS-CA-bundle → fixat
+6. Original copy-paste-fix för Identity-options-skew → DRY-refactor till `MigrationsOptionsFactory` (Klas-discipline-feedback)
+7. Reviewers inte invokerade inline → post-hoc audit + 4 fix-commits
 
-### Pushed commits denna session (21 st)
+### Lärdomar
 
-| Commit | Scope |
-|--------|-------|
-| `74d28ad` | feat(web): Batch B shadcn-first form-controls |
-| `2513580` | docs(tech-debt): Batch B stängningar |
-| `006e3e1` | feat(web): Batch C a11y-pass |
-| `bc91ff1` | docs(tech-debt): Batch C stängningar |
-| `f1a82be` | feat(web): Batch D UX-pass /mig |
-| `5623d01` | docs(tech-debt): Batch D stängningar |
-| `9f74efb` | feat: Batch E me-flöde fullstack |
-| `fdd2673` | docs(tech-debt): Batch E stängningar |
-| `80a6c3c` | chore(test): VerifyCredentialsTests pattern-match |
-| `4310a8e` | chore(security): .gitleaksignore fingerprints |
-| `b4bb60f` | test(applications): Batch F cross-user-isolation |
-| `d3cbf99` | docs(tech-debt): Batch F stängningar |
-| `62e8453` | test: disciplinretur TD-65 + TD-66 |
-| `71b7c9f` | docs(tech-debt): TD-65 + TD-66 stängda |
-| `861a7cf` | feat(security): TD-67 + ADR 0031 |
-| `ba4f36f` | docs(tech-debt): TD-67 stängd |
-| `eed6cc2` | fix(worker): TD-25 resilient loop |
-| `80c1f06` | docs(tech-debt): TD-25 stängd |
-| `70ca42b` | feat(infra): TD-68 CloudWatch security-alarms |
-| `2f66b4f` | docs(tech-debt): TD-68 Pågående |
-| `45fb7f7` | docs(tech-debt): TD-68 stängd efter dev-apply |
-
-### Lärdom sparad i memory
-
-- `memory/feedback_td_lifting_discipline.md`:
-  TD-lyftningar måste pressas mot §9.6-kriterier även om CTO/auditor föreslår.
-  "Scope-disciplin per batch" eller "+1-2h CC-tid" är INTE legitima skäl.
-
-### Nya ADRs
-
-- **ADR 0031** — Failed cross-user access detection: strukturerad loggning +
-  CloudWatch-aggregat. Bevarar ADR 0022 immutable.
+- **Web-search räddade scope** vid två tillfällen (Npgsql #1770 + AWS OIDC thumbprint)
+- **CTO-disciplin** vid multi-approach-val gav 4 separata CTO-ronder med tydliga beslut
+- **DRY > copy-paste** — Klas fångade `MigrationsOptionsFactory`-extraktion innan spaghetti-fix
+- **Auto-trigga schema-mode i CI** fångade F2-P0b-glömskan mekaniskt
+- **Bootstrap-mode-design** bevarar least-privilege permanent (ingen `CREATE ON DATABASE` på `jobbpilot_app`)
 
 ---
 
-## Nästa session — Fas 2-kickoff med ADR 0005-design
+## Nästa session — F2-P8b
 
-Per CLAUDE.md §9.2 är fas-skifte ett strategiskt beslut. Klas har gett GO
-för Fas 2-start men Fas 2 är blockerad av prereqs per BUILD.md §18 +
-`docs/steg-tracker.md` fotnot ²:
+Per ADR 0032 leverans-plan: P8b — Infrastructure-leverans.
 
-1. **ADR 0005** (go-to-market + kostnadsskydd-strategi) ska beslutas
-2. **Budget Actions** + `registrations_open`-flagga implementerade
-3. **Rate-limiting-utvidgning** för publika endpoints
-4. **Runbook** `docs/runbooks/aws-cost-recovery.md` skapad
+### Scope
 
-Startprompt för nästa /clear-session: `STARTPROMPT-FAS2-KICKOFF.md`
-(skapas vid session-end denna session).
+- `IJobTechSearchClient` via **Refit** (klassisk REST/JSON, BUILD.md §9.1)
+- `IJobTechStreamClient` typed-client (NDJSON long-polling + polymorft event-schema)
+- `PlatsbankenJobSource : IJobSource`
+- `Microsoft.Extensions.Http.Resilience` + `AddStandardResilienceHandler` (Polly v8, BUILD.md §9.1 semantik: 3 retry expo + CB 5/5min)
+- `JobTechOptions` (appsettings-binding) + `IOptions<T>`-pattern
+- Admin-trigger-endpoint `POST /api/v1/admin/job-ads/sync/platsbanken` (synkron snapshot för smoke-test)
+- WireMock-baserade integration-tester
+- **TD-73-arbete (blockerar P8c):** `JobTechPayloadSanitizer` + allowlist-design + 30d retention via Hangfire-job
 
-### Pending operativa uppgifter
+### Klas-STOPP-flagga (CTO-rond 1)
 
-- (Valfritt) Sätt `secops_alert_email` i dev `terraform.tfvars` +
-  re-apply + AWS-mail-opt-in. Idag är SNS-topic skapad men inga
-  subscriptions.
-- (Valfritt) Drift-test av TD-68 anomaly-alarm: registrera 2 users,
-  gör cross-user-anrop, verifiera att alarm triggar inom ~60s.
-- (Senare) Prod-invokation av TD-68-modulen när prod-ECS-stack levereras.
+Admin-endpoint exponerar synkron JobTech-call → verifiera resilience-config mot dev innan tag-push.
 
-### Förbud (default — kan lyftas av Klas)
+### Pending operativt
 
-- **INGA Fas 2-JobTech-features** utan ADR 0005-beslut + kostnadsskydd
-- **INGA STEG-starter** utan Klas-GO
-- **INGA ändringar** av `BUILD.md` / `CLAUDE.md` / `DESIGN.md` utan explicit instruktion
-- **INGA prod-deploys** utan Klas-godkännande
+- (Inga blockerande från denna session) — dev-deploy är grön
+- TD-72 trigger om Identity-schema-migration läggs på roadmap för Fas 2-end
+- Bootstrap-task manuellt körd 2026-05-12 (engångs eller vid Identity-schema-change)
+
+---
+
+## Tidigare session — F2-P3 + P4 + P6 komplett
+
+Föregående session (eftermiddag 2026-05-12) levererade Budget Actions
+terraform-modul (F2-P3), cost-recovery-runbook full utbyggnad (F2-P4),
+strict readiness-probe-split (F2-P6, TD-29 stängd). Alla Fas 2-prereqs
+avklarade.
+
+Se session-log `docs/sessions/2026-05-12-1330-fas2-p3-p4-p6-prereqs-komplett.md`.
