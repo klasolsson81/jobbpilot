@@ -1774,3 +1774,54 @@ BOLA-enumeration-attack (OWASP API1:2023) osynlig för anomaly-detection.
 **Tester:** 213 Application UnitTests gröna (+4 nya för logger-bevakning). Befintliga cross-user-integration-tester (TD-12, TD-66) bevakar fortsatt 404-beteende utan API-respons-skillnad.
 
 ---
+
+## TD-25: HardDeleteAccountsJob per-konto try/catch (resilient loop) ✓ STÄNGD 2026-05-12
+**Kategori:** Robusthet / Operations
+**Severity:** Minor
+**Fas:** 1+ (opportunistiskt — flyttad till Fas 1 in-block per CTO-beslut)
+**Källa:** Code review STEG 10b 2026-05-08 (Code-Nit-5)
+**Status:** **STÄNGD 2026-05-12 (commit `eed6cc2`)** — in-block-fix per §9.6.
+
+`HardDeleteAccountsJob.RunAsync` saknade try/catch per konto i Steg 2-loopen.
+Vid första exception bubblade den och avbröt loopen för alla efterföljande
+konton. Hangfire retry:ar hela jobbet, men under retry-fönstret var de andra
+moget-för-deletion-kontona blockerade.
+
+**Risk:** låg i Fas 1 (få konton), medium vid skala. Asymmetri: 30 min CC-tid
+nu vs produktions-blockering vid första error i Fas 2.
+
+**Leverans (commit `eed6cc2`):**
+
+1. **Steg 2 foreach-loop wrappad i try/catch:**
+   - `OperationCanceledException` re-throws (shutdown-cancel sväljs INTE)
+   - Generisk `Exception` fångas, `failed++`, `LogAccountFailed(jobSeekerId, ex)` med EventId 2502, Error-level
+   - Loop fortsätter med nästa konto
+2. **`LogComplete` utökad** med `failed`-parameter — slutlogg visar processed + failed för operativ insyn
+3. **4 unit-tester** (`Application.UnitTests/Auth/Jobs/HardDeleteAccounts/HardDeleteAccountsJobTests.cs`):
+   - Single account fail → andra processeras (isolation-invariant)
+   - Account fail → jobbet kastar INTE (no-throw-invariant)
+   - OperationCanceledException → propageras (cancel-disciplin per §3.5)
+   - All accounts fail → jobbet kör färdigt ändå (idempotens-invariant)
+
+**Pattern-fidelity:** matchar `DetectGhostedApplicationsJob` (ADR 0023) med
+**motiverad avvikelse**: HardDeleteAccounts har multi-boundary cascade
+(transactional cascade + Identity-DELETE som separat boundary) som kräver
+per-konto isolation där MarkGhosted inte gör det. Dokumenterad i XML-doc.
+
+**Idempotens-invariant (ADR 0024 D6) bevarad:** failade konton plockas upp
+av nästa cron eftersom `processed++` ligger efter `await` — bara success
+räknas. Jobbet markerar INTE failade konton som "klart".
+
+**CTO-beslut (senior-cto-advisor 2026-05-12):** in-block-fix per §9.6
+fas-regeln. TD-25 klassad "Fas 1+/Opportunistiskt" — scope ~30 min, ingen
+dependency-blockare. Motivering: defensive programming (Hunt/Thomas 1999
+kap. 4), risk-asymmetri (~30 min nu vs produktions-blockering i Fas 2).
+
+**Reviews:**
+- code-reviewer: 0 Blocker / 0 Major / 0 Minor. Approved. "Cancel-disciplin
+  bevisas maskinellt via test, inte bara via kod-läsning."
+
+**Tester:** 217 Application UnitTests gröna (+4 nya). dotnet format ren.
+EventId 2502 unikt i repot (verifierat mot 1-5, 1001-1003, 2001, 4001, 999).
+
+---

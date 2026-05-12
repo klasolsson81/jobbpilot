@@ -23,7 +23,6 @@ tidsbegränsning per touch — fas-tillhörighet styr. Default = fixa in-block.
 | TD-19 | Worker orchestrator + DI-pattern: defense-in-depth | Minor | 2 | Code quality |
 | TD-23 | RedisSessionStore atomicitet via MULTI/EXEC eller Lua | Minor | 2 | Säkerhet/Robusthet |
 | TD-24 | DeleteAccountCommand cascade-paginering vid power-user | Minor | 2 | Skalbarhet |
-| TD-25 | HardDeleteAccountsJob per-konto try/catch (resilient loop) | Minor | 2 | Robusthet |
 | TD-27 | EmailHash → HMAC med roterande nyckel | Minor | 2 | Säkerhet/GDPR |
 | TD-29 | Strict readiness-probe — separera liveness från readiness | Minor | 2 | Observability |
 | TD-56 | ListJobAdsQuery full paginering (Fas 2 JobTech-integration) | Minor | 2 | Architecture |
@@ -285,52 +284,6 @@ i en request-thread.
 **Beroenden:** Behöver paginering-mönster verifieras mot audit-paritet —
 ska EN audit-rad skrivas (Account.Deleted) eller flera (per batch)?
 Rek: en rad. Audit-rad skrivs sist, efter alla cascade-batches.
-
-
----
-
-## TD-25: HardDeleteAccountsJob per-konto try/catch (resilient loop)
-
-**Kategori:** Robusthet / Operations
-**Fas:** 1+ (opportunistiskt)
-**Prioritet:** Medium
-**Källa:** Code review STEG 10b 2026-05-08 (Code-Nit-5)
-
-`HardDeleteAccountsJob.RunAsync` har ingen try/catch per konto i Steg 2-loopen.
-Vid första exception bubblar den och avbryter loopen för **alla** efterföljande
-konton. Hangfire retry:ar hela jobbet, men under retry-fönstret är de andra
-moget-för-deletion-kontona också blockerade.
-
-**Risk i Fas 1:** låg (få konton att hard-deleta).
-**Risk vid skala:** medium (en korrupt rad blockerar alla andra).
-
-**Föreslagen åtgärd:**
-1. Lägg per-konto try/catch som loggar fel och `continue`:ar
-2. Konsekvens-checka mot DetectGhostedApplicationsJob (ADR 0023)-mönstret —
-   om DetectGhosted också låter exception bubbla bör båda förändras tillsammans
-   för konsistens
-3. Eventuellt: aggregera failed-id:s och rapportera vid slutet av jobbet
-
-**Exempel:**
-```csharp
-foreach (var jobSeekerId in jobSeekerIds)
-{
-    cancellationToken.ThrowIfCancellationRequested();
-    try
-    {
-        await hardDeleter.HardDeleteAccountAsync(jobSeekerId, cancellationToken);
-        processed++;
-    }
-    catch (OperationCanceledException) { throw; }
-    catch (Exception ex)
-    {
-        LogAccountFailed(logger, jobSeekerId, ex);
-    }
-}
-```
-
-**Beroenden:** Konsekvens-decision om DetectGhosted-mönstret också ska
-ändras. Diskutera vid Fas 2-touch.
 
 
 ---
@@ -864,6 +817,7 @@ ADR-cross-references och granskningsbevis.
 | TD-65 | Playwright E2E för delete-account-flow | 2026-05-12 | disciplinretur |
 | TD-66 | Cross-user-isolation-tester för Resume + JobSeeker | 2026-05-12 | disciplinretur |
 | TD-67 | Audit-trail för failed cross-user-access-attempts | 2026-05-12 | ADR 0031 + IFailedAccessLogger |
+| TD-25 | HardDeleteAccountsJob per-konto try/catch (resilient loop) | 2026-05-12 | `eed6cc2` |
 
 ---
 
