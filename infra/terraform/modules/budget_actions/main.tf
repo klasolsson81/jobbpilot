@@ -161,7 +161,7 @@ data "aws_iam_policy_document" "budget_action_assume" {
 
 resource "aws_iam_role" "budget_action" {
   name               = "${var.name_prefix}-budget-action-role"
-  description        = "Execution-role för AWS Budget Action — attacha/detacha JobbPilotBedrockDeny på api-task-role vid threshold-breach."
+  description        = "Execution-role for AWS Budget Action - attach/detach JobbPilotBedrockDeny on api-task-role at threshold-breach. AWS IAM description disallows U+2014 em-dash."
   assume_role_policy = data.aws_iam_policy_document.budget_action_assume.json
 
   tags = merge(var.tags, {
