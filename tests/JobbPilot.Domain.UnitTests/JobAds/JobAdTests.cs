@@ -109,4 +109,117 @@ public class JobAdTests
             .ShouldBeOfType<JobAdArchivedDomainEvent>()
             .JobAdId.ShouldBe(jobAd.Id);
     }
+
+    // ADR 0032 §4 — Import factory + UpdateFromSource state-transition
+
+    private static ExternalReference ValidExternalRef() =>
+        ExternalReference.Create(JobSource.Platsbanken, "26500001").Value;
+
+    [Fact]
+    public void Import_WithValidData_ReturnsSuccessWithExternalSet()
+    {
+        var (title, company, desc, url, _, publishedAt) = ValidParams();
+        var external = ValidExternalRef();
+        const string raw = "{\"id\":\"26500001\",\"headline\":\"Senior Backend Engineer\"}";
+
+        var result = JobAd.Import(title, company, desc, url, external, raw, publishedAt, null, Clock);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.External.ShouldBe(external);
+        result.Value.RawPayload.ShouldBe(raw);
+        result.Value.Source.ShouldBe(JobSource.Platsbanken);
+        result.Value.Status.ShouldBe(JobAdStatus.Active);
+    }
+
+    [Fact]
+    public void Import_RaisesJobAdImportedDomainEvent()
+    {
+        var (title, company, desc, url, _, publishedAt) = ValidParams();
+        var external = ValidExternalRef();
+        const string raw = "{\"id\":\"26500001\"}";
+
+        var jobAd = JobAd.Import(title, company, desc, url, external, raw, publishedAt, null, Clock).Value;
+
+        var evt = jobAd.DomainEvents.ShouldHaveSingleItem().ShouldBeOfType<JobAdImportedDomainEvent>();
+        evt.JobAdId.ShouldBe(jobAd.Id);
+        evt.Source.ShouldBe("Platsbanken");
+        evt.ExternalId.ShouldBe("26500001");
+        evt.Title.ShouldBe(title);
+    }
+
+    [Fact]
+    public void Import_WithEmptyRawPayload_ReturnsFailure()
+    {
+        var (title, company, desc, url, _, publishedAt) = ValidParams();
+        var external = ValidExternalRef();
+
+        var result = JobAd.Import(title, company, desc, url, external, "", publishedAt, null, Clock);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe("JobAd.RawPayloadRequired");
+    }
+
+    [Fact]
+    public void Import_WithInvalidUrl_ReturnsFailure()
+    {
+        var (title, company, desc, _, _, publishedAt) = ValidParams();
+        var external = ValidExternalRef();
+
+        var result = JobAd.Import(title, company, desc, "not-a-url", external, "{}", publishedAt, null, Clock);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe("JobAd.UrlInvalid");
+    }
+
+    [Fact]
+    public void UpdateFromSource_OnImportedJobAd_RefreshesMutableFields()
+    {
+        var (title, company, desc, url, _, publishedAt) = ValidParams();
+        var external = ValidExternalRef();
+        var jobAd = JobAd.Import(title, company, desc, url, external,
+            "{\"v\":1}", publishedAt, null, Clock).Value;
+        jobAd.ClearDomainEvents();
+
+        var newExpiresAt = publishedAt.AddDays(14);
+        var result = jobAd.UpdateFromSource(
+            "Updated title", "Updated description",
+            "https://jobs.klarna.com/job/123-updated", "{\"v\":2}", newExpiresAt);
+
+        result.IsSuccess.ShouldBeTrue();
+        jobAd.Title.ShouldBe("Updated title");
+        jobAd.Description.ShouldBe("Updated description");
+        jobAd.Url.ShouldBe("https://jobs.klarna.com/job/123-updated");
+        jobAd.ExpiresAt.ShouldBe(newExpiresAt);
+        jobAd.RawPayload.ShouldBe("{\"v\":2}");
+        // ADR 0032 §4 — UpdateFromSource raisar inga events (sync auditeras aggregerat)
+        jobAd.DomainEvents.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void UpdateFromSource_OnManualJobAd_ReturnsFailure()
+    {
+        var (title, company, desc, url, source, publishedAt) = ValidParams();
+        var jobAd = JobAd.Create(title, company, desc, url, source, publishedAt, null, Clock).Value;
+
+        var result = jobAd.UpdateFromSource(
+            "X", "Y", "https://example.com/x", "{}", null);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe("JobAd.NotImported");
+    }
+
+    [Fact]
+    public void UpdateFromSource_WithEmptyRawPayload_ReturnsFailure()
+    {
+        var (title, company, desc, url, _, publishedAt) = ValidParams();
+        var external = ValidExternalRef();
+        var jobAd = JobAd.Import(title, company, desc, url, external,
+            "{\"v\":1}", publishedAt, null, Clock).Value;
+
+        var result = jobAd.UpdateFromSource(
+            "Updated", "Updated desc", "https://example.com/x", "", null);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe("JobAd.RawPayloadRequired");
+    }
 }

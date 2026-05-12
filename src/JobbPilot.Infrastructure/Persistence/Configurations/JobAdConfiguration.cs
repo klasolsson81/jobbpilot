@@ -21,6 +21,9 @@ public sealed class JobAdConfiguration : IEntityTypeConfiguration<JobAd>
         builder.Property(j => j.CreatedAt).IsRequired();
         builder.Property(j => j.DeletedAt);
 
+        // ADR 0032 §4 — raw_payload som jsonb för debug/replay-artefakter.
+        builder.Property(j => j.RawPayload).HasColumnType("jsonb");
+
         builder.OwnsOne(j => j.Company, company =>
         {
             company.Property(c => c.Name)
@@ -37,6 +40,25 @@ public sealed class JobAdConfiguration : IEntityTypeConfiguration<JobAd>
             .HasConversion(s => s.Value, v => JobSource.FromValue(v).Value)
             .HasMaxLength(50)
             .IsRequired();
+
+        // ADR 0032 §4-§5 — ExternalReference owned-type + UNIQUE-index
+        // på (Source, ExternalId) WHERE external_id IS NOT NULL (defense-in-depth
+        // mot duplicat vid parallella Hangfire-workers). Explicit snake_case
+        // HasColumnName för konsekvens med övriga job_ads-kolumner (init-migration).
+        builder.OwnsOne(j => j.External, ext =>
+        {
+            ext.Property(e => e.Source)
+                .HasColumnName("external_source")
+                .HasConversion(s => s.Value, v => JobSource.FromValue(v).Value)
+                .HasMaxLength(50);
+            ext.Property(e => e.ExternalId)
+                .HasColumnName("external_id")
+                .HasMaxLength(100);
+            ext.HasIndex(e => new { e.Source, e.ExternalId })
+                .IsUnique()
+                .HasFilter("\"external_id\" IS NOT NULL")
+                .HasDatabaseName("ix_job_ads_external_source_external_id");
+        });
 
         builder.HasQueryFilter(j => j.DeletedAt == null);
 
