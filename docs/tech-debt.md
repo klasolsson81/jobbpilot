@@ -29,6 +29,7 @@ tidsbegränsning per touch — fas-tillhörighet styr. Default = fixa in-block.
 | TD-76 | GIN-index på raw_payload jsonb (latens-trigger) | Minor | Trigger | Performance |
 | TD-77 | Backend 5xx-rate-alarm (1% över 5 min) | Minor | 8 (Klass-launch) | Observability/SLA |
 | TD-78 | DB CPU > 80% i 10 min-alarm | Minor | 8 (Klass-launch) | Observability/Capacity |
+| TD-81 | middleware.ts → proxy.ts (Next.js 17-uppgradering) | Minor | Trigger | Frontend/Compatibility |
 | TD-62 | OpenAPI-codegen som supersession av manuella Zod-DTO-schemas | Minor | 2+ | Architecture/Tooling |
 | TD-63 | ActionResult kind-union för writes (ADR 0030-symmetri) | Minor | 2+ | Architecture |
 | TD-64 | i18n-migration av inline svenska error-strängar | Minor | Trigger | i18n |
@@ -873,6 +874,47 @@ EXPLAIN ANALYZE-verifiering före och efter (mätbar speedup på admin-endpoint)
 
 **Beroenden:** Inga blockerare; opportunistisk vid trigger.
 
+
+---
+
+## TD-81: middleware.ts → proxy.ts (Next.js 17-uppgradering)
+**Kategori:** Frontend / Compatibility
+**Severity:** Minor
+**Fas:** Trigger (Next.js 17-uppgradering eller proxy-konvention stabiliserat)
+**Källa:** Vercel-deploy-session 2026-05-14 (CTO Q5-beslut + build-warning bekräftad i Vercel build-logs)
+
+Next.js 16 visar deprecation-varning vid build:
+
+```
+⚠ The "middleware" file convention is deprecated. Please use "proxy" instead.
+Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+```
+
+Build-output markerar fortfarande filen som `ƒ Proxy (Middleware)` —
+funktionen fungerar identiskt i Next.js 16 (Vercel routar via samma
+mekanism). Bekräftat under Vercel-deploy-debugging att middleware.ts INTE
+var orsaken till 404-issue:n (vercel.json `framework=nextjs` löste).
+
+**Risk i nuläget:** Noll. Deprecation-varning, ej breaking. middleware.ts
+fungerar helt normalt i Next.js 16.x.
+
+**Risk vid Next.js 17:** Medium. Konventionen `middleware.ts` kan tas bort
+helt → bygget breakar tills filen renames + ev. API-skillnader hanteras.
+
+**Föreslagen åtgärd vid trigger:**
+
+1. Rename `web/jobbpilot-web/src/middleware.ts` → `web/jobbpilot-web/src/proxy.ts`
+2. Verifiera API-shape stabiliserat (Next.js 17 release-notes)
+3. Uppdatera Playwright-tester om matcher-paths påverkas
+4. Verifiera `PROTECTED_PREFIXES` (mig/ansökningar/cv) fortsatt skyddade
+
+**Beroenden:** Ingen blockerare; kan göras opportunistiskt vid Next.js
+17-uppgradering eller dedikerad uppgraderings-batch.
+
+**Trigger:** ett av:
+- Next.js 17 release + uppgraderings-batch
+- proxy-konvention dokumenterad som stabil i Next.js docs
+- Build-warning eskalerar till error
 
 ---
 

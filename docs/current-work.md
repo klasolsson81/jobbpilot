@@ -1,16 +1,75 @@
 # Current work — JobbPilot
 
-**Status:** **F2-P10 + TD-80 KOMPLETT 2026-05-13. F2-P10 frontend `/jobb`-katalog UI live lokalt (commit 70e1505). TD-80 (JobAd.Url scheme-whitelist) STÄNGD via Domain.ValidateCore + 17 nya unit-tester. Defense-in-depth uppfylld FE (Zod-refine) + BE (Domain-invariant). 932 backend-tester gröna + 313 frontend-tester gröna. Vercel-deploy är Klas-op (ej i denna session).**
-**Senast uppdaterad:** 2026-05-13 (F2-P10 + TD-80 komplett)
-**HEAD:** `70e1505` (F2-P10) — TD-80-commit pushas härnäst
-**Deploy:** `v0.2.5-dev` LIVE på dev (TD-80 backend-fix väntar nästa Fas 2-batch eller v0.2-prod-tag — inte tag-pushed denna session)
+**Status:** **VERCEL-DEPLOY LIVE 2026-05-14 00:50 — https://www.jobbpilot.se end-to-end fungerande. F2-P10 frontend `/jobb`-katalog renderar 3391 jobbannonser från Platsbanken via dev-backend. Alla auth-gated routes (mig, ansökningar, cv, admin/granskning) verifierade live. Root cause för 4h debugging: `framework: null` i Vercel project settings (löst via vercel.json `framework=nextjs`). 3 misslyckade hypoteser innan CTO-godkänd diagnos via `vercel pull` avslöjade verklig orsak. Lärande sparat i session-log + memory-kandidat.**
+**Senast uppdaterad:** 2026-05-14 00:50 (Vercel LIVE)
+**HEAD:** `fcfe710` (vercel.json framework=nextjs LÖSNINGEN) + 3 efterföljande commits från debug-iterationer behållna
+**Deploy:** `v0.2.5-dev` LIVE på dev-backend, frontend LIVE på Vercel (www.jobbpilot.se → dev.jobbpilot.se)
 **Långsiktig bana:** `docs/steg-tracker.md`
 **Tech debt:** `docs/tech-debt.md` (aktiva, +TD-80) + `docs/tech-debt-archive.md` (stängda)
 **Prod-checklist:** `docs/runbooks/v0.2-prod-launch-checklist.md`
 
 ---
 
-## Aktivt nu — TD-80 STÄNGD (JobAd.Url scheme-whitelist)
+## Aktivt nu — VERCEL-DEPLOY LIVE (frontend mot dev-backend)
+
+### Levererat (5 commits, 1 Klas-cleanup)
+
+| Commit | Innehåll | Effekt |
+|---|---|---|
+| `cbe4a10` | Vercel DNS-records (apex A 216.198.79.1 + www CNAME projekt-specifik + CAA Let's Encrypt) — Terraform applied i prod/baseline | DNS pekar mot Vercel ✅ |
+| `25aa476` | Ta bort pnpm-workspace.yaml + flytta ignoredBuiltDependencies till package.json's pnpm-field | Hypotes-test (fel orsak) men hygienförbättring behållen |
+| `9d0eae4` | next build/dev --webpack flag (force Webpack istället för Turbopack-default) | Hypotes-test (fel orsak) men säkerhetsmarginal behållen |
+| `fcfe710` | **vercel.json med "framework": "nextjs"** | **LÖSNINGEN** ✅ |
+| (Klas UI 00:50) | Dashboard Framework Preset = Next.js (defense-in-depth match) + radera oönskat `jobbpilot-web`-projekt | Cosmetic cleanup |
+
+### Root cause — `framework: null` i Vercel project settings
+
+Avslöjad av CTO-godkänd diagnos via lokal `vercel pull` + inspektera `.vercel/project.json`. När projektet skapades via "New Project"-flödet i UI valdes inte Application Preset = Next.js explicit (Klas noterade dropdown:n "försvann"). Vercel-platform-side hade `framework: null` → routing-tabellen registrerades inte som Next.js → ALLA URLs gav 404 NOT_FOUND oavsett auth/build-bundler/workspace-config.
+
+### CTO-rond 2026-05-13 kväll — diagnos först (entydigt mot principer)
+
+CTO valde Gemini-approach (systematisk diagnos) över ChatGPT (delete-project först). Motivering: Saltzer/Schroeder Fail-Safe Defaults + Beck TDD-spirit + CLAUDE.md §9.4 Discovery + YAGNI.
+
+### End-to-end verifierat (Klas screenshots 00:50 2026-05-14)
+
+| URL | Status | Fungerar |
+|---|---|---|
+| `jobbpilot.se` | 301 → www | ✅ |
+| `www.jobbpilot.se/` | 200 LandingPage | ✅ (designsystem-demo, behöver login/register-CTA) |
+| `www.jobbpilot.se/logga-in` | 200 | ✅ |
+| `www.jobbpilot.se/mig` | 200 | ✅ Klas profil + Admin-roll |
+| `www.jobbpilot.se/admin/granskning` | 200 | ✅ Audit-logg LIVE med System.JobAdsSynced cron-events |
+| `www.jobbpilot.se/jobb` | 200 | ✅ **3391 jobbannonser från Platsbanken** |
+| `www.jobbpilot.se/api/me` | 401 (utan auth) | ✅ Backend-koppling fungerar |
+
+### Disciplinmissar + lärande
+
+3 misslyckade hypoteser innan datadriven diagnos (auth, pnpm-workspace, Turbopack). ~2h Klas-tid på gissningar.
+
+**Lärande:** `vercel pull` + inspektera `.vercel/project.json` är obligatorisk första-diagnos vid Vercel-konstigheter. Settings-mismatch mellan dashboard och vad CC ser från utsidan är osynlig utan det steget.
+
+### TD-status
+
+- **TD-81** lyft 2026-05-14 — Minor Trigger — middleware.ts → proxy.ts (Next.js 17-uppgradering). Källa: Vercel-deploy-session build-warning. Risk i nuläget noll, hanteras vid Next.js 17.
+
+Aktiva: 22 (TD-13 Major Fas 2 + TD-26 Major Fas 4; resten Minor).
+
+### Pending operativt för Klas
+
+- **Landing-page-CTA** (Klas observation 00:48): `(marketing)/page.tsx` är design-system-demo, saknar "Logga in" + "Anmäl till väntelistan"-knappar. Civic-utility-MVP-krav.
+- **Backend prod-stack-bring-up** (ADR 0036 D1) — Fas 7-prep, frontend pekar på dev-backend tills dess
+- AWS SSO-token-livslängd, JobTech-API-key, BUILD.md §9.1 sync — kvarstår
+
+### Nästa session — Klas-val
+
+1. **Landing-page-CTA-fix** (snabb, civic-utility-MVP-blocker)
+2. **F2-P11 / nästa Fas 2-feature** TBD
+3. **v0.2-prod-tag-prep** (TD-13 PII-encryption är enda kvarstående Major Fas 2, CTO confirmed defer 2026-05-13)
+4. **OIDC-drift-städning** (pre-existing 2 change-poster i prod/baseline-Terraform, fix opportunistiskt)
+
+---
+
+## Tidigare aktivitet — TD-80 STÄNGD (JobAd.Url scheme-whitelist)
 
 ### Levererat
 
