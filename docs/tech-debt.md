@@ -27,6 +27,8 @@ tidsbegränsning per touch — fas-tillhörighet styr. Default = fixa in-block.
 | TD-72 | Auto-trigga Migrate bootstrap-mode i deploy-dev.yml | Minor | Trigger | Operations/CI-CD |
 | TD-75 | Name-baserad rekryterar-PII-radering (multi-path jsonb + full-text) | Minor | Trigger | GDPR/Privacy |
 | TD-76 | GIN-index på raw_payload jsonb (latens-trigger) | Minor | Trigger | Performance |
+| TD-77 | Backend 5xx-rate-alarm (1% över 5 min) | Minor | 8 (Klass-launch) | Observability/SLA |
+| TD-78 | DB CPU > 80% i 10 min-alarm | Minor | 8 (Klass-launch) | Observability/Capacity |
 | TD-62 | OpenAPI-codegen som supersession av manuella Zod-DTO-schemas | Minor | 2+ | Architecture/Tooling |
 | TD-63 | ActionResult kind-union för writes (ADR 0030-symmetri) | Minor | 2+ | Architecture |
 | TD-64 | i18n-migration av inline svenska error-strängar | Minor | Trigger | i18n |
@@ -562,6 +564,92 @@ där JobSeekerId-resolutionen naturligt behöver utvidgas med
 `CreateResumeCommandHandler`, `RenameResumeCommandHandler`,
 `DeleteResumeCommandHandler`, `DeleteResumeVersionCommandHandler`,
 `UpdateMasterContentCommandHandler`, `GetResumesQueryHandler`.
+
+
+---
+
+## TD-77: Backend 5xx-rate-alarm (1% över 5 min)
+**Kategori:** Observability / SLA
+**Severity:** Minor
+**Fas:** 8 (Klass-launch)
+**Källa:** senior-cto-advisor 2026-05-13 (v0.2-prod-tag-readiness-rond, Q2-deferral)
+
+BUILD.md §14.4 specar `Backend 5xx-rate > 1% över 5 min → PagerDuty/email`.
+Inte konfigurerat idag — saknas i `modules/cloudwatch_security_alarms` och
+finns ingen ALB target-group-baserad alarm-yta heller.
+
+**Risk i v0.2-prod-tag-fas:** noll. JobbPilot har 1 användare (Klas) första
+prod-veckorna. 1%-tröskel mot lågvolym ger ingen meningsfull signal:
+- 100 requests/dag × 1% = 1 5xx → trigger redan vid enstaka transient fel
+- Tröskeln är meningsfull först vid multi-user volym (Fas 7 internal beta /
+  Fas 8 Klass-launch där 20+ aktiva användare ger statistiskt stabila samples)
+
+**CTO-motivering (Beck 1999 YAGNI + Fowler 2002):** SLA-tröskel utan
+volym = teater. Tröskeln aktiveras meningsfullt först vid Klass-launch.
+
+**Föreslagen åtgärd vid Fas 8:**
+
+1. Utöka `modules/cloudwatch_security_alarms` (eller skapa
+   `modules/cloudwatch_ops_alarms`) med:
+   - Metric filter på ALB `HTTPCode_Target_5XX_Count` / `RequestCount`
+   - Composite-alarm: `5XX/RequestCount > 0.01` över `5 min` med `evaluation_periods = 1`
+   - SNS-topic kan delas med secops-anomaly eller separat ops-topic
+2. Email-notification till klas@jobbpilot.se
+3. Verifiera mot CloudWatch Insights vid Fas 7 internal beta för att tuna tröskel
+
+**Trigger:** Fas 8 Klass-launch eller faktiskt observerat 5xx-mönster i
+Fas 7 internal beta.
+
+**Beroenden:** ALB target-group metric-attachment (befintlig via `modules/alb`).
+Inga blockerare.
+
+
+---
+
+## TD-78: DB CPU > 80% i 10 min-alarm
+**Kategori:** Observability / Capacity
+**Severity:** Minor
+**Fas:** 8 (Klass-launch)
+**Källa:** senior-cto-advisor 2026-05-13 (v0.2-prod-tag-readiness-rond, Q2-deferral)
+
+BUILD.md §14.4 specar `Databas CPU > 80% i 10 min → email`. Inte
+konfigurerat idag — RDS-metrics finns automatiskt i CloudWatch via AWS/RDS-
+namespace, men ingen alarm-resurs är skapad.
+
+**Risk i v0.2-prod-tag-fas:** noll. `db.t4g.medium` (eller `db.t4g.micro` för
+dev) med 1 användares trafik (Klas + occasional smoke-test) genererar inget
+CPU-tryck > 80%. Hangfire-jobben (var 10:e min) toppar kortvarigt men
+hanteras inom default-tröskeln.
+
+**CTO-motivering (Beck 1999 YAGNI):** Capacity-alarm utan trafikvolym =
+teater. Aktiveras meningsfullt vid Fas 7-Fas 8 när 20+ aktiva användare
+genererar reell DB-load.
+
+**Föreslagen åtgärd vid Fas 8:**
+
+1. Utöka observability-modulen med:
+   ```hcl
+   resource "aws_cloudwatch_metric_alarm" "rds_cpu" {
+     alarm_name          = "${var.name_prefix}-rds-cpu-high"
+     metric_name         = "CPUUtilization"
+     namespace           = "AWS/RDS"
+     statistic           = "Average"
+     dimensions          = { DBInstanceIdentifier = module.rds.identifier }
+     comparison_operator = "GreaterThanThreshold"
+     threshold           = 80
+     period              = 300
+     evaluation_periods  = 2  # 10 min total
+     alarm_actions       = [aws_sns_topic.ops_alarms.arn]
+   }
+   ```
+2. Email-notification till klas@jobbpilot.se
+3. Vid Fas 8: tuna mot faktisk capacity (kan kräva uppgrade till
+   `db.t4g.large` om Klass-launch ger sustained pressure)
+
+**Trigger:** Fas 8 Klass-launch eller observerat CPU-mönster > 60%
+sustained i Fas 7 internal beta (tidig varning-signal).
+
+**Beroenden:** Inga.
 
 
 ## Minor — Efter MVP / Trigger-baserade

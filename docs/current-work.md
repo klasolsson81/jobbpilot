@@ -1,17 +1,86 @@
 # Current work — JobbPilot
 
-**Status:** **TD-73 prod-gating-batch KOMPLETT + LIVE 2026-05-13. Tag `v0.2.4-dev` deploy 25786909619 success (6m42s). Ready-probe 200 OK. Audit-wire α (ISystemEventAuditor + System.JobAdsSynced/RawPayloadPurged) + right-to-erasure för rekryterar-PII (Email-only, Name→TD-75) levererade. ADR 0035 ny + ADR 0032 amendment 2026-05-13 + ADR 0024 cross-ref-amendment. TD-73 stängd; v0.2-prod-tag inte längre gated. TD-75 (Name) + TD-76 (GIN) lyfta som Trigger-baserade.**
-**Senast uppdaterad:** 2026-05-13 (TD-73 prod-gating-batch leverans + deploy success)
-**HEAD:** `c13e1ce`
+**Status:** **v0.2-prod-tag-readiness-rond KLAR 2026-05-13. Audit-wire smoke-test VERIFIERAD live (3 INSERTs i `audit_log` från SystemEventAuditor efter v0.2.4-dev — 08:21/08:30/08:40 UTC). `docs/runbooks/v0.2-prod-launch-checklist.md` skapad. senior-cto-advisor 5 beslut: v0.2 = första prod-deploy-tag (Q1c-tolkning); 2 in-block-fix-alarms + RDS-backup-bump FÖRE tag-push; TD-77 + TD-78 lyfta som Fas 8. PENDING KLAS-GO för 3 leveranser.**
+**Senast uppdaterad:** 2026-05-13 (v0.2-prod-tag-readiness-rond + CTO-decision)
+**HEAD:** `6914990` (oförändrad sedan TD-73-batch — denna session: docs-only)
 **Deploy:** `v0.2.4-dev` live på `https://dev.jobbpilot.se/api/ready` (200 OK)
 **Långsiktig bana:** `docs/steg-tracker.md`
 **Tech debt:** `docs/tech-debt.md` (aktiva) + `docs/tech-debt-archive.md` (stängda)
+**Prod-checklist:** `docs/runbooks/v0.2-prod-launch-checklist.md`
 
 ---
 
-## Aktivt nu — TD-73 stängd, smoke-test väntar nästa cron-tick
+## Aktivt nu — v0.2-prod-tag-readiness, pending Klas-GO för in-block-fix-batch
 
-### Levererat denna session (1 commit)
+### Levererat denna session (docs-only, 1 commit kommande)
+
+| Commit | Innehåll |
+|---|---|
+| (pending push) | docs: v0.2-prod-launch-checklist + TD-77 + TD-78 + session-log |
+
+### CTO-rond 2026-05-13 (v0.2-prod-tag-readiness) — 5 beslut
+
+1. **Q1 v0.2-definition:** Tolkning (c) — första prod-deploy-triggande tag oavsett feature-completeness. Frontend kommer i `v0.2.x`-patch-tags efter. Motivering: Continuous Delivery (Humble/Farley 2010), Fitness Functions (Ford/Parsons/Kua 2017).
+2. **Q2 BUILD.md §14.4-alerts:**
+   - JobTech-sync 3 consecutive failures → **In-block-fix FÖRE tag** (fas-relevant + observability)
+   - Backend 5xx-rate > 1% / 5 min → **TD-77 Fas 8** (YAGNI vid 1-user-volym)
+   - DB CPU > 80% / 10 min → **TD-78 Fas 8** (samma logik)
+3. **Q3 SystemEventAuditor failure-alarm (EventId 5602) → In-block-fix FÖRE tag** (ADR 0035 §6 egen leveransspec; Art. 30 record-of-processing-kongruens)
+4. **Q4 RDS backup-retention:** **14d för prod** (industry-common, EDPB CEF 2025 verifierad acceptans, KISS över 35d-max utan TD-13)
+5. **Q5 TD-13 (PII-encryption + crypto-erasure):** **Defer Fas 2-stängning** (EDPB CEF 2025 verifierar standard practice räcker, fas-regel CLAUDE.md §9.6)
+
+### Smoke-test 2026-05-13 — AUDIT-WIRE VERIFIERAD LIVE
+
+CloudWatch Logs Insights mot `/aws/ecs/jobbpilot-dev/worker`:
+
+| Cron-tick | Stream-result | audit_log INSERT |
+|---|---|---|
+| 08:21:55 UTC | fetched=1029, added=72, errors=0 | ✓ INSERT INTO audit_log (… payload …) |
+| 08:30:47 UTC | fetched=1076, added=84, errors=0 | ✓ INSERT INTO audit_log (… payload …) |
+| 08:40:41 UTC | (pågående vid query-tid) | ✓ INSERT INTO audit_log (… payload …) |
+
+`SystemEventAuditor` skriver `System.JobAdsSynced` per cron-tick via
+idempotens-check + insert. **0 EventId 5602 (Critical audit failure)** i
+loggarna. TD-73 audit-wire fungerar i prod-flöde.
+
+### Web-search-källor (CLAUDE.md §9.5, verifierade 2026-05-13)
+
+- [AWS RDS Backup Retention](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_WorkingWithAutomatedBackups.BackupRetention.html) — default 7d console / 1d API, max 35d
+- [EDPB CEF 2025 Report (PDF, 2026-02)](https://www.edpb.europa.eu/system/files/2026-02/edpb_cef-report_2025_right-to-erasure_en.pdf) — automatic overwrite cycles + live-radering acceptabelt; crypto-erasure inte krav
+- [Terraform aws_cloudwatch_log_metric_filter](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_log_metric_filter)
+- [Terraform aws_cloudwatch_metric_alarm](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_metric_alarm) — provider v6.30 stable
+
+### TD-status
+
+- **TD-77** lyft 2026-05-13 — Backend 5xx-rate-alarm, Fas 8 Klass-launch
+- **TD-78** lyft 2026-05-13 — DB CPU > 80% alarm, Fas 8 Klass-launch
+- **TD-13** Major Fas 2 — bekräftad ej launch-blocker per CTO Q5 + EDPB CEF 2025
+
+Aktiva: 21 (TD-13 + TD-26 Major; resten Minor).
+
+### Pending Klas-GO (in-block-fix-batch FÖRE v0.2-tag)
+
+Per `docs/runbooks/v0.2-prod-launch-checklist.md` §9. Tre leveranser:
+
+1. **CloudWatch-alarm: JobTech-sync 3 consecutive failures** — Terraform-utbyggnad i `modules/cloudwatch_security_alarms` (eller ny `cloudwatch_ops_alarms`-modul)
+2. **CloudWatch-alarm: SystemEventAuditor failure (EventId 5602)** — stänger ADR 0035 §6-gap
+3. **RDS backup-retention 7d → 14d** — prod-Terraform (dev oförändrad)
+
+**Scope:** 2-3 commits, ~3-4h CC-tid.
+**Klas-STOPP-territorium per CLAUDE.md §9.6 punkt 5:** v0.2-definition är strategisk + prod-Terraform-state + tag-push behöver explicit Klas-GO.
+
+### Pending operativt för Klas (sedan tidigare)
+
+- AWS SSO-token-livslängd (re-auth med `aws sso login --profile jobbpilot` vid behov)
+- JobTech-API-key registrering (apirequest.jobtechdev.se nedlagd; v2 är open API)
+- Frontend-deploy till Vercel (kommer i v0.2.x-patch efter v0.2)
+- BUILD.md §9.1 sync mot ADR 0032 §3 — Klas-instruktion krävs
+
+---
+
+## Tidigare aktivitet (TD-73 prod-gating-batch — komplett)
+
+### Tidigare commits
 
 | Commit | Innehåll |
 |---|---|
