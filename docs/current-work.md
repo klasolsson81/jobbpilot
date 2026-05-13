@@ -1,92 +1,132 @@
 # Current work — JobbPilot
 
-**Status:** **F2-P8c komplett + LIVE-VERIFIERAT 2026-05-13 ~07:15. Tag `v0.2.3-dev` deploy 25782988366 success. SyncPlatsbankenStreamJob första cron-tick (07:00:48 UTC) persisterade 417 JobAds från live JobTech v2 — fetched=565, added=417, skipped=148, errors=0, duration=41.97s. End-to-end-bekräftelse av hela P8b+P8c-stacken. TD-73 punkt 2 stängd; punkt 4 prod-gating-batch kvarstår.**
-**Senast uppdaterad:** 2026-05-13 (session-end efter F2-P8c + tag-deploy)
-**HEAD:** `81dfab6`
-**Deploy:** `v0.2.3-dev` live på `https://dev.jobbpilot.se/api/ready` (200 OK)
+**Status:** **TD-73 prod-gating-batch KOMPLETT + LIVE 2026-05-13. Tag `v0.2.4-dev` deploy 25786909619 success (6m42s). Ready-probe 200 OK. Audit-wire α (ISystemEventAuditor + System.JobAdsSynced/RawPayloadPurged) + right-to-erasure för rekryterar-PII (Email-only, Name→TD-75) levererade. ADR 0035 ny + ADR 0032 amendment 2026-05-13 + ADR 0024 cross-ref-amendment. TD-73 stängd; v0.2-prod-tag inte längre gated. TD-75 (Name) + TD-76 (GIN) lyfta som Trigger-baserade.**
+**Senast uppdaterad:** 2026-05-13 (TD-73 prod-gating-batch leverans + deploy success)
+**HEAD:** `c13e1ce`
+**Deploy:** `v0.2.4-dev` live på `https://dev.jobbpilot.se/api/ready` (200 OK)
 **Långsiktig bana:** `docs/steg-tracker.md`
 **Tech debt:** `docs/tech-debt.md` (aktiva) + `docs/tech-debt-archive.md` (stängda)
 
 ---
 
-## Aktivt nu — F2-P8c komplett, smoke-test väntar AWS SSO-refresh
+## Aktivt nu — TD-73 stängd, smoke-test väntar nästa cron-tick
 
 ### Levererat denna session (1 commit)
 
 | Commit | Innehåll |
 |---|---|
-| `81dfab6` | feat(jobads): F2-P8c — JobTech Hangfire-jobben + race-säker upsert + 30d-retention |
+| `c13e1ce` | feat(jobads): TD-73 prod-gating — audit-wire α + right-to-erasure för rekryterar-PII |
 
 ### Granskningstrail
 
-- `docs/sessions/2026-05-13-0700-f2-p8c-hangfire-jobs.md` — session-log
-- Agent-rapporter inline (dotnet-architect + senior-cto-advisor + code-reviewer + security-auditor)
-- Tidigare session: `docs/sessions/2026-05-13-0600-f2-p8b-jobtech-infra.md`
+- `docs/sessions/2026-05-13-0730-td73-prod-gating.md` — session-log (skapas i denna session-end)
+- Reviewers INLINE: dotnet-architect + senior-cto-advisor + code-reviewer + security-auditor
+- Tidigare session: `docs/sessions/2026-05-13-0700-f2-p8c-hangfire-jobs.md`
 
 ### Leveranser
 
 | Område | Innehåll |
 |---|---|
-| **Application commands** | `UpsertExternalJobAdCommand` + `ArchiveExternalJobAdCommand` (system-commands utan IAuthenticatedRequest, ej IAuditableCommand — aggregerad audit per job-run per CTO punkt 1) + outcome-enums |
-| **Application jobs** | `SyncPlatsbankenStreamJob` (cron `*/10`, overlap-window 15min), `SyncPlatsbankenSnapshotJob` (cron `0 2`, per-item mediator-loop), `PurgeStaleRawPayloadsJob` (cron `30 4`, ExecuteUpdateAsync — TD-73 punkt 2) |
-| **Application ports** | `IDbExceptionInspector` (DIP, Postgres 23505), `IAppDbContext.Detach(object)`, `JobSourceRetentionOptions` |
-| **Infrastructure** | `DbExceptionInspector` (internal sealed singleton), `AddJobSources` utökad med inspector + JobSourceRetentionOptions alias-bind + 3 Job-DI-registreringar |
-| **Worker** | `SyncPlatsbankenStreamWorker` (Hangfire-wrapper `[DisableConcurrentExecution(540)]`), `AddJobSources` nu i Worker, RecurringJobRegistrar med 6 jobb i nytt cron-schema |
-| **P8b refaktor** | `SyncPlatsbankenSnapshotCommandHandler` tunn shim runt SyncPlatsbankenSnapshotJob — admin-trigger + nattjobb delar kodväg |
-
-### ADRs
-
-- **ADR 0032** Accepted oförändrad. P8c-scope levererad. §8-amendment 2026-05-12 punkt 2 ✓ klar (raw_payload retention 30d). Punkt 4 (right-to-erasure-cascade) defererad till prod-gating-batch per CTO.
-
-### TD-status
-
-- **TD-73** Major — punkt 2 ✓ stängd, punkt 4 omformulerad till **prod-gating-batch** (audit-wire α + right-to-erasure buntade — ingen v0.2-prod-tag utan båda)
-
-Aktiva oförändrade: 18 (TD-73 fortfarande Major aktivt).
+| **Ny ADR 0035** | System-event audit-pipeline (bypass-port parallell till IAuditTrailEraser). EventType-konvention `System.<Event>`, AggregateType `System.<Aggregate>`. Idempotens-skydd vid Hangfire-retry. Best-effort-semantik vid audit-failure. |
+| **ADR 0032 amendment** | §8 punkt 4 levererad: audit-wire via `ISystemEventAuditor` (inte domain-event), Email-only right-to-erasure, Name→TD-75, GIN-index→TD-76 |
+| **ADR 0024 cross-ref-amendment** | Pekare till ADR 0035 + ADR 0032 §8 för rekryterar-PII-cascade (separat från ADR 0024 D6 user-cascade) |
+| **Domain** | `AuditLogEntry.Payload` + `CreateSystemEvent`-factory (bevarar Guid.Empty-invariant) |
+| **Application ports** | `ISystemEventAuditor`, `IRecruiterPiiPurger`, `SystemAuditEvent`-record-hierarki, `RedactRecruiterPiiCommand` (+ validator + enum) |
+| **Infrastructure** | `SystemEventAuditor` (idempotens-check via (EventType, AggregateId)-lookup), `RecruiterPiiPurger` (`EF.Functions.JsonContains` + `ExecuteUpdateAsync`), EF-migration `AddAuditLogPayload` |
+| **EF-config** | `AuditLogEntryConfiguration.Payload` jsonb-mapping |
+| **Worker/Hangfire** | Audit-wire i `SyncPlatsbankenStreamJob` (finally med exception-mask-skydd), `SyncPlatsbankenSnapshotJob`, `PurgeStaleRawPayloadsJob` |
+| **Admin endpoint** | `POST /api/v1/admin/job-ads/redact-recruiter-pii` med `RequireAuthorization(Admin)` + `JsonStringEnumConverter` |
+| **Architecture-tester** | ISystemEventAuditor + IRecruiterPiiPurger konsumentlistor (Application + Infrastructure) |
+| **Runbooks** | `recruiter-pii-erasure.md` (auto-flöde Email + manuell-flöde Name); `gdpr-processing-register.md` uppdaterad |
 
 ### Reviewers INLINE (CLAUDE.md §9.2)
 
 | Reviewer | Tidpunkt | Verdict |
 |---|---|---|
-| dotnet-architect | INNAN kod | Design-skiss approved 8 punkter. 4 multi-approach lyfta till CTO |
-| senior-cto-advisor | EFTER architect, INNAN kod | 6 beslut entydigt mot principer (Martin/Fowler/Beck/Saltzer-Schroeder/GDPR). Audit-wire α + right-to-erasure defererade till TD-73 prod-batch (CC-tolkning av Klas "minimera STOPP") |
-| code-reviewer | EFTER impl, INNAN commit | GO. 0 Blockers, 0 Major, 2 Minor (doc-fixes — båda in-block-fixade) |
-| security-auditor | EFTER impl, INNAN commit | APPROVED. 0 Critical, 0 GDPR-Blockers, 0 Major, 3 Sec-Min (acceptable as-is) |
+| dotnet-architect | INNAN kod | Design-skiss approved; 5 multi-approach → CTO |
+| senior-cto-advisor | EFTER architect, INNAN kod | 13 beslut entydigt mot principer (Martin/Evans/Fowler/Beck/Saltzer-Schroeder/GDPR). **INGET Klas-STOPP** behövdes per CLAUDE.md §9.6 punkt 5 |
+| code-reviewer | EFTER impl, INNAN commit | GO. 0 Blocker, 0 Major, 3 Minor (Minor-1 + Minor-2 in-block-fixade per §9.6; Minor-3 är planerad uppföljning) |
+| security-auditor | EFTER impl, INNAN commit | APPROVED-WITH-CONDITIONS. 0 Critical, 0 GDPR-Blocker, 0 Major, 4 Sec-Min (acceptable as-is) |
+
+### CTO-rond 2026-05-13 (TD-73 prod-gating) — 13 beslut
+
+1. **Q1 AggregateId:** Per-run-Guid (via Hangfire jobId-pattern) — OCP-väg framåt
+2. **Q2 Erasure-shape:** Total null-out via `SetProperty(_ => null)` — KISS + data-minimisation > debug-värde
+3. **Q3 Audit-granularitet:** En aggregerad audit-rad per request — ADR 0024 D4-precedens
+4. **Q4 RedactCmd.AggregateId:** Per-request-Guid (RequestId) — följer Q3
+5. **Q5 GIN-index:** Defer till TD-76 — YAGNI vid F2-volym
+6. **R-Risk1 Atomicitet:** Best-effort + Hangfire retry + idempotens-check + Critical log — Fowler 2018
+7. **R-Risk2 Name-matching:** Email-only nu, Name som TD-75 — YAGNI + Art. 17 kräver inte name-identifier
+8. **M1 ADR-shape:** Ny ADR 0035 + amendment till ADR 0032 §8 + cross-ref ADR 0024 — Ford/Parsons/Kua immutability
+9. **M2 Klas-STOPP-buntning:** INGET Klas-STOPP — entydiga principer i alla 13 frågor
+10. **M3 Snapshot-shim:** SyncPlatsbankenSnapshotCommand har redan inte IAuditableCommand — no-op
+11. **M4 ICorrelationIdProvider:** Impl-validation räcker
+12. **M5 SystemEventAuditor lifetime:** Scoped (matchar IAppDbContext)
+13. **M6 Volym:** GIN-defer korrekt även vid sanity-check (5-15k INSERTs/dygn netto)
+
+### Web-search-källor (CLAUDE.md §9.5, verifierade 2026-05-13)
+
+- [Npgsql 10.0 Release Notes](https://www.npgsql.org/efcore/release-notes/10.0.html)
+- [Trailhead Technology — EF Core 10 PostgreSQL Hybrid DB](https://trailheadtechnology.com/ef-core-10-turns-postgresql-into-a-hybrid-relational-document-db/)
+- [GitHub Issue #3745](https://github.com/npgsql/efcore.pg/issues/3745) — Contains-regression
+- [PostgreSQL Docs 18 — GIN Indexes](https://www.postgresql.org/docs/current/gin.html)
+- [pganalyze — GIN Index The Good and Bad](https://pganalyze.com/blog/gin-index)
 
 ### Tester (full svit grön)
 
-- Domain.UnitTests: 218 (oförändrat)
-- Application.UnitTests: 270 → **307** (+37: handlers + jobs + inspector + P8b-test-refaktor)
-- Architecture.Tests: 37 → **46** (+9: P8cJobsLayerTests)
-- Api.IntegrationTests: 234 (oförändrat)
-- Worker.IntegrationTests: 6 (oförändrat)
+- Domain.UnitTests: 218 → **225** (+7: CreateSystemEvent-invarianter + Payload-default)
+- Application.UnitTests: 307 → **323** (+16: SystemEventAuditor + RedactCommand + Validator)
+- Architecture.Tests: 46 → **50** (+4: ISystemEventAuditor + IRecruiterPiiPurger konsumentlistor × Application + Infrastructure)
+- Api.IntegrationTests: 234 → **240** (+6: AdminRedactRecruiterPiiTests end-to-end mot Postgres)
+- Worker.IntegrationTests: 26 (oförändrat)
 - Migrate.UnitTests: 6 (oförändrat)
 
-Totalt backend: **837/837 grönt** (+43 nya).
+Totalt backend: 837 → **870 grönt** (+33 nya).
 
 ### Disciplinmissar fångade + fixade
 
-1. dotnet format whitespace i SyncPlatsbankenStreamJob switch-block → dotnet format + re-stage
-2. `IDbExceptionInspector.cs` XMLdoc klipp/klistra-fel → skrev om verbatim
-3. `JobSourceRetentionOptions.SectionName` dead/missvisande → konstant borttagen + alias-bind-not
+1. **Architect föreslog `EF.Functions.JsonContains` i Application-handler** — Clean Arch-brott (Npgsql i Application). Refactor: skapade `IRecruiterPiiPurger` Application-port + Postgres-impl. Samma mönster som `IAuditTrailEraser`.
+2. **Architect+arch-test listade `RedactRecruiterPiiCommandHandler` som ISystemEventAuditor-konsument** — fel; handlern är `IAuditableCommand` + går via `AuditBehavior`. Fixad i arch-test + ADR 0035 §7 docs-not.
+3. **Stream-job finally-block kunde maska originalexception vid audit-failure** (code-reviewer Minor-1). Fixad in-block med try/catch (CA1031-suppress) + Cwalina/Abrams §7.5-not.
+4. **`JsonStringEnumConverter` saknades** för admin-endpoint enum-deserialisering — fixad via `[JsonConverter(typeof(JsonStringEnumConverter<>))]` på `RecruiterIdentifierType`.
 
-### Smoke-test live-resultat (efter SSO-refresh ~07:15 UTC)
+### Tag-cykel + deploy
 
+- `v0.2.4-dev` på `c13e1ce` → push 08:13 UTC → deploy run `25786909619`.
+- Deploy completion: 08:20 UTC (~6m42s).
+- Ready-probe: `https://dev.jobbpilot.se/api/ready` → **200 OK** verifierat efter deploy.
+
+### Smoke-test status — väntar nästa cron-tick
+
+**Pending verifikation:** Nästa stream-cron `*/10` (08:40 UTC) ska skriva
+första `System.JobAdsSynced`-raden i `audit_log` via nya `ISystemEventAuditor`.
+Verifikation via CloudWatch logs (Worker-task) eller psql mot dev-RDS:
+
+```sql
+SELECT event_type, aggregate_type, aggregate_id, occurred_at,
+       payload->>'Source' as source,
+       payload->>'Fetched' as fetched,
+       payload->>'Added' as added
+FROM audit_log
+WHERE event_type LIKE 'System.%'
+ORDER BY occurred_at DESC
+LIMIT 5;
 ```
-SyncPlatsbankenStreamJob: klart — source=Platsbanken,
-fetched=565, added=417, updated=0, archived=0, skipped=148, errors=0,
-durationSec=41.97
-```
 
-End-to-end-verifierat: DI-graph Worker → IJobSource → JobTech v2 → handler → DB.
-417 JobAds persisterade i `job_ads`-tabellen vid första `*/10`-cron-tick efter
-Worker-startup. v2 path-migration + sanitizer + race-säkra upsert-handlers
-alla bekräftade i prod. 148 skipped = validation-failure efter sanering
-(items utan title/desc/url/company — förväntat ratio).
+Förväntad rad: `event_type = 'System.JobAdsSynced'`, payload med counts.
 
-### Pending operativt (oförändrat sedan P8b)
+### TD-status
 
-- JobTech-API-key registrering (apirequest.jobtechdev.se nedlagd; JobStream v2 är open API)
+- **TD-73** Major → **STÄNGD 2026-05-13** (flyttad till `tech-debt-archive.md`)
+- **TD-75** Minor lyft — Name-baserad rekryterar-PII-radering (Trigger: första Name-begäran)
+- **TD-76** Minor lyft — GIN-index på raw_payload jsonb (Trigger: latens >5s eller volym ×10)
+
+Aktiva: 19 (TD-13 + TD-26 Major; resten Minor). **0 Major Fas Nu, 0 Major Fas 2 (gating blockerare borta).**
+
+### Pending operativt (oförändrat sedan P8c)
+
+- AWS SSO-token-livslängd (re-auth med `aws sso login --profile jobbpilot` vid behov)
+- JobTech-API-key registrering (apirequest.jobtechdev.se nedlagd; v2 är open API)
 - Frontend-deploy till Vercel
 - BUILD.md §9.1 sync mot ADR 0032 §3 — Klas-instruktion krävs
 
@@ -94,14 +134,15 @@ alla bekräftade i prod. 148 skipped = validation-failure efter sanering
 
 ## Nästa session — Klas-val
 
-1. **TD-73 prod-gating-batch:** audit-wire-α + right-to-erasure-admin-endpoint buntade i en ADR-amendment-pass (ADR 0022 payload-aktivering + ADR 0032 §8 audit-mekanism-spec). Krävs INNAN v0.2-prod-tag.
-2. **F2-P9 search/filter-yta** (TD-70) — GET `/api/v1/job-ads` med `?ssyk=...&region=...&q=...` per JobTech v2 `occupation-concept-id` + `location-concept-id`.
+1. **v0.2-prod-tag-förberedelse:** TD-73 stängd; samla prod-launch-checklist (CloudWatch-alarms, retention-jobb-verifiering, ev. backup-strategi). Inga aktiva Major-blockare kvar i Fas 2.
+2. **F2-P9 search/filter-yta** (TD-70): GET `/api/v1/job-ads` med `?ssyk=...&region=...&q=...` per JobTech v2 `occupation-concept-id` + `location-concept-id`.
 3. **Frontend-deploy** till Vercel + JobAd-katalog UI.
 
 ---
 
 ## Tidigare sessioner (kort)
 
-- **2026-05-13 morgon** (denna): F2-P8c JobTech Hangfire-jobben + race-säker upsert + 30d-retention. 1 commit `81dfab6`, tag `v0.2.3-dev` deploy success. 43 nya tester.
-- **2026-05-13 natt:** F2-P8b JobTech Infrastructure-leverans (Refit + Resilience + admin-trigger). 5 commits, tag `v0.2.2.1-dev`. TD-73 punkt 1+3 klara.
-- **2026-05-12 kväll:** F2-P7 + P8a + bootstrap + aggregate-review. 17 commits, 3 nya ADRs (0032/0033/0034), tag `v0.2.1-dev`.
+- **2026-05-13 förmiddag** (denna): TD-73 prod-gating-batch — audit-wire α (ADR 0035) + right-to-erasure (ADR 0032 §8 amendment). 1 commit `c13e1ce`, tag `v0.2.4-dev` deploy success. 33 nya tester. TD-73 stängd; TD-75 + TD-76 lyfta.
+- **2026-05-13 morgon:** F2-P8c JobTech Hangfire-jobben + race-säker upsert + 30d-retention. 1 commit `81dfab6`, tag `v0.2.3-dev`. 43 nya tester.
+- **2026-05-13 natt:** F2-P8b JobTech Infrastructure-leverans. 5 commits, tag `v0.2.2.1-dev`.
+- **2026-05-12 kväll:** F2-P7 + P8a + bootstrap + aggregate-review. 17 commits, 3 nya ADRs.
