@@ -48,7 +48,13 @@ module "rds" {
   db_name         = "jobbpilot"
   master_username = "jobbpilot_admin"
 
-  backup_retention_days = 7
+  # 14d per ADR 0036 D4 + v0.2-prod-launch-checklist §3.2. Industry-common
+  # för prod-class workloads. EDPB CEF 2025-rapporten (2026-02) verifierar
+  # att automatic overwrite cycles + live-radering är acceptabel Art. 17-
+  # täckning för backups; crypto-erasure (TD-13) inte krav. KISS över 35d-max
+  # som ökar GDPR-overlap-fönster utan motsvarande recovery-värde vid 1-user-
+  # volym i Fas 2.
+  backup_retention_days = 14
   deletion_protection   = true
 
   tags = var.common_tags
