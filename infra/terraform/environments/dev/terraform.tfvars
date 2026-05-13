@@ -43,3 +43,14 @@ failed_access_alarm_threshold = 50
 # ---------------------------------------------------------------------------
 cost_anomaly_alert_email = ""
 baseline_budget_name     = "jobbpilot-monthly"
+
+# ---------------------------------------------------------------------------
+# F2-P8b — Admin-bootstrap (ADR 0028 + AdminBootstrap-mekanism 2026-05-11)
+#
+# IdempotentAdminRoleSeeder tilldelar Admin-rollen vid host-startup till user
+# med matchande email. Värdet injiceras som env-var
+# AdminBootstrap__InitialAdminEmail i Api-task-def (icke-känsligt — lösenord
+# sätts vid registrering av Klas själv). Synkroniserat 2026-05-13 inför
+# admin-trigger-smoke-test mot /api/v1/admin/job-ads/sync/platsbanken.
+# ---------------------------------------------------------------------------
+initial_admin_email = "klasolsson81@gmail.com"

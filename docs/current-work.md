@@ -1,8 +1,9 @@
 # Current work — JobbPilot
 
-**Status:** **F2-P8b komplett 2026-05-13 ~06:00. Commit `8c09191` pushad till `main`. Tag-push `v0.2.2-dev` VÄNTAR Klas-GO per CTO-rond 1 (resilience-verifiering mot dev). 1 commit, 24 filer, 1703 insertions. 3 agent-ronder (architect INNAN kod + code-reviewer/security-auditor INNAN commit) per CLAUDE.md §9.2 inline-discipline. TD-73 punkt 1 + 3 levererade (sanitizer + processing-register). Nästa: F2-P8c (Hangfire-jobben).**
-**Senast uppdaterad:** 2026-05-13 (session-end efter F2-P8b)
-**HEAD:** `8c09191` (icke-deployad — tag-push väntar Klas-GO)
+**Status:** **F2-P8b komplett 2026-05-13 ~06:30. Tag `v0.2.2.1-dev` LIVE på dev (deploy `25778778579`). 5 commits + Terraform-sync för AdminBootstrap. CTO-rond 5: Variant B — accepterade 504 ALB-timeout på admin-trigger eftersom ADR 0032 §3 redan designar snapshot som Hangfire-cron. Pipeline-mekanik verifierad i CloudWatch (CT-propagation, no partial-persist). End-to-end DB-persist-verifiering flyttad till P8c-acceptance-criteria som planerat arbete (inte TD per §9.6). TD-73 punkt 1 + 3 levererade. Nästa: F2-P8c (Hangfire-jobben).**
+**Senast uppdaterad:** 2026-05-13 (session-end efter F2-P8b + smoke-test + CTO-rond 5)
+**HEAD:** `03f8207` (commit för global.json roll-forward-fix) + Terraform-uncommitted i wd
+**Deploy:** `v0.2.2.1-dev` live på `https://dev.jobbpilot.se/api/ready` (200 OK)
 **Långsiktig bana:** `docs/steg-tracker.md`
 **Tech debt:** `docs/tech-debt.md` (aktiva) + `docs/tech-debt-archive.md` (stängda)
 
@@ -10,11 +11,17 @@
 
 ## Aktivt nu — F2-P8b komplett, tag-push väntar Klas-GO
 
-### Levererat denna session (1 commit)
+### Levererat denna session (5 commits)
 
 | Commit | Innehåll |
 |---|---|
 | `8c09191` | feat(jobads): F2-P8b — JobTech Infrastructure + admin-trigger-endpoint |
+| `037e0e8` | docs: session-end 2026-05-13 — F2-P8b komplett + TD-73 partial-progress |
+| `8d89ded` | fix(jobads): F2-P8b — JobStream v2 path-migration (klas-fynd) |
+| `139a85e` | fix(jobads): F2-P8b — JobStream v2-shape (webpage_url + PII-skydd) |
+| `03f8207` | fix(build): global.json rollForward latestPatch → latestFeature |
+
+Plus uncommitted Terraform-sync för `AdminBootstrap__InitialAdminEmail` (commit pågår).
 
 ### Granskningstrail
 
@@ -37,7 +44,7 @@
 
 ### ADRs
 
-- **ADR 0032** Accepted — JobTech-integration (P8a + P8b § levererade. §8-amendment punkt 1 + 3 levererade. Punkt 2 + 4 kvarstår för P8c)
+- **ADR 0032** Accepted — JobTech-integration (P8a + P8b § levererade. §8-amendment 2026-05-12 punkt 1 + 3 levererade. Punkt 2 + 4 kvarstår för P8c. **Amendment 2026-05-13** — JobStream v2 path-migration efter Klas-fynd att jobstream.api.jobtechdev.se kör 2.1.1 med `/v2/snapshot` + `/v2/stream?updated-after=` istället för deprecated v1)
 - **ADR 0033** Accepted — Migrate CLI-mode-dispatch (oförändrat)
 - **ADR 0034** Accepted — DB-role privilege-separation (oförändrat)
 

@@ -2,10 +2,14 @@
 session: F2-P8b — JobTech Infrastructure-leverans (Refit + Resilience + admin-trigger)
 datum: 2026-05-13
 slug: f2-p8b-jobtech-infra
-status: Klar — väntar Klas-GO för tag-push v0.2.2-dev
+status: Klar — deploy live på v0.2.2.1-dev, E2E-smoke flyttat till P8c per CTO-rond 5
 commits:
   - 8c09191  # feat(jobads): F2-P8b — JobTech Infrastructure + admin-trigger-endpoint
-deploy_tag: (väntar Klas-GO — resilience-verifiering mot dev krävs per CTO-rond 1)
+  - 037e0e8  # docs: session-end 2026-05-13 — F2-P8b komplett + TD-73 partial-progress
+  - 8d89ded  # fix(jobads): F2-P8b — JobStream v2 path-migration (klas-fynd)
+  - 139a85e  # fix(jobads): F2-P8b — JobStream v2-shape (webpage_url + PII-skydd)
+  - 03f8207  # fix(build): global.json rollForward latestPatch → latestFeature
+deploy_tag: v0.2.2.1-dev (live på dev.jobbpilot.se)
 ---
 
 # Session 2026-05-13 (efterm./natt) — F2-P8b JobTech Infrastructure
@@ -116,21 +120,119 @@ Tre kritiska fakta-verifieringar via web-search (CLAUDE.md §9.5):
 - **CVE-pinning är inte luxe — det är default** — varje gång ett nytt paket
   läggs till bör senaste CVE-status verifieras. NU1902 är `WarningAsError`.
 
-## Pending
+## Post-tag-push: smoke-test mot dev (2026-05-13 ~06:00–06:30)
 
-**Klas-STOPP-flagga (CTO-rond 1 2026-05-12):** admin-endpoint exponerar synkron
-JobTech-call → verifiera resilience-config mot dev INNAN tag-push.
+### Tag-cykel
 
-Steg som väntar Klas-GO:
+- `v0.2.2-dev` på `139a85e` → **FAILED** (SDK 10.0.200 vs container 10.0.300, `global.json rollForward=latestPatch` för strikt)
+- Fix `03f8207`: `latestPatch` → `latestFeature` (accepterar 10.0.x.x)
+- `v0.2.2.1-dev` på `03f8207` → **SUCCESS** ✓ (deploy `25778778579`)
 
-1. Skapa tag `v0.2.2-dev` på commit `8c09191` → deploy-pipeline triggar
-2. Smoke-test admin-endpoint mot dev:
-   - `POST https://dev.jobbpilot.se/api/v1/admin/job-ads/sync/platsbanken`
-     (med admin-session via Klas-konto)
-   - Verifiera 200-respons med counts från riktig JobTech-snapshot
-   - Verifiera att `job_ads`-tabellen får nya rader med External-ref + sanerad RawPayload
-3. (Operativt pending) JobTech-API-key registrering på apirequest.jobtechdev.se
-   krävs INNAN admin-trigger fungerar — annars 401 mot JobTech
+### Klas-fynd via curl mot live JobTech
+
+Klas observation av Swagger UI (`jobstream.api.jobtechdev.se` 2.1.1) avslöjade
+att v1-endpoints (`/snapshot`, `/stream`) är **deprecated** — `/v2/snapshot` +
+`/v2/stream?updated-after=...` är aktuella. Plus: `apirequest.jobtechdev.se`
+ger DNS-fel (subdomän nedlagd).
+
+Live-curl mot `/v2/stream?updated-after=...` → **HTTP 200 utan api-key** =
+bekräftat open API. Markdown-docs som säger key krävs är föråldrad.
+
+V2-shape skiljer sig dock från v1 — kritisk bugg upptäcktes:
+- `webpage_url` (top-level) ersätter `source_links[0].url`
+- `application_details.email` + `employer.email/phone_number` är PII
+- Nya fält: `text_formatted`, `number_of_vacancies`, `logo_url`, `coordinates`, etc.
+
+Utan fix hade min `FirstNonMailtoUrl(sourceLinks=null, applicationDetailsUrl=null)`
+returnerat null → URL tom → alla items skippats. Commit `139a85e` fixade:
+- `JobTechHit.WebpageUrl`-property
+- 3-args `FirstNonMailtoUrl(webpageUrl, sourceLinks, applicationDetailsUrl)`
+- Sanitizer-allowlist utökad med v2-publika fält
+- 3 nya v2-PII-regression-tester
+
+### Admin-bootstrap för smoke-test
+
+ECS task-def `jobbpilot-dev-api:10` hade **ingen** `AdminBootstrap__InitialAdminEmail`
+— Klas hade aldrig satt upp det. Skapade task-def rev 11 med
+`AdminBootstrap__InitialAdminEmail=klasolsson81@gmail.com`. Synkroniserade
+Terraform i samma session (per Klas-disciplin "lyft inga TDs som vi inte kan
+fixa direkt"):
+- `infra/terraform/environments/dev/variables.tf` — ny `initial_admin_email`-variabel
+- `infra/terraform/environments/dev/terraform.tfvars` — `initial_admin_email = "klasolsson81@gmail.com"`
+- `infra/terraform/environments/dev/main.tf` — `api_environment["AdminBootstrap__InitialAdminEmail"]`
+
+Klas registrerade konto via curl → force-deploy så `IdempotentAdminRoleSeeder`
+körs igen vid host-startup → Admin-roll tilldelad (verifierat via
+`/api/v1/me` returnerade `roles: ["Admin"]`).
+
+### Smoke-test admin-trigger — 504 Gateway Timeout
+
+`POST /api/v1/admin/job-ads/sync/platsbanken` med admin-session → **504 efter
+exakt 60s**.
+
+CloudWatch-loggar bevisar **korrekt design**:
+```
+Failed handling SyncPlatsbankenSnapshotCommand after 59879ms
+System.Threading.Tasks.TaskCanceledException: A task was canceled.
+   at JobTechStreamClient.FetchSnapshotAsync line 34
+   at PlatsbankenJobSource.FetchSnapshotAsync line 28
+   at SyncPlatsbankenSnapshotCommandHandler line 33
+   [pipeline-behaviors propagerade CT korrekt: Audit → UnitOfWork →
+    Validation → Logging]
+```
+
+CT-propagation OK, no partial-persist, clean cancellation, stack-trace ren.
+
+**ALB default `idle_timeout=60s`** är otillräckligt för JobTech-snapshot
+(~50-100 MB JSON-array). Min `HttpClient.Timeout=5min` löser inte detta —
+ALB stänger downstream-anslutningen och triggar CT-cancellation.
+
+### CTO-rond 5: ALB-timeout-beslut
+
+Klas tre varianter presenterade till `senior-cto-advisor`:
+- **A** — Bumpa ALB idle_timeout 60s → 300s (+ Terraform-sync)
+- **B** — Acceptera 504, vänta P8c (synkron HTTP är fel transport för snapshot)
+- **C** — Filtrerad sync via query-param `?limit=N`
+
+**CTO-beslut: Variant B.** Kärnargument:
+
+> "Snapshot är **per design** ett bakgrundsjobb. En 50–100 MB JSON-import över
+> HTTP-request är fel transport oavsett timeout-värde. Att bumpa ALB för att
+> tvinga in en synkron variant är att låta operations-konfig kompensera för
+> fel arkitektur (Martin 2017 kap 17 Boundaries; Fowler 2002 Asynchronous
+> Messaging)."
+
+> "504:n är **bevis på korrekt design**, inte en bug att maskera. Att flytta
+> timeout-gränsen tar bort signalen som validerar att CT-kedjan fungerar."
+
+> "Bumpen blir **dead config** så fort Hangfire är på plats — vi bumpar för
+> en vecka."
+
+> "Saltzer/Schroeder 1975: global ALB-bump exponerar alla endpoints (inkl
+> anonyma /api/ready, /api/v1/auth/login) för 5× längre slow-read-fönster
+> för att lösa ett admin-anrop som inte ens hör hemma där."
+
+ADR 0032 §3+§9 stödjer redan Variant B — **inget ADR-amendment behövs**.
+End-to-end DB-persist-verifiering flyttas till **P8c-acceptance-criteria**
+som planerat arbete, inte TD (CLAUDE.md §9.6 kriterium 1: annan fas).
+
+### Vad som verifierats i smoke-test
+
+| Test | Resultat |
+|---|---|
+| GET /api/ready | 200 ✓ |
+| POST /admin/sync/platsbanken (anonym) | 401 ✓ defense-in-depth |
+| POST /admin/sync/platsbanken (non-admin) | 403 ✓ AdminAuthorizationBehavior |
+| GET /me + sessionId-flow | 200 ✓ |
+| GET /job-ads paginated | 200 ✓ (empty list pre-sync) |
+| Auth-flow register → login → session | 200/200 ✓ |
+| `AdminBootstrap__InitialAdminEmail`-mekanism | Admin-roll tilldelad ✓ |
+| Pipeline-behaviors-stack | Stack-trace bevisar korrekt ordning ✓ |
+| CT-propagation Api → Handler → Infrastructure | Loggar bevisar ✓ |
+| JobTech v2 open API + shape | Curl-verifierat ✓ |
+| Full DB-persist mot riktig JobTech | **Skjuten till P8c** per CTO |
+
+## Pending operativt
 
 ## Nästa session — F2-P8c (Hangfire)
 

@@ -137,6 +137,12 @@ variable "enable_autoscaling" {
   default     = false
 }
 
+variable "initial_admin_email" {
+  description = "Email till första admin-användaren. IdempotentAdminRoleSeeder tilldelar Admin-rollen vid host-startup till user med matchande email. Sätts som env-var AdminBootstrap__InitialAdminEmail på Api-task-def (icke-känsligt; lösenord sätts vid registrering). Tom sträng = ingen auto-tilldelning. Se ADR 0028."
+  type        = string
+  default     = ""
+}
+
 variable "alb_https_enabled" {
   description = "ALB HTTPS-listener på 443. Default false per ADR 0026 (HTTP-only acceptance under Fas 0 med tidsfönster + triggers). Sätts true när ADR 0026-trigger uppfylls (domän + ACM-cert, eller superseder-ADR). Värdet injiceras också som env-var Alb__HttpsEnabled till Api-tasken som gate:ar app.UseHttpsRedirection() i Program.cs (Sec-Major-2-fix STEG 13b)."
   type        = bool
