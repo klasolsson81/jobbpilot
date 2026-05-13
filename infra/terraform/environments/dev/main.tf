@@ -305,11 +305,19 @@ module "ecs" {
   # Klartext env-vars (icke-känsligt). Alb__HttpsEnabled gate:ar
   # app.UseHttpsRedirection() — se Api/Program.cs (förhindrar redirect-loop
   # bakom HTTP-only-ALB per ADR 0026 + sec-auditor Sec-Major-2 STEG 13b).
+  #
+  # AdminBootstrap__InitialAdminEmail — IdempotentAdminRoleSeeder tilldelar
+  # Admin-rollen till user med matchande email vid host-startup (senior-cto-
+  # advisor 2026-05-11 B1 — IaC over manual psql-script). Email är inte
+  # känsligt; lösenord sätts vid registrering av Klas själv. Värdet
+  # synkroniserades manuellt till task-def rev 11 2026-05-13 inför F2-P8b
+  # admin-trigger-smoke-test och persisteras nu via Terraform.
   api_environment = {
     "ASPNETCORE_ENVIRONMENT"             = "Production"
     "ASPNETCORE_URLS"                    = "http://+:8080"
     "ForwardedHeaders__KnownNetworks__0" = var.vpc_cidr
     "Alb__HttpsEnabled"                  = tostring(var.alb_https_enabled)
+    "AdminBootstrap__InitialAdminEmail"  = var.initial_admin_email
   }
 
   # Worker har inga Redis-deps; Hangfire + Postgres räcker. DOTNET_ENVIRONMENT
