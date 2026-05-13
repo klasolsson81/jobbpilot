@@ -740,27 +740,52 @@ har ingen PII faktiskt importerats; JobTech-anslutning sker P8b/P8c.
    `application_deadline`) bevaras. Sanering körs i `PlatsbankenJobSource.TryConvertToImportItem`
    innan items lämnar Infrastructure. Architecture-test verifierar att
    Application aldrig ser osanerad payload.
-2. **KVAR till P8c.** Retention för `raw_payload` (30 dagar efter publish via
-   `PurgeStaleRawPayloadsJob` Hangfire-cron). `JobTechOptions.RawPayloadRetentionDays`
-   default 30 redan etablerad i F2-P8b. `RawPayloadPurgedDomainEvent` audit-wire.
+2. ✅ **LEVERERAD i F2-P8c (2026-05-13)** — `PurgeStaleRawPayloadsJob` (Hangfire
+   recurring `30 4 * * *` UTC) null:ar `raw_payload` via EF Core 10
+   `ExecuteUpdateAsync` (CLAUDE.md §3.6 OK — LINQ-genererad SQL).
+   `JobSourceRetentionOptions.RawPayloadRetentionDays` (Application-port, binds
+   mot samma section som `JobTechOptions`, default 30). Count + cutoff
+   strukturerat loggat via Serilog → CloudWatch interim tills audit-wire (se
+   punkt 4 nedan).
 3. ✅ **LEVERERAD i F2-P8b (commit `8c09191`, 2026-05-13)** — `docs/runbooks/gdpr-processing-register.md`
    skapad med JobTech-entry (datakategori + rättslig grund Art. 6(1)(f) +
    retention 30d + sub-processor + PII-stripping-trail).
-4. **KVAR till P8c eller separat batch.** Right-to-erasure-stöd via jsonb-query
-   mot `raw_payload`. Implementeras som del av `DeleteAccountCommand`-mönster
-   (ADR 0024 cascade) men för rekryterar-PII-identifier.
+4. **KVAR till separat batch innan Fas 2 prod-tag** (CTO-rond 2026-05-13 punkt
+   5+7). Two-pronged scope grupperad till en batch:
+   - **(a) Audit-wire för system-events:** `ISystemEventAuditor`-port (Application)
+     + `audit_log.payload` jsonb-kolumn aktiveras + `JobAdsSyncedDomainEvent` +
+     `RawPayloadPurgedDomainEvent`. Kräver ADR 0022-amendment (payload-aktivering
+     från Fas 4 → Fas 2 för system-events) + ADR 0032-amendment (§8 audit-mekanism-spec).
+   - **(b) Right-to-erasure för rekryterar-PII:** admin-endpoint
+     `POST /api/v1/admin/job-ads/redact-recruiter-pii` med jsonb-query +
+     `ExecuteUpdateAsync`. Eventuell GIN-index-migration på relevanta
+     `raw_payload`-keys om query-volym kräver. GDPR Art. 17-täckning för
+     rekryterar-PII i raw_payload.
 
-**Trigger:** ~~P8b-start~~ → kvar-arbete triggas av P8c-start (Hangfire-jobben).
+   **Gating:** v0.2-prod-tag får INTE släppas utan att (a) + (b) levererat. Per
+   30d-retention via punkt 2 är PII-fönstret minimerat → faktisk volym för (b)
+   är liten. Architects argument: bunta (a) + (b) i en ADR-amendment-batch
+   istället för två.
+
+**Trigger:** ~~P8b-start~~ → ~~P8c-start~~ → trigger för kvar-batch (a+b) är Fas 2
+prod-tag-förberedelse (eller dedikerad TD-73-batch om scope tillåter tidigare).
 
 **Beroenden:** ADR 0032 §8-amendment 2026-05-12 (PII-stripping-pipeline-spec),
-processing-register-dokumentation (✅ skapad). TD-13 PII-encryption om
-envelope-yta ska täcka raw_payload (cross-ref redan i TD-13).
+processing-register-dokumentation (✅ skapad), `PurgeStaleRawPayloadsJob` (✅
+levererad). TD-13 PII-encryption om envelope-yta ska täcka raw_payload (cross-ref
+redan i TD-13).
 
 **P8b-leverans-trail (2026-05-13):**
 - `src/JobbPilot.Infrastructure/JobSources/Platsbanken/JobTechPayloadSanitizer.cs`
 - `tests/JobbPilot.Application.UnitTests/JobAds/Infrastructure/JobTechPayloadSanitizerTests.cs`
 - `docs/runbooks/gdpr-processing-register.md`
 - security-auditor F2-P8b GO med villkor (alla Major in-block-fixade)
+
+**P8c-leverans-trail (2026-05-13):**
+- `src/JobbPilot.Application/JobAds/Jobs/PurgeRawPayloads/PurgeStaleRawPayloadsJob.cs`
+- `src/JobbPilot.Application/JobAds/Abstractions/JobSourceRetentionOptions.cs`
+- `src/JobbPilot.Worker/Hosting/RecurringJobRegistrar.cs` — cron `30 4 * * *`
+- senior-cto-advisor 2026-05-13 (punkt 2+4 prod-gating-grupperat)
 
 
 ---
