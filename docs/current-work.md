@@ -1,16 +1,70 @@
 # Current work — JobbPilot
 
-**Status:** **D+A-session KOMPLETT + DEPLOYAD 2026-05-13. TD-79 STÄNGD (Del D — `lifecycle.ignore_changes = [task_definition]`). TD-70 STÄNGD (Del A — F2-P9 search/filter-yta `?ssyk&?region&?q` med Postgres generated columns + ListReadPolicy rate-limit). 915 backend-tester gröna (+45). 2 commits + 1 tag pushed (`v0.2.5-dev`), deploy success 7m, migration F2P9JobAdSearchColumns applied via Phase E. Live på dev.**
-**Senast uppdaterad:** 2026-05-13 (D+A komplett, v0.2.5-dev live)
-**HEAD:** `d4294b6` + `v0.2.5-dev` tag
-**Deploy:** `v0.2.5-dev` LIVE — API task-def `:15`, Worker `:9`, `https://dev.jobbpilot.se/api/ready` 200 OK
+**Status:** **F2-P10 frontend `/jobb`-katalog UI KOMPLETT (lokal) 2026-05-13. ADR 0030 mini-amendment (rateLimited-variant) + 5 konsument-pages migrerade + ny `/jobb`-route med JobAdFilters/JobAdList/JobAdPagination. 313/313 vitest-tester gröna (+29 nya), tsc clean, lint 0 errors. Security-auditor Blocker (XSS via `javascript:`-URL) fixad in-block via Zod-refine; TD-80 lyft för BE-Domain-tightening. Vercel-deploy är Klas-op (ej i denna session).**
+**Senast uppdaterad:** 2026-05-13 (F2-P10 frontend komplett, lokal)
+**HEAD:** `19ca82c` (D+A-session) — F2-P10-commit pushas härnäst
+**Deploy:** `v0.2.5-dev` LIVE på dev (backend orörd denna session — ren frontend-leverans)
 **Långsiktig bana:** `docs/steg-tracker.md`
-**Tech debt:** `docs/tech-debt.md` (aktiva) + `docs/tech-debt-archive.md` (stängda)
+**Tech debt:** `docs/tech-debt.md` (aktiva, +TD-80) + `docs/tech-debt-archive.md` (stängda)
 **Prod-checklist:** `docs/runbooks/v0.2-prod-launch-checklist.md`
 
 ---
 
-## Aktivt nu — D+A-session KOMPLETT (TD-79 + TD-70 stängda)
+## Aktivt nu — F2-P10 frontend `/jobb`-katalog UI KOMPLETT
+
+### Levererat (frontend-only batch)
+
+| Område | Innehåll |
+|---|---|
+| ADR 0030 amendment 2026-05-13 | `rateLimited`-variant förstklassig i `ApiResult<T>` — RFC 9110 Retry-After, default 60s |
+| `lib/dto/_helpers.ts` | `rateLimited`-kind + `parseRetryAfter` + `responseToResult` mappning av 429 |
+| 5 konsument-pages | ansokningar, ansokningar/[id], cv, cv/[id], mig (renderProfile), admin/granskning — alla med rateLimited-case + civic-utility-copy |
+| `lib/dto/job-ads.ts` | Zod-schemas: jobAdStatus/Source/SortBy/Dto + listJobAdsResult + jobAdFilters (regex-defense + URL-scheme http(s)-refine för XSS-skydd) |
+| `lib/job-ads/status.ts` | Labels + variant-mappning (Aktiv/Utgången/Arkiverad + 4 sort-options + 4 source-labels) |
+| `lib/api/job-ads.ts` | `getJobAds(query)` server-only fetcher → `ApiResult<ListJobAdsResult>` |
+| `components/job-ads/` | StatusBadge + Card + List + Pagination (GOV.UK-numeric) + Filters (Client, RHF + manuell safeParse) |
+| `app/(app)/jobb/page.tsx` | Server Component, async searchParams (Next.js 16), 6-fall switch + assertNever |
+| `app/(app)/layout.tsx` | Nav-länk "Jobb" tillagd (första item) |
+| `tests/e2e/jobb.spec.ts` | 7 Playwright-tester (auth-redirect + render + filter-submit + validation + reset + nav) |
+
+### CTO-rond F2-P10 — 4 entydiga beslut
+
+| Q | Beslut | Kort motivering |
+|---|---|---|
+| Q1 | **A** Utöka `ApiResult<T>` med `rateLimited` | CCP/REP, OCP via assertNever, Saltzer/Schroeder Economy of Mechanism |
+| Q2 | **A** URL-driven server-state (router.push) | CLAUDE.md §4.3+§5.2, Fielding HATEOAS, Beck YAGNI |
+| Q3 | **A** `JobAdStatusBadge` + `lib/job-ads/status.ts` | REP/CCP, SRP, codebase-konsekvens |
+| Q4 | **A** Numeric pagination GOV.UK-stil | civic-utility-konvention, WCAG keyboard-direkthopp, Norman affordance |
+
+### Reviewers INLINE
+
+| Reviewer | Verdict |
+|---|---|
+| design-reviewer | Approved med 6 Minor (5 pre-existing patterns); Minor 1+2 (badge role=status, dubbel aria-live) fixade in-block |
+| code-reviewer | Approved (0/0/3); M1 (kollaps-kommentar) + M2 (badge role=status) fixade in-block; M3 (Card focus-wrap) defererat — gäller framtida `/jobb/[id]` |
+| security-auditor | **BLOCKER → fixad** XSS-vektor via `javascript:`-URL i `<a href={jobAd.url}>`. Zod-refine `^https?://` blockar FE-side. **TD-80 lyft** för BE Domain-tightening (annan fas per §9.6 punkt 1) |
+
+### Tester
+
+- vitest: **313/313 grönt** (+29 nya: 23 dto/status/filters/badge/card/list/pagination + 5 nya rateLimited i `_helpers.test.ts` + 1 uppdaterad assertNever-test + 8 URL-scheme-tester efter security-fix)
+- `npx tsc --noEmit`: clean
+- `pnpm lint`: 0 errors, 3 pre-existing warnings (audit-log-table.test, delete-account-dialog watch, applications.spec applicationId)
+
+### TD-status
+
+- **TD-80** lyft 2026-05-13 — Major Fas 2 — JobAd.Url scheme-whitelist (http/https) i Domain.ValidateInputs (security-auditor F2-P10 split)
+
+Aktiva: 22 (TD-13 + TD-26 + TD-80 Major; resten Minor).
+
+### Pending operativt för Klas
+
+- **Vercel-deploy** för `/jobb` LIVE — egen Klas-op (DNS, env-vars för BACKEND_URL + auth-cookie-domain)
+- **Lokal Lighthouse-pass + axe-DevTools** på `/jobb` mot dev-backend — Klas kör manuellt
+- AWS SSO-token-livslängd, JobTech-API-key, BUILD.md §9.1 sync mot ADR 0032 §3 — kvarstår
+
+---
+
+## Tidigare aktivitet — D+A-session KOMPLETT (TD-79 + TD-70 stängda)
 
 ### Levererat Del A (TD-70 — F2-P9 search/filter)
 

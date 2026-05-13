@@ -18,6 +18,7 @@ tidsbegränsning per touch — fas-tillhörighet styr. Default = fixa in-block.
 | ID | Titel | Severity | Fas | Kategori |
 |---|---|---|---|---|
 | TD-13 | Encryption av PII-kolumner | **Major** | 2 | Säkerhet/GDPR |
+| TD-80 | JobAd.Url scheme-whitelist (http/https) i Domain.ValidateInputs | **Major** | 2 | Säkerhet/XSS-defense |
 | TD-26 | AI-kostnadstak: token-limit + per-user spend-cap | **Major** | 4 (AI) | Säkerhet/Kostnad |
 | TD-19 | Worker orchestrator + DI-pattern: defense-in-depth | Minor | 2 | Code quality |
 | TD-23 | RedisSessionStore atomicitet via MULTI/EXEC eller Lua | Minor | 2 | Säkerhet/Robusthet |
@@ -103,6 +104,57 @@ DEK kastas vid kontoradering → backups blir omedelbart olesbara) är ett alter
 kan bakas in i Fas 2-impl. Tradeoff: extra komplexitet i restore-flöden + key-rotation,
 men ger omedelbar Art. 17-täckning av backup-data. ADR i Fas 2 ska ta ställning.
 
+
+## TD-80: JobAd.Url scheme-whitelist (http/https) i Domain.ValidateInputs
+
+**Kategori:** Säkerhet / XSS-defense
+**Severity:** Major
+**Fas:** 2
+**Källa:** security-auditor F2-P10 frontend-review 2026-05-13 (Blocker → split: FE in-block, BE TD per §9.6 punkt 1 "annan fas")
+
+`JobAd.ValidateInputs` (`src/JobbPilot.Domain/JobAds/JobAd.cs:171`) använder
+`Uri.TryCreate(url, UriKind.Absolute, out _)` som accepterar:
+
+- `javascript:alert(1)` → XSS vid render i autentiserad session
+- `data:text/html,<script>...</script>` → XSS
+- `vbscript:msgbox(1)` → legacy XSS (IE-rester)
+- `file:///etc/passwd` → path-disclosure-yta
+
+Vid render via `<a href={jobAd.url}>` blir klick = JS-exekvering i
+autentiserad session-kontext (cookies, fetches mot `/api/v1/*`). Cookie-stöld
+är GDPR Art. 32-överträdelse (säker behandling).
+
+**Mitigering vid F2-P10 (FE-defense-in-depth):** `jobAdDtoSchema.url` har Zod
+refine `/^https?:\/\//i.test(u)` — DTO-parse misslyckas vid icke-http(s) →
+`kind: "error"` → ingen render. Skyddet finns men i fel lager för
+defense-in-depth-principen — Domain-invarianten ska blockera vid persist.
+
+**Föreslagen åtgärd (Fas 2):**
+
+```csharp
+if (string.IsNullOrWhiteSpace(url) ||
+    !Uri.TryCreate(url, UriKind.Absolute, out var parsed) ||
+    (parsed.Scheme != Uri.UriSchemeHttp && parsed.Scheme != Uri.UriSchemeHttps))
+    return Result.Failure(
+        DomainError.Validation("JobAd.UrlInvalid",
+            "URL måste vara en giltig http(s)-URL."));
+```
+
+**Migrations-överväganden:**
+
+- Existerande `Manual`-källa-rader: kontrollera om någon har annat scheme
+  (sannolikt 0 rader pga FE-form-validering vid CreateJobAdCommand).
+- JobTech-källa-rader: `JobTechPayloadSanitizer` allowlist bevarar `url`-fält
+  oavkortat. Verifiera att JobTech aldrig returnerar non-http(s) URLs (vore
+  protokoll-brott men defense-in-depth motiverar).
+
+**Beroenden:** Inga blockerare. Fixet är litet (5 rader + 4-5 nya unit-tester
+i `JobAdTests.cs`). Bör levereras innan v0.2-prod-tag som Fas 2-stängnings-
+batch tillsammans med ev. övriga Major-Fas-2-poster.
+
+**Trigger:** v0.2-prod-tag-prep eller opportunistisk Domain-touch på JobAd.
+
+---
 
 ## Major — Fas 3+
 
