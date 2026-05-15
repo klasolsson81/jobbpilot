@@ -24,7 +24,7 @@ export function JobAdCard({ jobAd }: JobAdCardProps) {
   const expiresAt = jobAd.expiresAt ? formatDate(jobAd.expiresAt) : null;
 
   return (
-    <article className="flex flex-col gap-2 border-b border-border-default px-1 py-4 text-sm last:border-b-0">
+    <article className="flex flex-col gap-2 border-b border-border-strong px-3 py-6 text-sm transition-colors duration-75 last:border-b-0 hover:bg-surface-tertiary hover:[box-shadow:inset_3px_0_0_var(--jp-brand-600)]">
       <header className="flex items-start justify-between gap-4">
         <div className="flex min-w-0 flex-col gap-0.5">
           <h3 className="text-[15px] leading-snug font-medium tracking-[-0.005em] text-text-primary">

@@ -49,7 +49,9 @@ describe("LoginForm", () => {
     expect(formData).toBeInstanceOf(FormData);
     expect(formData.get("email")).toBe("anna@example.se");
     expect(formData.get("password")).toBe("hemligt1");
-    expect(formData.get("next")).toBe("/mig");
+    // Post-login-default ändrad /mig → /jobb (senior-cto-advisor 2026-05-16,
+    // Beslut 3: man loggar in för att söka jobb, inte ändra inställningar).
+    expect(formData.get("next")).toBe("/jobb");
   });
 
   it("shows server error as role=alert when action returns { error }", async () => {

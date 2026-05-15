@@ -611,8 +611,8 @@ body {
 .jp-pageScroll { flex: 1; overflow: auto; min-height: 0; }
 .jp-page {
   padding: calc(var(--jp-section-y) * 1.2) var(--jp-pad-x) calc(var(--jp-section-y) * 2);
-  max-width: 1080px;
-  margin: 0;
+  max-width: 1180px;
+  margin-inline: auto;
 }
 .jp-page--wide { max-width: none; }
 

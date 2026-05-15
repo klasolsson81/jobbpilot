@@ -15,7 +15,7 @@ export function RegisterForm() {
 
   return (
     <form action={formAction} className="flex flex-col gap-5">
-      <input type="hidden" name="next" value={searchParams.get("next") ?? "/mig"} />
+      <input type="hidden" name="next" value={searchParams.get("next") ?? "/jobb"} />
 
       <div className="flex flex-col gap-1.5">
         <label htmlFor="email" className="text-label font-medium text-text-primary">
