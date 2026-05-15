@@ -19,7 +19,7 @@ function safeRedirectPath(raw: string | null): string {
   ) {
     return raw;
   }
-  return "/mig";
+  return "/jobb";
 }
 
 export type AuthActionState = {

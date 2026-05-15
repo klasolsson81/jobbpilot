@@ -23,6 +23,7 @@ tidsbegränsning per touch — fas-tillhörighet styr. Default = fixa in-block.
 | TD-23 | RedisSessionStore atomicitet via MULTI/EXEC eller Lua | Minor | 2 | Säkerhet/Robusthet |
 | TD-24 | DeleteAccountCommand cascade-paginering vid power-user | Minor | 2 | Skalbarhet |
 | TD-27 | EmailHash → HMAC med roterande nyckel | Minor | 2 | Säkerhet/GDPR |
+| TD-82 | Översikt/Dashboard-sida (post-login-landningsvy) | Minor | 2 | Frontend/Feature |
 | TD-74 | Strikta DML-GRANTs på public + identity istället för GRANT ALL | Minor | 2 (opportunistisk) | Säkerhet/Least Privilege |
 | TD-72 | Auto-trigga Migrate bootstrap-mode i deploy-dev.yml | Minor | Trigger | Operations/CI-CD |
 | TD-75 | Name-baserad rekryterar-PII-radering (multi-path jsonb + full-text) | Minor | Trigger | GDPR/Privacy |
@@ -297,6 +298,37 @@ korrelations-fönster).
    är etablerat (Fas 4+)
 
 **Beroenden:** TD-13 (KMS-integration). Bör adresseras tillsammans.
+
+---
+
+## TD-82: Översikt/Dashboard-sida (post-login-landningsvy)
+**Kategori:** Frontend / Feature
+**Severity:** Minor
+**Fas:** 2 (Klas kan override:a mot roadmap)
+**Källa:** senior-cto-advisor 2026-05-16 (UI-refactor v2-iteration, Beslut 3)
+
+Designsystem v2 / referensdesignen (`pages.jsx → DashboardPage`) har en
+"Översikt" som första nav-item och naturlig post-login-landning (Aktuellt-feed,
+senaste ansökningar, matchande jobb). Den byggdes **inte** i v2-batchen och nav
+saknar den medvetet.
+
+**Skäl till TD (CLAUDE.md §9.6 kriterium 2 — saknad funktion-dependency):** En
+äkta Översikt kräver aggregat-queries som inte finns (ansökningsstatus-counts,
+kommande intervjuer/deadlines, ny-matchningar). Att scaffolda en tom/fejkad
+dashboard nu vore fyllnadselement — direkt brott mot PRINCIPLES.md regel 3
+("varje pixel ska bära information"). En tom översikt är sämre än ingen.
+
+Interim-beslut levererat in-block i v2-iterationen: post-login redirectar till
+`/jobb` (produktens primära jobb-att-göra), inte `/mig`.
+
+**Föreslagen åtgärd:** När aggregat-query-ytan finns (Fas 2 ansöknings-/
+matchnings-data): bygg Översikt enligt `JobbPilotNEWDESIGN/src/pages.jsx`
+DashboardPage (Aktuellt-feed `.jp-attention`, "Senaste ansökningar"-tabell,
+"Matchande jobb"-ledger), lägg in som första nav-item i "Söka jobb"-sektionen,
+och ändra post-login-default från `/jobb` till `/oversikt`.
+
+**Beroenden:** Aggregat-queries för ansökningsstatus-counts + kommande
+kalenderhändelser (Fas 2-domändata).
 
 ---
 
