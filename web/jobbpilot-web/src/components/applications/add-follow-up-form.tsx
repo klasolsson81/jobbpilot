@@ -66,10 +66,16 @@ export function AddFollowUpForm({ applicationId }: AddFollowUpFormProps) {
         <Textarea
           id="follow-up-note"
           name="note"
-          placeholder="Vad diskuterades?"
           rows={2}
+          aria-describedby="follow-up-note-hint"
           disabled={isPending}
         />
+        <p
+          id="follow-up-note-hint"
+          className="text-body-sm text-text-secondary"
+        >
+          Till exempel vad som diskuterades.
+        </p>
       </div>
       {state && !state.success && (
         <p className="text-body-sm text-danger-600">{state.error}</p>

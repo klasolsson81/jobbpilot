@@ -150,6 +150,117 @@ async function shoot(page: Page, outDir: string, name: string): Promise<void> {
   await page.screenshot({ path: join(outDir, `${name}.png`), fullPage: true });
 }
 
+/**
+ * ADR 0042 Beslut B/C interaktiva states på /jobb. Verktyget tar annars bara
+ * sidladdnings-screenshots; design-reviewer VETO:ade Batch 6 för att korpusen
+ * saknade bild av disclosure-expanderad / typeahead-öppen / chip-ifylld. Tre
+ * extra namngivna shots capureras här, mot live-backend (riktig korpus).
+ *
+ * Robusta selektorer (role/aria/text, inte klass-kedjor):
+ *  - Filter-disclosure: knapp med text "Filter" + aria-expanded (JobAdFilters).
+ *  - Typeahead: combobox-rollen (JobAdTypeahead Input role="combobox"),
+ *    listan har aria-label "Sökförslag".
+ *  - Multi-select-chip: "Yrkesområde"-fältet → "Lägg till" → chip med
+ *    "Ta bort <kod>"-knapp (JobAdMultiSelect).
+ *
+ * Gated till 1280 + 3440 (breddspann) per uppdragskrav; körs i light+dark
+ * via THEME-loopen. Best-effort: en miss på en state fäller inte hela körningen
+ * (defensiv catch → varning), men loggas så design-reviewer ser luckan.
+ */
+async function shootJobbInteractiveStates(
+  page: Page,
+  outDir: string,
+  theme: string,
+  vpTag: string,
+): Promise<number> {
+  let shot = 0;
+
+  // State 1 — filter-disclosure expanderad.
+  try {
+    await page.goto(`${BASE_URL}/jobb`, { waitUntil: "networkidle" });
+    const filterToggle = page
+      .getByRole("button", { name: /^Filter/ })
+      .first();
+    await filterToggle.waitFor({ state: "visible", timeout: 5000 });
+    if ((await filterToggle.getAttribute("aria-expanded")) !== "true") {
+      await filterToggle.click();
+    }
+    // Vänta tills taxonomi-fältet (Yrkesområde) faktiskt är i DOM:en —
+    // bevisar att panelen är expanderad, inte bara att klicket gick igenom.
+    await page
+      .getByText("Yrkesområde", { exact: true })
+      .waitFor({ state: "visible", timeout: 5000 });
+    // Disclosure-rotation/expand (DESIGN.md §10, 150ms) settlar.
+    await page.waitForTimeout(300);
+    await shoot(page, outDir, `jobb-filter-expanded__${theme}__${vpTag}`);
+    shot++;
+  } catch (err) {
+    console.warn(
+      `[visual-verify] VARNING: jobb-filter-expanded (${theme}/${vpTag}) ` +
+        `kunde inte capureras: ${(err as Error).message}`,
+    );
+  }
+
+  // State 2 — typeahead-lista öppen (≥2 tecken mot live-backend).
+  try {
+    await page.goto(`${BASE_URL}/jobb`, { waitUntil: "networkidle" });
+    const combo = page.getByRole("combobox").first();
+    await combo.waitFor({ state: "visible", timeout: 5000 });
+    await combo.click();
+    await combo.fill("utv");
+    // Förslagslistan har aria-label "Sökförslag" (JobAdTypeahead <ul>).
+    // Live-backend → debounce (SUGGEST_DEBOUNCE_MS) + nätverk; vänta på
+    // listan, inte en fast timeout.
+    await page
+      .getByRole("listbox")
+      .or(page.locator('ul[aria-label="Sökförslag"]'))
+      .first()
+      .waitFor({ state: "visible", timeout: 8000 });
+    await page.waitForTimeout(200);
+    await shoot(page, outDir, `jobb-typeahead-open__${theme}__${vpTag}`);
+    shot++;
+  } catch (err) {
+    console.warn(
+      `[visual-verify] VARNING: jobb-typeahead-open (${theme}/${vpTag}) ` +
+        `kunde inte capureras (live-backend kan sakna prefix-träff): ` +
+        `${(err as Error).message}`,
+    );
+  }
+
+  // State 3 — multi-select-chip ifylld (minst ett taxonomi-värde).
+  try {
+    await page.goto(`${BASE_URL}/jobb`, { waitUntil: "networkidle" });
+    const filterToggle = page
+      .getByRole("button", { name: /^Filter/ })
+      .first();
+    await filterToggle.waitFor({ state: "visible", timeout: 5000 });
+    if ((await filterToggle.getAttribute("aria-expanded")) !== "true") {
+      await filterToggle.click();
+    }
+    // "Yrkesområde"-gruppen: label → input → "Lägg till"-knapp. Ett giltigt
+    // concept-id-format (1–32 tecken [A-Za-z0-9_-]) räcker; backend är inte
+    // i loopen för chip-rendering (lokal state).
+    const yrkesField = page.getByLabel("Yrkesområde");
+    await yrkesField.waitFor({ state: "visible", timeout: 5000 });
+    await yrkesField.fill("MVqp_eS8_kDZ");
+    await yrkesField.press("Enter");
+    // Chip renderas med "Ta bort <kod>"-dismiss-knapp (JobAdMultiSelect).
+    await page
+      .getByRole("button", { name: "Ta bort MVqp_eS8_kDZ" })
+      .waitFor({ state: "visible", timeout: 5000 });
+    await page.waitForTimeout(200);
+    await shoot(page, outDir, `jobb-chip-filled__${theme}__${vpTag}`);
+    shot++;
+  } catch (err) {
+    console.warn(
+      `[visual-verify] VARNING: jobb-chip-filled (${theme}/${vpTag}) ` +
+        `kunde inte capureras: ${(err as Error).message}`,
+    );
+  }
+
+  return shot;
+}
+
 async function main(): Promise<void> {
   // Self-cleaning: radera ALLA tidigare körningar innan ny mapp skapas.
   if (existsSync(ROOT)) {
@@ -226,6 +337,20 @@ async function main(): Promise<void> {
           });
           await shoot(page, outDir, `${target.name}__${theme}__${vp.tag}`);
           count++;
+        }
+
+        // ADR 0042 Beslut B/C — interaktiva /jobb-states (disclosure/
+        // typeahead/chip). Auth-gated sida → bara i auth-läge. Gated till
+        // breddspannet 1280 + 3440 per uppdragskrav (1920 utelämnas medvetet
+        // för att hålla körtiden nere — mellanbredden tillför inget för
+        // dessa interaktionstillstånd).
+        if (AUTH_MODE && (vp.tag === "1280" || vp.tag === "3440")) {
+          count += await shootJobbInteractiveStates(
+            page,
+            outDir,
+            theme,
+            vp.tag,
+          );
         }
 
         // Bekräftelse-dialog (DESIGN.md §6) — öppna och capurera öppet

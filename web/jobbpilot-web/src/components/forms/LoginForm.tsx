@@ -37,8 +37,11 @@ export function LoginForm() {
           type="email"
           autoComplete="email"
           required
-          placeholder="din.email@exempel.se"
+          aria-describedby="email-hint"
         />
+        <p id="email-hint" className="text-body-sm text-text-secondary">
+          Formatet är namn@domän.se
+        </p>
       </div>
 
       <div className="flex flex-col gap-1.5">

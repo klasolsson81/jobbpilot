@@ -51,10 +51,16 @@ export function AuditLogFilter({ current }: AuditLogFilterProps) {
           id="filter-event-type"
           name="eventType"
           type="text"
-          placeholder="Application.Created"
           defaultValue={current.eventType ?? ""}
           maxLength={100}
+          aria-describedby="filter-event-type-hint"
         />
+        <p
+          id="filter-event-type-hint"
+          className="text-body-sm text-text-secondary"
+        >
+          Format: Aggregat.Händelse, t.ex. Application.Created
+        </p>
       </div>
 
       <div className="flex flex-col gap-1">
@@ -63,10 +69,16 @@ export function AuditLogFilter({ current }: AuditLogFilterProps) {
           id="filter-aggregate-type"
           name="aggregateType"
           type="text"
-          placeholder="Application"
           defaultValue={current.aggregateType ?? ""}
           maxLength={100}
+          aria-describedby="filter-aggregate-type-hint"
         />
+        <p
+          id="filter-aggregate-type-hint"
+          className="text-body-sm text-text-secondary"
+        >
+          Aggregatnamn, t.ex. Application
+        </p>
       </div>
 
       <div className="flex flex-col gap-1">
@@ -75,9 +87,15 @@ export function AuditLogFilter({ current }: AuditLogFilterProps) {
           id="filter-user-id"
           name="userId"
           type="text"
-          placeholder="UUID"
           defaultValue={current.userId ?? ""}
+          aria-describedby="filter-user-id-hint"
         />
+        <p
+          id="filter-user-id-hint"
+          className="text-body-sm text-text-secondary"
+        >
+          Anges som UUID
+        </p>
       </div>
 
       <div className="flex items-end gap-2 sm:col-span-2 lg:col-span-5">

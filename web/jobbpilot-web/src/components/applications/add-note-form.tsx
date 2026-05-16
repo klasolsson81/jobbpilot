@@ -30,7 +30,6 @@ export function AddNoteForm({ applicationId }: AddNoteFormProps) {
         <Textarea
           id="note-content"
           name="content"
-          placeholder="Skriv en notering..."
           rows={3}
           required
           disabled={isPending}

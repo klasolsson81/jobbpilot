@@ -216,8 +216,7 @@ export function AppShell({
               <Search size={13} />
               <input
                 type="search"
-                placeholder="Sök jobb, ansökningar, CV…"
-                aria-label="Sök"
+                aria-label="Sök jobb, ansökningar och CV"
               />
               <span className="jp-search__kbd">⌘K</span>
             </label>
