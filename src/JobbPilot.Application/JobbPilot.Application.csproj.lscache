@@ -212,10 +212,6 @@ JobAds/Commands/RedactRecruiterPii/
  RedactRecruiterPiiCommand.cs
  RedactRecruiterPiiCommandHandler.cs
  RedactRecruiterPiiCommandValidator.cs
-JobAds/Commands/SyncPlatsbankenSnapshot/
- SyncPlatsbankenSnapshotCommand.cs
- SyncPlatsbankenSnapshotCommandHandler.cs
- SyncPlatsbankenSnapshotResult.cs
 JobAds/Commands/UpsertExternalJobAd/
  UpsertExternalJobAdCommand.cs
  UpsertExternalJobAdCommandHandler.cs
@@ -230,8 +226,8 @@ JobAds/Queries/GetJobAd/
  GetJobAdQueryHandler.cs
 JobAds/Queries/
  JobAdDto.cs
+ JobAdSearch.cs
  ListJobAds/
-  JobAdSortBy.cs
   ListJobAdsQuery.cs
   ListJobAdsQueryHandler.cs
   ListJobAdsQueryValidator.cs
@@ -281,6 +277,28 @@ Resumes/Queries/
  ResumeMappingExtensions.cs
  ResumeVersionDto.cs
  SkillDto.cs
+SavedSearches/Commands/CreateSavedSearch/
+ CreateSavedSearchCommand.cs
+ CreateSavedSearchCommandHandler.cs
+ CreateSavedSearchCommandValidator.cs
+SavedSearches/Commands/DeleteSavedSearch/
+ DeleteSavedSearchCommand.cs
+ DeleteSavedSearchCommandHandler.cs
+SavedSearches/Commands/UpdateSavedSearch/
+ UpdateSavedSearchCommand.cs
+ UpdateSavedSearchCommandHandler.cs
+ UpdateSavedSearchCommandValidator.cs
+SavedSearches/Queries/GetSavedSearch/
+ GetSavedSearchQuery.cs
+ GetSavedSearchQueryHandler.cs
+SavedSearches/Queries/ListSavedSearches/
+ ListSavedSearchesQuery.cs
+ ListSavedSearchesQueryHandler.cs
+SavedSearches/Queries/RunSavedSearch/
+ RunSavedSearchQuery.cs
+ RunSavedSearchQueryHandler.cs
+ RunSavedSearchQueryValidator.cs
+SavedSearches/Queries/SavedSearchDto.cs
 Waitlist/Commands/ApproveWaitlistEntry/
  ApproveWaitlistEntryCommand.cs
  ApproveWaitlistEntryCommandHandler.cs
