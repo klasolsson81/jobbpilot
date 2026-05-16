@@ -253,13 +253,16 @@ export function ResumeContentForm({
         <Label htmlFor="summary" className="sr-only">
           Sammanfattning
         </Label>
+        <p id="summary-hint" className="text-body-sm text-text-secondary">
+          En kort sammanfattning av din profil.
+        </p>
         <Textarea
           id="summary"
           {...register("summary")}
+          aria-describedby="summary-hint"
           {...fieldA11y("summary")}
           rows={4}
           maxLength={2000}
-          placeholder="Kort sammanfattning av din profil..."
           disabled={isPending}
         />
       </section>

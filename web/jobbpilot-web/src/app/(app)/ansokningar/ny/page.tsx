@@ -23,14 +23,17 @@ export default function NyAnsokningPage() {
       <form action={formAction} className="flex flex-col gap-5 max-w-lg">
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="cover-letter">Personligt brev</Label>
-          <p className="text-body-sm text-text-secondary">
+          <p
+            id="cover-letter-hint"
+            className="text-body-sm text-text-secondary"
+          >
             Valfritt. Du kan lägga till eller redigera det senare.
           </p>
           <Textarea
             id="cover-letter"
             name="coverLetter"
-            placeholder="Skriv ett personligt brev..."
             rows={8}
+            aria-describedby="cover-letter-hint"
             disabled={isPending}
           />
         </div>

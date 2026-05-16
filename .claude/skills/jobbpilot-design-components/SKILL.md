@@ -124,17 +124,43 @@ Spec (matches `.jp-input` / `.jp-select`, recalibrated per ADR 0038):
 - Focus: `border-brand-600` + `box-shadow: 0 0 0 3px var(--jp-brand-50)`
   (3px brand-50 ring)
 - Font: 16px
-- Placeholder: `text-text-tertiary` (placeholder är dekorativt — får aldrig
-  bära information; label ovanför + hint nedanför bär betydelsen)
 - Error state: `border-danger-600`, error message below in `text-danger-700`
 
 Always pair with a `<label>` — never placeholder-only inputs. No floating
 labels (label sits above the field).
 
-**Inga beskrivande placeholder-exempel i sök-/filterfält** (ADR 0038) — label
-ovanför och hint nedanför kvarstår som informationsbärarna. Auth-formulärens
-format-placeholders (`din.email@exempel.se`) behålls: de visar ett
-syntaxmönster med stark label-kontext, inte fält-instruktion.
+#### Rena input-fält — ingen placeholder-exempeltext (Platsbanken-regel)
+
+**Klas hård designregel 2026-05-17 (förstärker ADR 0038):** Inga input-fält i
+JobbPilot får ha exempel-/instruktions-text i `placeholder`. Inputs ska alltid
+vara **rena à la Platsbanken** — tomt fält, ingen grå exempeltext i rutan.
+Gäller hela appen (auth, sök/filter, dialoger, CV-/ansöknings-/admin-formulär).
+
+- **Default = ingen `placeholder` alls.** Ta bort den.
+- Behöver fältet ett exempel eller formathjälp (e-postsyntax, concept-id-format,
+  vad ett fritextfält ska innehålla): lägg det som **hjälptext (hint) under
+  input-rutan** — `text-body-sm text-text-secondary`, kopplad via
+  `aria-describedby` (a11y-skillens form-mönster). Label kvarstår alltid ovanför.
+- **Hint-placering:** default är **under** fältet (codebase-konventionen:
+  label → input → hint/fel i samma scan-rytm). **Ovanför** är tillåtet endast
+  när fältet saknar synlig label (t.ex. `sr-only`-label) — då ger en synlig
+  rad ovanför fältet sighted-användare fältets syfte där labeln annars suttit.
+  Blanda inte placeringarna i samma vy utan skäl.
+- **Rationale:** placeholder försvinner vid inmatning, har svag kontrast
+  (kan inte bära information — WCAG), och kollideras med ifyllt värde. 1177,
+  Digg och Platsbanken använar rena fält + synlig hint. Civic-utility:
+  information är synlig och beständig, inte tillfällig dekoration i rutan.
+- **Undantag (ej `placeholder`-exempeltext, behålls):** shadcn `SelectValue`
+  `placeholder` (t.ex. "Välj kanal") — det är combobox-ens *unselected display
+  value*, funktionellt nödvändig för att signalera "inget valt", inte
+  exempeltext i ett textfält. Icke-textuella fält utan synlig label (global
+  chrome-sök) bär scope via `aria-label`, inte placeholder.
+- **a11y:** hint kopplas med `aria-describedby`; vid fel tar `role="alert"`-
+  felmeddelandet beskrivnings-prioritet (se `jobbpilot-design-a11y` §5).
+
+ADR 0038:s tidigare formulering om kvarhållna auth-format-placeholders
+(`din.email@exempel.se`) är **upphävd** av denna regel — e-postsyntax flyttad
+till hint under fältet ("Formatet är namn@domän.se").
 
 ### Form (shadcn Form wrapper)
 

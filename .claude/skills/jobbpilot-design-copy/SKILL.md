@@ -200,20 +200,29 @@ Acceptabla generiska (när kontexten är otvetydig):
 
 ---
 
-## Placeholder text
+## Placeholder text — rena fält (Platsbanken-regel)
 
-Placeholder ersätter inte en label. Alltid: label + placeholder.
+**Klas hård designregel 2026-05-17 (förstärker ADR 0038):** Inga input-fält
+har exempel-/instruktions-text i `placeholder`. Fälten är rena à la
+Platsbanken. Exempel/format flyttas till **hjälptext (hint) under fältet** i
+`text-text-secondary`, kopplad via `aria-describedby`. Label kvarstår ovanför.
 
 ```tsx
-// ✅ Korrekt
-<FormLabel>E-post</FormLabel>
-<Input placeholder="du@exempel.se" />
+// ✅ Korrekt — rent fält, exempel som hint under
+<label htmlFor="email">E-post</label>
+<Input id="email" aria-describedby="email-hint" />
+<p id="email-hint" className="text-body-sm text-text-secondary">
+  Formatet är namn@domän.se
+</p>
 
-// ❌ Fel
-<Input placeholder="Ange din e-post" />  // ingen label
+// ❌ Fel — exempeltext i rutan
+<Input placeholder="du@exempel.se" />
+// ❌ Fel — instruktion i rutan, ingen label
+<Input placeholder="Ange din e-post" />
 ```
 
-Placeholder ska vara ett exempel, inte en instruktion.
+Full regel + a11y + undantag (shadcn `SelectValue`, chrome-sök `aria-label`):
+se `jobbpilot-design-components` → Input/Textarea/Select → "Rena input-fält".
 
 ---
 
