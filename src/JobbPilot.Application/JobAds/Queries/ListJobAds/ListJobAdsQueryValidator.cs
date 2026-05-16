@@ -49,5 +49,12 @@ public sealed class ListJobAdsQueryValidator : AbstractValidator<ListJobAdsQuery
             .MaximumLength(100)
             .When(q => !string.IsNullOrWhiteSpace(q.Q))
             .WithMessage("Söktext måste vara 2-100 tecken.");
+
+        // ADR 0042 Beslut D — relevans-sortering kräver söktext (fail-fast,
+        // speglar SearchCriteria.Create-invarianten).
+        RuleFor(q => q.Q)
+            .NotEmpty()
+            .When(q => q.SortBy == Domain.JobAds.JobAdSortBy.Relevance)
+            .WithMessage("Relevans-sortering kräver en söktext.");
     }
 }

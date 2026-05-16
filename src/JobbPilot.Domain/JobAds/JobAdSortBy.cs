@@ -13,4 +13,9 @@ public enum JobAdSortBy
     PublishedAtAsc = 1,
     ExpiresAtDesc = 2,
     ExpiresAtAsc = 3,
+
+    // ADR 0042 Beslut D — relevans-sort (D2 ILIKE-heuristik). Kräver q
+    // non-null (invariant i SearchCriteria.Create + ListJobAdsQueryValidator
+    // — relevans-ordning utan söktext är odefinierad).
+    Relevance = 4,
 }

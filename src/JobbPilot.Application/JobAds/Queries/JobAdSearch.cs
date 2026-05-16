@@ -72,7 +72,12 @@ internal static class JobAdSearch
     // invalid values innan denna metod, så throw är defense-in-depth — exception
     // når inte runtime. Vid framtida JobAdSortBy-tillägg: case missas →
     // ArgumentOutOfRangeException → integration-test fail (fail-fast).
-    public static IQueryable<JobAd> ApplySort(IQueryable<JobAd> source, JobAdSortBy sortBy) =>
+    // ADR 0042 Beslut D — q-parametern krävs av Relevance (D2 ILIKE-heuristik).
+    // Relevance-utan-q är odefinierat och avvisas redan i ListJobAdsQueryValidator
+    // + SearchCriteria.Create (fail-fast); null-guarden här är defense-in-depth
+    // (fallback PublishedAtDesc, kastar ej i query-vägen).
+    public static IQueryable<JobAd> ApplySort(
+        IQueryable<JobAd> source, JobAdSortBy sortBy, string? q) =>
         sortBy switch
         {
             JobAdSortBy.PublishedAtDesc => source.OrderByDescending(j => j.PublishedAt).ThenBy(j => j.Id),
@@ -86,7 +91,36 @@ internal static class JobAdSearch
                 source.OrderBy(j => j.ExpiresAt == null)
                       .ThenBy(j => j.ExpiresAt)
                       .ThenBy(j => j.Id),
+            // D2 ILIKE-heuristik (ADR 0042 Beslut D; D1 tsvector = framtida
+            // skala-trigger, ej TD). Rangordning: titel exakt (3) > titel-prefix
+            // (2) > titel innehåller (1) > övrigt (0), sedan PublishedAt desc.
+            // EF.Functions.Like + .ToLower() (provider-agnostiskt, Clean Arch —
+            // samma mönster + CA-suppress som ApplyCriteria; EF.Functions.ILike
+            // ligger i Npgsql-extension → Application-lager-brott).
+            JobAdSortBy.Relevance =>
+                ApplyRelevanceSort(source, q),
             _ => throw new ArgumentOutOfRangeException(
                 nameof(sortBy), sortBy, "Unknown JobAdSortBy — validator should reject."),
         };
+
+    private static IQueryable<JobAd> ApplyRelevanceSort(IQueryable<JobAd> source, string? q)
+    {
+        if (string.IsNullOrWhiteSpace(q))
+            return source.OrderByDescending(j => j.PublishedAt).ThenBy(j => j.Id);
+
+        var lowered = q.ToLowerInvariant();
+        var exact = lowered;
+        var prefix = lowered + "%";
+        var contains = "%" + lowered + "%";
+
+#pragma warning disable CA1304, CA1311
+        return source
+            .OrderByDescending(j =>
+                EF.Functions.Like(j.Title.ToLower(), exact) ? 3 :
+                EF.Functions.Like(j.Title.ToLower(), prefix) ? 2 :
+                EF.Functions.Like(j.Title.ToLower(), contains) ? 1 : 0)
+            .ThenByDescending(j => j.PublishedAt)
+            .ThenBy(j => j.Id);
+#pragma warning restore CA1304, CA1311
+    }
 }

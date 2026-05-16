@@ -182,4 +182,40 @@ public class ListJobAdsMultiFilterTests(ApiFactory factory)
             .ShouldBe(["Match1", "Match2"]);
         result.TotalCount.ShouldBe(2);
     }
+
+    // Batch 4 — ADR 0042 Beslut D (D2 ILIKE-relevans) + Beslut E (IsNew).
+    // Verifierar Npgsql-translation av Relevance-CASE-ordningen mot riktig
+    // Postgres (arkitekt-flaggad query-logik-klass) + IsNew-projektionen.
+    [Fact]
+    public async Task RelevanceSort_RanksTitleMatchFirst_AndIsNewReflectsSince()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var ssyk = $"rel{Guid.NewGuid():N}"[..16];
+        var token = $"zeta{Guid.NewGuid():N}"[..18];
+
+        // Exakt titel-match (rank 3), prefix (rank 2), contains (rank 1).
+        await SeedImportedJobAdAsync(token, ssyk, null, $"ext-{Guid.NewGuid():N}", ct);
+        await SeedImportedJobAdAsync($"{token} utvecklare", ssyk, null, $"ext-{Guid.NewGuid():N}", ct);
+        await SeedImportedJobAdAsync($"Senior {token} roll", ssyk, null, $"ext-{Guid.NewGuid():N}", ct);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var handler = new ListJobAdsQueryHandler(db);
+
+        var result = await handler.Handle(
+            new ListJobAdsQuery(
+                SortBy: JobAdSortBy.Relevance, Ssyk: [ssyk], Q: token,
+                Since: DateTimeOffset.UtcNow.AddDays(-30)), ct);
+
+        result.TotalCount.ShouldBe(3);
+        result.Items[0].Title.ShouldBe(token);                 // exakt = högst rank
+        result.Items[1].Title.ShouldBe($"{token} utvecklare"); // prefix
+        result.Items[2].Title.ShouldBe($"Senior {token} roll"); // contains
+        // Since i det förflutna → alla nyligen seedade = IsNew.
+        result.Items.ShouldAllBe(i => i.IsNew);
+
+        var noSince = await handler.Handle(
+            new ListJobAdsQuery(SortBy: JobAdSortBy.Relevance, Ssyk: [ssyk], Q: token), ct);
+        noSince.Items.ShouldAllBe(i => !i.IsNew);
+    }
 }

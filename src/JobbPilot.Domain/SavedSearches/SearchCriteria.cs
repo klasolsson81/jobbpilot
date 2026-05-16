@@ -95,6 +95,13 @@ public sealed record SearchCriteria
             return Result.Failure<SearchCriteria>(DomainError.Validation(
                 "SearchCriteria.InvalidQ", "Söktext måste vara 2-100 tecken."));
 
+        // ADR 0042 Beslut D — relevans-ordning utan söktext är odefinierad
+        // (fail-fast; speglas i ListJobAdsQueryValidator).
+        if (sortBy == JobAdSortBy.Relevance && normQ is null)
+            return Result.Failure<SearchCriteria>(DomainError.Validation(
+                "SearchCriteria.RelevanceRequiresQ",
+                "Relevans-sortering kräver en söktext."));
+
         return Result.Success(new SearchCriteria
         {
             Ssyk = normSsyk,

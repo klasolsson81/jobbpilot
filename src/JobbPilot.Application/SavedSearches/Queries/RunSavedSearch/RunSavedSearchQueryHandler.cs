@@ -59,7 +59,7 @@ public sealed class RunSavedSearchQueryHandler(
 
         var totalCount = await baseQuery.CountAsync(cancellationToken);
 
-        var ordered = JobAdSearch.ApplySort(baseQuery, criteria.SortBy);
+        var ordered = JobAdSearch.ApplySort(baseQuery, criteria.SortBy, criteria.Q);
 
         var items = await ordered
             .Skip((query.Page - 1) * query.PageSize)
@@ -74,7 +74,10 @@ public sealed class RunSavedSearchQueryHandler(
                 j.Status.Value,
                 j.PublishedAt,
                 j.ExpiresAt,
-                j.CreatedAt))
+                j.CreatedAt,
+                // ADR 0042 Beslut E — Since är ListJobAdsQuery-runtime-kontext,
+                // ej del av SavedSearch; run exponerar därför aldrig IsNew=true.
+                false))
             .ToListAsync(cancellationToken);
 
         return new PagedResult<JobAdDto>(items, totalCount, query.Page, query.PageSize);

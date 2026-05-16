@@ -22,7 +22,12 @@ public sealed class ListJobAdsQueryHandler(IAppDbContext db)
         // så totalen reflekterar filtrerad mängd, inte totalt antal annonser.
         var totalCount = await baseQuery.CountAsync(cancellationToken);
 
-        var ordered = JobAdSearch.ApplySort(baseQuery, query.SortBy);
+        var ordered = JobAdSearch.ApplySort(baseQuery, query.SortBy, query.Q);
+
+        // ADR 0042 Beslut E — IsNew = PublishedAt inom "ny sedan"-fönstret.
+        // Lokalt fångad nullable → EF översätter jämförelsen (false när Since
+        // ej angivet).
+        var since = query.Since;
 
         var items = await ordered
             .Skip((query.Page - 1) * query.PageSize)
@@ -37,7 +42,8 @@ public sealed class ListJobAdsQueryHandler(IAppDbContext db)
                 j.Status.Value,
                 j.PublishedAt,
                 j.ExpiresAt,
-                j.CreatedAt))
+                j.CreatedAt,
+                since != null && j.PublishedAt >= since))
             .ToListAsync(cancellationToken);
 
         return new PagedResult<JobAdDto>(items, totalCount, query.Page, query.PageSize);
