@@ -224,4 +224,22 @@ public class ListJobAdsQueryValidatorTests
             Ssyk: ["MVqp_eS8_kDZ", "abc-123"], Region: ["stockholm"], Q: "developer"));
         result.IsValid.ShouldBeTrue();
     }
+
+    // ADR 0042 Beslut D — Relevance kräver Q (speglar SearchCriteria-invarianten).
+
+    [Fact]
+    public void Validate_RelevanceSortWithoutQ_IsInvalid()
+    {
+        var result = _validator.Validate(new ListJobAdsQuery(
+            SortBy: JobAdSortBy.Relevance, Ssyk: ["12345"], Q: null));
+        result.IsValid.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Validate_RelevanceSortWithQ_IsValid()
+    {
+        var result = _validator.Validate(new ListJobAdsQuery(
+            SortBy: JobAdSortBy.Relevance, Q: "developer"));
+        result.IsValid.ShouldBeTrue();
+    }
 }

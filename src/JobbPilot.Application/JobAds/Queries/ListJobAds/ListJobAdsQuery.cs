@@ -13,4 +13,7 @@ public sealed record ListJobAdsQuery(
     JobAdSortBy SortBy = JobAdSortBy.PublishedAtDesc,
     IReadOnlyList<string>? Ssyk = null,
     IReadOnlyList<string>? Region = null,
-    string? Q = null) : IQuery<PagedResult<JobAdDto>>;
+    string? Q = null,
+    // ADR 0042 Beslut E — "Ny sedan"-fönster (runtime-kontext, ej i
+    // SearchCriteria; analog Page/PageSize). Driver JobAdDto.IsNew.
+    DateTimeOffset? Since = null) : IQuery<PagedResult<JobAdDto>>;

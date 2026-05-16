@@ -412,4 +412,27 @@ public class SearchCriteriaTests
         result.IsFailure.ShouldBeTrue();
         result.Error.Code.ShouldBe("SearchCriteria.InvalidSortBy");
     }
+
+    // ---------------------------------------------------------------
+    // ADR 0042 Beslut D — Relevance kräver q (relevans utan söktext odefinierad)
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public void Create_RelevanceSortWithoutQ_ReturnsFailure()
+    {
+        var result = SearchCriteria.Create(["12345"], null, null, JobAdSortBy.Relevance);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe("SearchCriteria.RelevanceRequiresQ");
+    }
+
+    [Fact]
+    public void Create_RelevanceSortWithQ_ReturnsSuccess()
+    {
+        var result = SearchCriteria.Create(null, null, "backend", JobAdSortBy.Relevance);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.SortBy.ShouldBe(JobAdSortBy.Relevance);
+        result.Value.Q.ShouldBe("backend");
+    }
 }

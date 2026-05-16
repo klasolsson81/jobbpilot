@@ -32,10 +32,12 @@ public static class JobAdsEndpoints
             string[]? ssyk = null,
             string[]? region = null,
             string? q = null,
+            // ADR 0042 Beslut E — "ny sedan"-fönster (runtime-kontext).
+            DateTimeOffset? since = null,
             CancellationToken ct = default) =>
         {
             var result = await mediator.Send(
-                new ListJobAdsQuery(page, pageSize, sortBy, ssyk, region, q), ct);
+                new ListJobAdsQuery(page, pageSize, sortBy, ssyk, region, q, since), ct);
             return Results.Ok(result);
         })
         .RequireRateLimiting(RateLimitingExtensions.ListReadPolicy);

@@ -10,5 +10,9 @@ public sealed record JobAdDto(
     string Status,
     DateTimeOffset PublishedAt,
     DateTimeOffset? ExpiresAt,
-    DateTimeOffset CreatedAt
+    DateTimeOffset CreatedAt,
+    // ADR 0042 Beslut E — "Ny"-badge. Runtime-presentationskontext (ej i
+    // SearchCriteria — analogt Page/PageSize). true om PublishedAt >= Since
+    // (ListJobAdsQuery.Since); false när Since ej angivet / RunSavedSearch.
+    bool IsNew
 );
