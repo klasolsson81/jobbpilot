@@ -75,6 +75,39 @@ Shell Variant B, landing) i Next.js-kodbasen och uppdatera alla design-specs
 filer) · 313/313 vitest · `next build --webpack` grön · pre-commit:
 242+354+50 .NET-tester gröna.
 
+## Iteration 2 — Klas-feedback efter live-test (2026-05-16)
+
+Klas underkände v2 visuellt (testade jobbpilot.se på 3440px). Rotorsak:
+agent-review granskade kod/diff, inte renderad UI i bred viewport.
+
+**senior-cto-advisor-beslut (5 punkter):**
+1. **Ny obligatorisk rutin:** `docs/runbooks/frontend-visual-verification.md` +
+   `scripts/visual-verify.ts` + `pnpm visual-verify`. Playwright headless,
+   1280/1920/3440 × light/dark, bilder i `C:/tmp/jobbpilot-visual/<ts>/`
+   (utanför repot), self-cleaning (raderar tidigare körningar vid start),
+   design-reviewer granskar **mot bilderna**, Klas slutgodkänner. Auth-gated
+   sidor deferras till live-deploy.
+2. Dubbel-login löst: landing-panelen renderar nu **riktiga**
+   `LoginForm`/`RegisterForm` (wire mot `loginAction`/`registerAction`),
+   `/logga-in`+`/registrera` kvar som fallback.
+3. Post-login `/mig` → `/jobb` (`safeRedirectPath` + form-defaults). Översikt
+   byggs ej (saknar aggregat-query-dependency) → **TD-82** (Minor, Fas 2).
+4. Bred-skärm: `.jp-page` `max-width:1180px; margin-inline:auto`; landing
+   centrerad `max-w-[1200px]`-container.
+5. Jobb-rad-separation: `border-border-strong` + py-6 + hover-bg + inset
+   brand-vänsterkant (inom civic-ledger, ingen card/shadow).
+
+**Verifiering iteration 2:** visual-verify-loop körd (24 shots).
+design-reviewer mot bilderna: Klas-klagomål (3440-centrering + dubbel-login)
+verifierat **lösta**; 1 Blocker funnen+fixad (auth-sidor tvåtons-band →
+`(auth)/layout` `min-h-full`→`min-h-screen`); re-run bekräftade fix.
+tsc/lint(0 err)/313 vitest/next build gröna.
+
+**Kräver Klas-GO (ej gjort):**
+- Rad i `web/jobbpilot-web/AGENTS.md` som pekar på visual-verification-runbook
+  (scaffolding-fil — memory `feedback_dont_delete_auto_files`).
+- TD-82 fas-placering (Fas 2 satt — Klas äger roadmap-strategi).
+
 ## Nästa session
 
 - Klas-beslut om `.jp-h1`/display font-weight-auktoritet (jobbpilot.css vs
