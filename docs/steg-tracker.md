@@ -1,7 +1,8 @@
 # JobbPilot — STEG-tracker
 
-> **Version:** 1.20
-> **Senast uppdaterad:** 2026-05-12 ~08:00 (**Fas 1-rensning komplett.** Lång CC-session 2026-05-11 21:00 → 2026-05-12 08:00 levererade Fas 1-rensningens batches B–F (TD-1, TD-2, TD-3, TD-4, TD-5, TD-6, TD-12, TD-28, TD-40, TD-41, TD-57), disciplinretur av TD-65 + TD-66, samt TD-67 (ADR 0031 — failed-access-detection) + TD-25 (HardDeleteAccountsJob resilient loop) + TD-68 (CloudWatch security-alarms med dev-apply). 16 TDs stängda. Fas 1 Minor-sektionen är TOM. Aktiva TDs är Fas 2+/Trigger/Opportunistiska. Klas-feedback om TD-lyftnings-disciplin sparad i memory. 21 commits pushade. Lärdom: TD-listan är inte ett dumpning-ställe — §9.6-kriterier (annan fas / saknad funktion-dependency) ska pressas även när CTO/auditor föreslår lyft.)
+> **Version:** 1.21
+> **Senast uppdaterad:** 2026-05-16 (**Fas 2-milstolpe funktionellt nådd.** F2 Saved Searches levererad end-to-end (ADR 0039 Accepted): `SavedSearch` AR + `SearchCriteria` VO + 6 endpoints JobSeeker-scoped + `JobAdSearch` delad SPOT-modul + frontend Spara/lista/kör/radera. ADR 0040 (Proposed) — framtida smart CV-baserat filter (Fas 4+). TD-84 lyft (mutationsendpoints NotFound→400, projekt-brett, Minor/Trigger). Fas 2-raden → "Pågående — milstolpe funktionellt nådd 2026-05-16" + ny fotnot ⁵. Commits `b82e7cf`→`d602968` pushade. Kvar innan Fas 2 formellt stängs: ingestion-cron-verifiering + auth-gated visuell verifiering (pending live-deploy).)
+> **Föregående uppdatering:** 1.20 / 2026-05-12 ~08:00 (Fas 1-rensning komplett — batches B–F, 16 TDs stängda, Fas 1 Minor-sektion TOM)
 > **Roll:** permanent översikt över STEG- och fas-progression.
 
 Kompletteras av:
@@ -27,7 +28,7 @@ Mellan-arbete (upptakter, cleanup-passningar, disciplin-uppgraderingar) är inte
 |-----|------|------------------|-----------|--------|
 | Fas 0 | Foundation | ~2 v | Registrera + logga in på dev.jobbpilot.se | **Klar 2026-05-10** ¹ |
 | Fas 1 | Core Domain | ~3 v | CV manuellt + "fake" ansökningar i admin-audit | **Klar 2026-05-11** ³ + **rensad 2026-05-12** ⁴ |
-| Fas 2 | JobTech Integration | ~2 v | Söka jobb på Platsbanken via appen, spara sökningar | Planerad² |
+| Fas 2 | JobTech Integration | ~2 v | Söka jobb på Platsbanken via appen, spara sökningar | **Pågående — milstolpe funktionellt nådd 2026-05-16** ²⁵ |
 | Fas 3 | Application Management | ~2 v | Fullständig ansökningshantering (utan AI) | Planerad |
 | Fas 4 | AI Layer | ~3-4 v | Alla AI-features end-to-end + 14 dagar dogfood | Planerad |
 | Fas 5 | Integrationer | ~2 v | Gmail auto-loggar, intervjuer i Google Calendar | Planerad |
@@ -45,6 +46,8 @@ Mellan-arbete (upptakter, cleanup-passningar, disciplin-uppgraderingar) är inte
 ³ Fas 1 fullt klar 2026-05-11. Milestonestängning levererad i stationär-CC-session: admin-roll-infrastruktur (per-request claims A1 + IdempotentAdminRoleSeeder B1) + GET /api/v1/admin/audit-log + frontend `/admin/granskning` med Server Components + zero client-JS för core-flöde. 5 parallella agent-reviews APPROVED (code-reviewer + security-auditor + dotnet-architect + design-reviewer × 2 frontiers). CTO-triage med 12 in-block-fixar applicerade per 4-timmarsregeln + 6 nya TDs (TD-50 till TD-55) + ADR 0028 (admin-authorization defense-in-depth, marker-interface + HTTP-policy dubbel-gate).
 
 ⁴ Fas 1-rensning komplett 2026-05-12 (lång CC-session 2026-05-11 21:00 → 2026-05-12 08:00). Levererade Fas 1-rensningens batches B–F: TD-1 + TD-2 (a11y), TD-3 + TD-4 + TD-5 (UX-pass /mig), TD-6 + TD-28 (me-flöde fullstack med ny `/auth/verify`-endpoint per Klas-Alt1), TD-12 (cross-user-isolation, 7 tester), TD-40 (retroaktivt), TD-41 + TD-57 (shadcn-first form-controls). Disciplinretur: TD-65 (Playwright E2E) + TD-66 (Resume/JobSeeker cross-user-isolation) stängda efter Klas-feedback om TD-lyftnings-disciplin. Plus TD-25 (HardDeleteAccountsJob resilient loop), TD-67 (failed-access-detection via IFailedAccessLogger + ADR 0031), TD-68 (CloudWatch security-alarms — Terraform-modul + dev-apply genomförd, jobbpilot-dev-secops-anomaly SNS-topic + 2 alarms live). 16 TDs stängda. Fas 1 Minor-sektionen i tech-debt.md är TOM. Lärdom sparad i memory: TD-lyftningar måste pressas mot §9.6-kriterier — "scope-disciplin per batch" eller "+1-2h CC-tid" är inte legitima skäl.
+
+⁵ Fas 2-milstolpen "söka jobb på Platsbanken + spara sökningar" **funktionellt nådd 2026-05-16**. JobTech-ingestion kod-komplett + deployad (`v0.2.6-dev`), pending cron-live-verifiering (separat lokal session, AWS SSO). "Spara sökningar" levererad end-to-end (ADR 0039 Accepted): `SavedSearch` AR + `SearchCriteria` VO + 6 endpoints JobSeeker-scoped + `JobAdSearch` delad SPOT-modul + frontend Spara/lista/kör/radera. Commits `b82e7cf`→`d602968`. ADR 0040 (Proposed) — framtida smart CV-baserat filter (Fas 4+), Klas-grundtanke CTO-vägd. TD-84 lyft (mutationsendpoints NotFound→400, projekt-brett, Minor/Trigger). Kvar innan Fas 2 formellt stängs: ingestion-cron-verifiering + auth-gated visuell verifiering (pending live-deploy) + ev. Fas 2-städning.
 
 ## 3. STEG-historik
 
