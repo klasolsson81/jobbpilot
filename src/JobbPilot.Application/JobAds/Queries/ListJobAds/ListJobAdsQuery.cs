@@ -1,4 +1,5 @@
 using JobbPilot.Application.Common;
+using JobbPilot.Domain.JobAds;
 using Mediator;
 
 namespace JobbPilot.Application.JobAds.Queries.ListJobAds;

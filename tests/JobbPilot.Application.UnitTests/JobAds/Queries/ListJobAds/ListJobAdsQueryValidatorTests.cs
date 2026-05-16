@@ -1,4 +1,5 @@
 using JobbPilot.Application.JobAds.Queries.ListJobAds;
+using JobbPilot.Domain.JobAds;
 using Shouldly;
 
 namespace JobbPilot.Application.UnitTests.JobAds.Queries.ListJobAds;

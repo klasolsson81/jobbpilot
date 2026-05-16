@@ -2,6 +2,7 @@ using JobbPilot.Api.RateLimiting;
 using JobbPilot.Application.JobAds.Commands.CreateJobAd;
 using JobbPilot.Application.JobAds.Queries.GetJobAd;
 using JobbPilot.Application.JobAds.Queries.ListJobAds;
+using JobbPilot.Domain.JobAds;
 using Mediator;
 
 namespace JobbPilot.Api.Endpoints;
