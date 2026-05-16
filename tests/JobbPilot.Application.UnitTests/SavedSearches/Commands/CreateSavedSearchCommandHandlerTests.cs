@@ -28,7 +28,7 @@ public class CreateSavedSearchCommandHandlerTests
     }
 
     private static CreateSavedSearchCommand ValidCommand() =>
-        new("Backend i Stockholm", "12345", "stockholm", "backend",
+        new("Backend i Stockholm", ["12345"], ["stockholm"], "backend",
             JobAdSortBy.PublishedAtDesc, NotificationEnabled: true);
 
     [Fact]
@@ -84,6 +84,8 @@ public class CreateSavedSearchCommandHandlerTests
         // Inget kriterium angivet → SearchCriteria.Empty bubblar upp som 400.
         var command = new CreateSavedSearchCommand(
             "Tom sökning", null, null, null, JobAdSortBy.PublishedAtDesc, false);
+        // OBS: tomma/null-listor + null Q = generaliserad tom-invariant
+        // (ADR 0042 Beslut B.3) → samma SearchCriteria.Empty som gammalt.
 
         var result = await handler.Handle(command, CancellationToken.None);
 
@@ -100,7 +102,7 @@ public class CreateSavedSearchCommandHandlerTests
         var handler = new CreateSavedSearchCommandHandler(db, _currentUser, FakeDateTimeProvider.Default);
 
         var command = new CreateSavedSearchCommand(
-            "", "12345", null, null, JobAdSortBy.PublishedAtDesc, false);
+            "", ["12345"], null, null, JobAdSortBy.PublishedAtDesc, false);
 
         var result = await handler.Handle(command, CancellationToken.None);
 

@@ -6,6 +6,10 @@ namespace JobbPilot.Application.SavedSearches.Commands.CreateSavedSearch;
 public sealed class CreateSavedSearchCommandValidator
     : AbstractValidator<CreateSavedSearchCommand>
 {
+    // Speglar SearchCriteria.ConceptIdPattern + ListJobAdsQueryValidator
+    // (defense-in-depth). Domän-faktorn är sanningskällan.
+    private const string ConceptIdPattern = @"^[A-Za-z0-9_-]{1,32}$";
+
     public CreateSavedSearchCommandValidator()
     {
         RuleFor(c => c.Name)
@@ -14,9 +18,32 @@ public sealed class CreateSavedSearchCommandValidator
             .MaximumLength(SavedSearch.NameMaxLength)
             .WithMessage($"Namn får vara max {SavedSearch.NameMaxLength} tecken.");
 
-        // Criteria-invarianter (minst ett kriterium, concept-id-format, q-längd)
-        // ägs av SearchCriteria.Create (Domain) — handlern returnerar dess
-        // DomainError som 400. SortBy valideras här som tidig defense-in-depth.
+        // Criteria-invarianter (minst ett kriterium, q-längd) ägs av
+        // SearchCriteria.Create (Domain, sanningskälla) — handlern returnerar
+        // dess DomainError som 400. SortBy + maxantal-cap/per-element-regex
+        // valideras här som tidig defense-in-depth (paritet med
+        // ListJobAdsQueryValidator; security-auditor M1 2026-05-16, §9.6
+        // in-block-fix). Cap refererar Domain-konstanten (single source).
         RuleFor(c => c.SortBy).IsInEnum();
+
+        RuleFor(c => c.Ssyk!)
+            .Must(l => l.Count <= SearchCriteria.MaxConceptIds)
+            .When(c => c.Ssyk is not null)
+            .WithMessage($"Max {SearchCriteria.MaxConceptIds} yrkesområden per sökning.");
+
+        RuleForEach(c => c.Ssyk)
+            .Matches(ConceptIdPattern)
+            .When(c => c.Ssyk is not null)
+            .WithMessage("Ssyk måste vara en giltig JobTech concept-id (1-32 tecken, alfanumeriskt + _-).");
+
+        RuleFor(c => c.Region!)
+            .Must(l => l.Count <= SearchCriteria.MaxConceptIds)
+            .When(c => c.Region is not null)
+            .WithMessage($"Max {SearchCriteria.MaxConceptIds} regioner per sökning.");
+
+        RuleForEach(c => c.Region)
+            .Matches(ConceptIdPattern)
+            .When(c => c.Region is not null)
+            .WithMessage("Region måste vara en giltig JobTech location-concept-id (1-32 tecken, alfanumeriskt + _-).");
     }
 }

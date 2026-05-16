@@ -26,7 +26,7 @@ public class UpdateSavedSearchCommandHandlerTests
         var seeker = JobSeeker.Register(userId, "Test User", FakeDateTimeProvider.Default).Value;
         db.JobSeekers.Add(seeker);
 
-        var criteria = SearchCriteria.Create("12345", "stockholm", "backend",
+        var criteria = SearchCriteria.Create(["12345"], ["stockholm"], "backend",
             JobAdSortBy.PublishedAtDesc).Value;
         var saved = SavedSearch.Create(seeker.Id, "Originalnamn", criteria, false,
             FakeDateTimeProvider.Default).Value;
@@ -61,7 +61,7 @@ public class UpdateSavedSearchCommandHandlerTests
 
         var result = await handler.Handle(
             new UpdateSavedSearchCommand(saved.Id.Value, null, null,
-                new SavedSearchCriteriaInput("99999", null, null, JobAdSortBy.PublishedAtAsc)),
+                new SavedSearchCriteriaInput(["99999"], null, null, JobAdSortBy.PublishedAtAsc)),
             CancellationToken.None);
 
         result.IsSuccess.ShouldBeTrue();
@@ -92,7 +92,7 @@ public class UpdateSavedSearchCommandHandlerTests
 
         var result = await handler.Handle(
             new UpdateSavedSearchCommand(saved.Id.Value, null, null,
-                new SavedSearchCriteriaInput("has space", null, null, JobAdSortBy.PublishedAtDesc)),
+                new SavedSearchCriteriaInput(["has space"], null, null, JobAdSortBy.PublishedAtDesc)),
             CancellationToken.None);
 
         result.IsFailure.ShouldBeTrue();

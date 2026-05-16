@@ -4,22 +4,27 @@ using Shouldly;
 
 namespace JobbPilot.Domain.UnitTests.SavedSearches;
 
-// VO-invarianter speglar ListJobAdsQueryValidator (ADR 0039 Beslut 3) så en
-// sparad sökning aldrig kan vara mer tillåtande än motsvarande live-sökning.
+// Batch 3 — ADR 0042 Beslut B (Accepted): Ssyk/Region string? → IReadOnlyList<string>.
+// Q/SortBy oförändrade (ADR 0039 Beslut 3 kärnresonemang hålls). VO-invarianter
+// speglar ListJobAdsQueryValidator så en sparad sökning aldrig kan vara mer
+// tillåtande än motsvarande live-sökning.
+//
+// RÖD tills SearchCriteria.cs implementerar list-signatur + fyra invarianter.
+// Kompilerar mot ny signatur (annars blockeras impl-bygget).
 public class SearchCriteriaTests
 {
     // ---------------------------------------------------------------
-    // Happy path + minst-ett-kriterium
+    // Happy path + minst-ett-kriterium (list-form)
     // ---------------------------------------------------------------
 
     [Fact]
     public void Create_WithSsykOnly_ReturnsSuccess()
     {
-        var result = SearchCriteria.Create("12345", null, null, JobAdSortBy.PublishedAtDesc);
+        var result = SearchCriteria.Create(["12345"], null, null, JobAdSortBy.PublishedAtDesc);
 
         result.IsSuccess.ShouldBeTrue();
-        result.Value.Ssyk.ShouldBe("12345");
-        result.Value.Region.ShouldBeNull();
+        result.Value.Ssyk.ShouldBe(["12345"]);
+        result.Value.Region.ShouldBeEmpty();
         result.Value.Q.ShouldBeNull();
         result.Value.SortBy.ShouldBe(JobAdSortBy.PublishedAtDesc);
     }
@@ -27,10 +32,11 @@ public class SearchCriteriaTests
     [Fact]
     public void Create_WithRegionOnly_ReturnsSuccess()
     {
-        var result = SearchCriteria.Create(null, "stockholm_AB", null, JobAdSortBy.PublishedAtDesc);
+        var result = SearchCriteria.Create(null, ["stockholm_AB"], null, JobAdSortBy.PublishedAtDesc);
 
         result.IsSuccess.ShouldBeTrue();
-        result.Value.Region.ShouldBe("stockholm_AB");
+        result.Value.Region.ShouldBe(["stockholm_AB"]);
+        result.Value.Ssyk.ShouldBeEmpty();
     }
 
     [Fact]
@@ -40,26 +46,223 @@ public class SearchCriteriaTests
 
         result.IsSuccess.ShouldBeTrue();
         result.Value.Q.ShouldBe("backend");
+        result.Value.Ssyk.ShouldBeEmpty();
+        result.Value.Region.ShouldBeEmpty();
     }
 
     [Fact]
     public void Create_WithAllCriteria_ReturnsSuccess()
     {
-        var result = SearchCriteria.Create("12345", "stockholm", "backend", JobAdSortBy.ExpiresAtAsc);
+        var result = SearchCriteria.Create(
+            ["12345", "67890"], ["stockholm", "uppsala"], "backend", JobAdSortBy.ExpiresAtAsc);
 
         result.IsSuccess.ShouldBeTrue();
-        result.Value.Ssyk.ShouldBe("12345");
-        result.Value.Region.ShouldBe("stockholm");
+        result.Value.Ssyk.ShouldBe(["12345", "67890"]);
+        result.Value.Region.ShouldBe(["stockholm", "uppsala"]);
         result.Value.Q.ShouldBe("backend");
         result.Value.SortBy.ShouldBe(JobAdSortBy.ExpiresAtAsc);
     }
 
+    [Fact]
+    public void Create_WithMultiSsyk_ReturnsSuccess()
+    {
+        // Genuint Fas 2-produktbehov (ADR 0042): OR-bevakning över yrken.
+        var result = SearchCriteria.Create(
+            ["systemutvecklare", "frontendutvecklare"], null, null, JobAdSortBy.PublishedAtDesc);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.Ssyk.Count.ShouldBe(2);
+    }
+
     // ---------------------------------------------------------------
-    // Tom-validering — alla null/whitespace
+    // Invariant 1 — Normalisering: trim + drop tom/whitespace + distinct
+    //                ordinal + sorterad ordinal
     // ---------------------------------------------------------------
 
     [Fact]
-    public void Create_WithAllNull_ReturnsFailure()
+    public void Create_NormalizesSsyk_SortedDistinctOrdinal()
+    {
+        var result = SearchCriteria.Create(
+            ["b", "a", "b", " c "], null, null, JobAdSortBy.PublishedAtDesc);
+
+        result.IsSuccess.ShouldBeTrue();
+        // distinct + sorterad ordinal + trim
+        result.Value.Ssyk.ShouldBe(["a", "b", "c"]);
+    }
+
+    [Fact]
+    public void Create_NormalizesRegion_SortedDistinctOrdinal()
+    {
+        var result = SearchCriteria.Create(
+            null, ["uppsala", "stockholm", "uppsala"], null, JobAdSortBy.PublishedAtDesc);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.Region.ShouldBe(["stockholm", "uppsala"]);
+    }
+
+    [Fact]
+    public void Create_DropsEmptyAndWhitespaceElements()
+    {
+        // Tomma/whitespace-element droppas; minst ett giltigt kvar → success.
+        var result = SearchCriteria.Create(
+            ["12345", "", "   ", "67890"], null, null, JobAdSortBy.PublishedAtDesc);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.Ssyk.ShouldBe(["12345", "67890"]);
+    }
+
+    [Fact]
+    public void Create_OrdinalSort_IsCaseSensitive()
+    {
+        // Ordinal-sortering: versaler före gemener (ASCII). Säkerställer
+        // deterministisk ordning för jsonb-dedupe oavsett input-ordning.
+        var a = SearchCriteria.Create(
+            ["zebra", "Apple"], null, null, JobAdSortBy.PublishedAtDesc).Value;
+        var b = SearchCriteria.Create(
+            ["Apple", "zebra"], null, null, JobAdSortBy.PublishedAtDesc).Value;
+
+        a.Ssyk.ShouldBe(b.Ssyk);
+        // ordinal: 'A' (65) < 'z' (122)
+        a.Ssyk[0].ShouldBe("Apple");
+    }
+
+    // ---------------------------------------------------------------
+    // Invariant 2 — Equality strukturell (SequenceEqual ordinal).
+    //                Record + IReadOnlyList får default REFERENS-equality →
+    //                MÅSTE överridas. Detta är SavedSearch jsonb-dedupe-grunden.
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public void TwoCriteria_SameElementsDifferentOrder_AreValueEqual()
+    {
+        // KRITISKT: jsonb-dedupe vilar på detta. Normalisering gör att samma
+        // element i olika ordning producerar strukturellt lika VO:n.
+        var a = SearchCriteria.Create(
+            ["b", "a"], ["x", "y"], "backend", JobAdSortBy.PublishedAtDesc).Value;
+        var b = SearchCriteria.Create(
+            ["a", "b"], ["y", "x"], "backend", JobAdSortBy.PublishedAtDesc).Value;
+
+        a.Equals(b).ShouldBeTrue();
+        (a == b).ShouldBeTrue();
+        a.GetHashCode().ShouldBe(b.GetHashCode());
+        a.ShouldBe(b);
+    }
+
+    [Fact]
+    public void TwoCriteria_DifferentSsykElements_AreNotValueEqual()
+    {
+        var a = SearchCriteria.Create(["12345"], null, null, JobAdSortBy.PublishedAtDesc).Value;
+        var b = SearchCriteria.Create(["99999"], null, null, JobAdSortBy.PublishedAtDesc).Value;
+
+        a.Equals(b).ShouldBeFalse();
+        (a == b).ShouldBeFalse();
+        a.ShouldNotBe(b);
+    }
+
+    [Fact]
+    public void TwoCriteria_DifferentSsykCount_AreNotValueEqual()
+    {
+        var a = SearchCriteria.Create(["12345"], null, null, JobAdSortBy.PublishedAtDesc).Value;
+        var b = SearchCriteria.Create(["12345", "67890"], null, null, JobAdSortBy.PublishedAtDesc).Value;
+
+        a.ShouldNotBe(b);
+    }
+
+    [Fact]
+    public void CriteriaDifferingOnlyByQ_AreNotValueEqual()
+    {
+        var a = SearchCriteria.Create(["12345"], null, "backend", JobAdSortBy.PublishedAtDesc).Value;
+        var b = SearchCriteria.Create(["12345"], null, "frontend", JobAdSortBy.PublishedAtDesc).Value;
+
+        a.ShouldNotBe(b);
+    }
+
+    [Fact]
+    public void CriteriaDifferingOnlyBySortBy_AreNotValueEqual()
+    {
+        // SortBy ingår i identiteten (ADR 0039 Beslut 3 hålls).
+        var a = SearchCriteria.Create(["12345"], null, null, JobAdSortBy.PublishedAtDesc).Value;
+        var b = SearchCriteria.Create(["12345"], null, null, JobAdSortBy.PublishedAtAsc).Value;
+
+        a.ShouldNotBe(b);
+    }
+
+    [Fact]
+    public void TrimNormalizedCriteria_AreValueEqualToUntrimmed()
+    {
+        var a = SearchCriteria.Create(["  12345  "], null, null, JobAdSortBy.PublishedAtDesc).Value;
+        var b = SearchCriteria.Create(["12345"], null, null, JobAdSortBy.PublishedAtDesc).Value;
+
+        a.ShouldBe(b);
+        a.GetHashCode().ShouldBe(b.GetHashCode());
+    }
+
+    [Fact]
+    public void DuplicateElements_NormalizeToSame_AreValueEqual()
+    {
+        var a = SearchCriteria.Create(["12345", "12345"], null, null, JobAdSortBy.PublishedAtDesc).Value;
+        var b = SearchCriteria.Create(["12345"], null, null, JobAdSortBy.PublishedAtDesc).Value;
+
+        a.ShouldBe(b);
+    }
+
+    // ---------------------------------------------------------------
+    // Invariant 3 — Maxantal-cap = 10 per lista (Domain-konstant)
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public void Create_WithExactlyTenSsyk_ReturnsSuccess()
+    {
+        var ten = Enumerable.Range(1, 10).Select(i => $"ssyk{i}").ToArray();
+
+        var result = SearchCriteria.Create(ten, null, null, JobAdSortBy.PublishedAtDesc);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.Ssyk.Count.ShouldBe(10);
+    }
+
+    [Fact]
+    public void Create_WithElevenSsyk_ReturnsFailure()
+    {
+        var eleven = Enumerable.Range(1, 11).Select(i => $"ssyk{i}").ToArray();
+
+        var result = SearchCriteria.Create(eleven, null, null, JobAdSortBy.PublishedAtDesc);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe("SearchCriteria.TooManySsyk");
+    }
+
+    [Fact]
+    public void Create_WithElevenRegion_ReturnsFailure()
+    {
+        var eleven = Enumerable.Range(1, 11).Select(i => $"reg{i}").ToArray();
+
+        var result = SearchCriteria.Create(null, eleven, null, JobAdSortBy.PublishedAtDesc);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe("SearchCriteria.TooManyRegion");
+    }
+
+    [Fact]
+    public void Create_CapAppliesAfterDistinct_ElevenWithDuplicateUnderCap_ReturnsSuccess()
+    {
+        // 11 råelement varav 1 dubblett → 10 distinkta → under cap → success.
+        var raw = Enumerable.Range(1, 10).Select(i => $"ssyk{i}").ToList();
+        raw.Add("ssyk1"); // dubblett
+
+        var result = SearchCriteria.Create(raw, null, null, JobAdSortBy.PublishedAtDesc);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.Ssyk.Count.ShouldBe(10);
+    }
+
+    // ---------------------------------------------------------------
+    // Invariant 4 — Tom-invariant generaliserad. Tomma listor + null/
+    //                whitespace Q → SearchCriteria.Empty.
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public void Create_WithAllNull_ReturnsEmptyFailure()
     {
         var result = SearchCriteria.Create(null, null, null, JobAdSortBy.PublishedAtDesc);
 
@@ -67,66 +270,94 @@ public class SearchCriteriaTests
         result.Error.Code.ShouldBe("SearchCriteria.Empty");
     }
 
-    [Theory]
-    [InlineData("", "", "")]
-    [InlineData("   ", "  ", " ")]
-    [InlineData(null, "  ", null)]
-    public void Create_WithOnlyWhitespaceCriteria_ReturnsEmptyFailure(
-        string? ssyk, string? region, string? q)
+    [Fact]
+    public void Create_WithEmptyListsAndNullQ_ReturnsEmptyFailure()
     {
-        var result = SearchCriteria.Create(ssyk, region, q, JobAdSortBy.PublishedAtDesc);
+        var result = SearchCriteria.Create([], [], null, JobAdSortBy.PublishedAtDesc);
 
         result.IsFailure.ShouldBeTrue();
         result.Error.Code.ShouldBe("SearchCriteria.Empty");
     }
 
+    [Fact]
+    public void Create_WithOnlyWhitespaceElementsAndWhitespaceQ_ReturnsEmptyFailure()
+    {
+        // Tom efter normalisering (alla element whitespace) + whitespace Q
+        // = inget filter = SearchCriteria.Empty.
+        var result = SearchCriteria.Create(
+            ["", "  "], [" "], "   ", JobAdSortBy.PublishedAtDesc);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe("SearchCriteria.Empty");
+    }
+
+    [Fact]
+    public void Create_WithEmptyListsButQNonNull_ReturnsSuccess()
+    {
+        var result = SearchCriteria.Create([], [], "backend", JobAdSortBy.PublishedAtDesc);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.Ssyk.ShouldBeEmpty();
+        result.Value.Region.ShouldBeEmpty();
+        result.Value.Q.ShouldBe("backend");
+    }
+
+    [Fact]
+    public void Create_WithOneNonEmptyListAndNullQ_ReturnsSuccess()
+    {
+        var result = SearchCriteria.Create(["12345"], [], null, JobAdSortBy.PublishedAtDesc);
+
+        result.IsSuccess.ShouldBeTrue();
+    }
+
     // ---------------------------------------------------------------
-    // Ssyk-format (concept-id-regex ^[A-Za-z0-9_-]{1,32}$)
+    // Invariant 5 — Per-element regex ^[A-Za-z0-9_-]{1,32}$
     // ---------------------------------------------------------------
 
     [Theory]
     [InlineData("has space")]
     [InlineData("åäö")]
     [InlineData("semi;colon")]
+    [InlineData("dot.notation")]
+    [InlineData("plus+sign")]
     [InlineData("123456789012345678901234567890123")] // 33 tecken > 32
-    public void Create_WithInvalidSsyk_ReturnsFailure(string ssyk)
+    public void Create_WithInvalidSsykElement_ReturnsFailure(string bad)
     {
-        var result = SearchCriteria.Create(ssyk, null, null, JobAdSortBy.PublishedAtDesc);
+        // Ett ogiltigt element bland giltiga → hela Create faller.
+        var result = SearchCriteria.Create(
+            ["12345", bad], null, null, JobAdSortBy.PublishedAtDesc);
 
         result.IsFailure.ShouldBeTrue();
         result.Error.Code.ShouldBe("SearchCriteria.InvalidSsyk");
     }
 
     [Theory]
-    [InlineData("a")]
-    [InlineData("ABC-123_xyz")]
-    [InlineData("12345678901234567890123456789012")] // exakt 32 tecken
-    public void Create_WithValidSsykFormat_ReturnsSuccess(string ssyk)
-    {
-        var result = SearchCriteria.Create(ssyk, null, null, JobAdSortBy.PublishedAtDesc);
-
-        result.IsSuccess.ShouldBeTrue();
-        result.Value.Ssyk.ShouldBe(ssyk);
-    }
-
-    // ---------------------------------------------------------------
-    // Region-format (samma concept-id-regex)
-    // ---------------------------------------------------------------
-
-    [Theory]
     [InlineData("region space")]
     [InlineData("åäö")]
-    [InlineData("123456789012345678901234567890123")] // 33 tecken
-    public void Create_WithInvalidRegion_ReturnsFailure(string region)
+    [InlineData("123456789012345678901234567890123")]
+    public void Create_WithInvalidRegionElement_ReturnsFailure(string bad)
     {
-        var result = SearchCriteria.Create(null, region, null, JobAdSortBy.PublishedAtDesc);
+        var result = SearchCriteria.Create(
+            null, ["stockholm", bad], null, JobAdSortBy.PublishedAtDesc);
 
         result.IsFailure.ShouldBeTrue();
         result.Error.Code.ShouldBe("SearchCriteria.InvalidRegion");
     }
 
+    [Theory]
+    [InlineData("a")]
+    [InlineData("ABC-123_xyz")]
+    [InlineData("12345678901234567890123456789012")] // exakt 32 tecken
+    public void Create_WithValidSsykElementFormat_ReturnsSuccess(string ssyk)
+    {
+        var result = SearchCriteria.Create([ssyk], null, null, JobAdSortBy.PublishedAtDesc);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.Ssyk.ShouldBe([ssyk]);
+    }
+
     // ---------------------------------------------------------------
-    // Q-längd (2-100 tecken)
+    // Q oförändrat — 2-100 tecken-regeln kvar
     // ---------------------------------------------------------------
 
     [Fact]
@@ -141,7 +372,8 @@ public class SearchCriteriaTests
     [Fact]
     public void Create_WithQTooLong_ReturnsFailure()
     {
-        var result = SearchCriteria.Create(null, null, new string('x', 101), JobAdSortBy.PublishedAtDesc);
+        var result = SearchCriteria.Create(
+            null, null, new string('x', 101), JobAdSortBy.PublishedAtDesc);
 
         result.IsFailure.ShouldBeTrue();
         result.Error.Code.ShouldBe("SearchCriteria.InvalidQ");
@@ -161,7 +393,7 @@ public class SearchCriteriaTests
     [Fact]
     public void Create_WithQAtMaxLength_ReturnsSuccess()
     {
-        var q = new string('x', 100); // exakt max 100
+        var q = new string('x', 100);
         var result = SearchCriteria.Create(null, null, q, JobAdSortBy.PublishedAtDesc);
 
         result.IsSuccess.ShouldBeTrue();
@@ -169,86 +401,15 @@ public class SearchCriteriaTests
     }
 
     // ---------------------------------------------------------------
-    // SortBy — Enum.IsDefined
+    // SortBy — Enum.IsDefined (oförändrat)
     // ---------------------------------------------------------------
 
     [Fact]
     public void Create_WithUndefinedSortBy_ReturnsFailure()
     {
-        var result = SearchCriteria.Create("12345", null, null, (JobAdSortBy)999);
+        var result = SearchCriteria.Create(["12345"], null, null, (JobAdSortBy)999);
 
         result.IsFailure.ShouldBeTrue();
         result.Error.Code.ShouldBe("SearchCriteria.InvalidSortBy");
-    }
-
-    // ---------------------------------------------------------------
-    // Trim-normalisering
-    // ---------------------------------------------------------------
-
-    [Fact]
-    public void Create_TrimsAllCriteria()
-    {
-        var result = SearchCriteria.Create("  12345  ", "  stockholm  ", "  backend  ",
-            JobAdSortBy.PublishedAtDesc);
-
-        result.IsSuccess.ShouldBeTrue();
-        result.Value.Ssyk.ShouldBe("12345");
-        result.Value.Region.ShouldBe("stockholm");
-        result.Value.Q.ShouldBe("backend");
-    }
-
-    [Fact]
-    public void Create_NormalizesWhitespaceFieldsToNull()
-    {
-        // Region whitespace → null, men ssyk satt → fortfarande giltig
-        var result = SearchCriteria.Create("12345", "   ", null, JobAdSortBy.PublishedAtDesc);
-
-        result.IsSuccess.ShouldBeTrue();
-        result.Value.Region.ShouldBeNull();
-    }
-
-    // ---------------------------------------------------------------
-    // Värde-likhet (record → Evans 2003 kap. 5)
-    // ---------------------------------------------------------------
-
-    [Fact]
-    public void TwoIdenticalCriteria_AreValueEqual()
-    {
-        var a = SearchCriteria.Create("12345", "stockholm", "backend", JobAdSortBy.PublishedAtDesc).Value;
-        var b = SearchCriteria.Create("12345", "stockholm", "backend", JobAdSortBy.PublishedAtDesc).Value;
-
-        a.ShouldBe(b);
-        (a == b).ShouldBeTrue();
-        a.GetHashCode().ShouldBe(b.GetHashCode());
-    }
-
-    [Fact]
-    public void TwoDifferentCriteria_AreNotValueEqual()
-    {
-        var a = SearchCriteria.Create("12345", null, null, JobAdSortBy.PublishedAtDesc).Value;
-        var b = SearchCriteria.Create("99999", null, null, JobAdSortBy.PublishedAtDesc).Value;
-
-        a.ShouldNotBe(b);
-        (a == b).ShouldBeFalse();
-    }
-
-    [Fact]
-    public void CriteriaDifferingOnlyBySortBy_AreNotValueEqual()
-    {
-        // SortBy ingår i identiteten (determinerar paginerat resultat).
-        var a = SearchCriteria.Create("12345", null, null, JobAdSortBy.PublishedAtDesc).Value;
-        var b = SearchCriteria.Create("12345", null, null, JobAdSortBy.PublishedAtAsc).Value;
-
-        a.ShouldNotBe(b);
-    }
-
-    [Fact]
-    public void TrimNormalizedCriteria_AreValueEqualToUntrimmed()
-    {
-        // Normalisering gör att "  12345  " och "12345" producerar lika VO:n.
-        var a = SearchCriteria.Create("  12345  ", null, null, JobAdSortBy.PublishedAtDesc).Value;
-        var b = SearchCriteria.Create("12345", null, null, JobAdSortBy.PublishedAtDesc).Value;
-
-        a.ShouldBe(b);
     }
 }

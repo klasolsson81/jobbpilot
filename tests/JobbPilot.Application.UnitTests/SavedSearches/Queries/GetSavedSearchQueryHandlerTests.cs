@@ -25,7 +25,7 @@ public class GetSavedSearchQueryHandlerTests
     {
         var seeker = JobSeeker.Register(userId, "Test User", FakeDateTimeProvider.Default).Value;
         db.JobSeekers.Add(seeker);
-        var criteria = SearchCriteria.Create("12345", "stockholm", "backend",
+        var criteria = SearchCriteria.Create(["12345"], ["stockholm"], "backend",
             JobAdSortBy.PublishedAtDesc).Value;
         var saved = SavedSearch.Create(seeker.Id, "Mitt sök", criteria, true,
             FakeDateTimeProvider.Default).Value;
@@ -48,7 +48,9 @@ public class GetSavedSearchQueryHandlerTests
         result.ShouldNotBeNull();
         result!.Id.ShouldBe(saved.Id.Value);
         result.Name.ShouldBe("Mitt sök");
-        result.Ssyk.ShouldBe("12345");
+        // Batch 3 (ADR 0042 Beslut B): DTO.Ssyk projiceras från VO:ns
+        // IReadOnlyList<string>. Single seeded element ⇒ ett-element-lista.
+        result.Ssyk.ShouldBe(["12345"]);
         result.NotificationEnabled.ShouldBeTrue();
     }
 

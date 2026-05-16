@@ -16,7 +16,7 @@ public sealed class ListJobAdsQueryHandler(IAppDbContext db)
         // med RunSavedSearchQueryHandler). Handlern är en tunn adapter som
         // mappar sitt query-record till den delade komposition.
         var baseQuery = JobAdSearch.ApplyCriteria(
-            db.JobAds.AsNoTracking(), query.Ssyk, query.Region, query.Q);
+            db.JobAds.AsNoTracking(), query.Ssyk ?? [], query.Region ?? [], query.Q);
 
         // Separat count-query per CLAUDE.md §3.6. Filter appliceras före count
         // så totalen reflekterar filtrerad mängd, inte totalt antal annonser.

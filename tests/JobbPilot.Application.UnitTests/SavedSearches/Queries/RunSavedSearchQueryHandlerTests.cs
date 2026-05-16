@@ -38,9 +38,14 @@ public class RunSavedSearchQueryHandlerTests
         var seeker = JobSeeker.Register(userId, "Test User", FakeDateTimeProvider.Default).Value;
         db.JobSeekers.Add(seeker);
         // Default: q=null,region=null kräver minst ett kriterium → ssyk default.
+        // Single-element-lista ⇒ samma beteende som gammalt single-värde
+        // (ADR 0039 Beslut 1 SPOT — regressions-grind).
+        var ssykList = ssyk is not null
+            ? new[] { ssyk }
+            : q is null && region is null ? ["12345"] : System.Array.Empty<string>();
+        var regionList = region is not null ? new[] { region } : System.Array.Empty<string>();
         var criteria = SearchCriteria.Create(
-            ssyk ?? (q is null && region is null ? "12345" : null),
-            region, q, JobAdSortBy.PublishedAtDesc).Value;
+            ssykList, regionList, q, JobAdSortBy.PublishedAtDesc).Value;
         var saved = SavedSearch.Create(seeker.Id, "Kör mig", criteria, false,
             FakeDateTimeProvider.Default).Value;
         db.SavedSearches.Add(saved);

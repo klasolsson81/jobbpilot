@@ -29,8 +29,8 @@ public class SavedSearchesTests(ApiFactory factory)
     private static object CreateBody(string name) => new
     {
         name,
-        ssyk = "12345",
-        region = (string?)null,
+        ssyk = new[] { "12345" },          // ADR 0042 Beslut B — multi (array)
+        region = (string[]?)null,
         q = "backend",
         sortBy = 0,
         notificationEnabled = false,

@@ -17,7 +17,7 @@ public class SavedSearchTests
     private const string ValidName = "Backend i Stockholm";
 
     private static SearchCriteria ValidCriteria() =>
-        SearchCriteria.Create("12345", "stockholm", "backend", JobAdSortBy.PublishedAtDesc).Value;
+        SearchCriteria.Create(["12345"], ["stockholm"], "backend", JobAdSortBy.PublishedAtDesc).Value;
 
     private static SavedSearch CreateValid() =>
         SavedSearch.Create(ValidJobSeekerId, ValidName, ValidCriteria(), false, Clock).Value;
@@ -174,7 +174,7 @@ public class SavedSearchTests
     {
         var savedSearch = CreateValid();
         var later = FakeDateTimeProvider.At(Clock.UtcNow.AddHours(2));
-        var newCriteria = SearchCriteria.Create("99999", null, null, JobAdSortBy.PublishedAtAsc).Value;
+        var newCriteria = SearchCriteria.Create(["99999"], null, null, JobAdSortBy.PublishedAtAsc).Value;
 
         var result = savedSearch.UpdateCriteria(newCriteria, later);
 

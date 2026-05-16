@@ -15,7 +15,7 @@ public class CreateSavedSearchCommandValidatorTests
     public void Validate_WithValidCommand_IsValid()
     {
         var result = _validator.Validate(new CreateSavedSearchCommand(
-            "Mitt sök", "12345", null, null, JobAdSortBy.PublishedAtDesc, false));
+            "Mitt sök", ["12345"], null, null, JobAdSortBy.PublishedAtDesc, false));
         result.IsValid.ShouldBeTrue();
     }
 
@@ -25,7 +25,7 @@ public class CreateSavedSearchCommandValidatorTests
     public void Validate_WithEmptyName_IsInvalid(string name)
     {
         var result = _validator.Validate(new CreateSavedSearchCommand(
-            name, "12345", null, null, JobAdSortBy.PublishedAtDesc, false));
+            name, ["12345"], null, null, JobAdSortBy.PublishedAtDesc, false));
         result.IsValid.ShouldBeFalse();
     }
 
@@ -33,7 +33,7 @@ public class CreateSavedSearchCommandValidatorTests
     public void Validate_WithNameTooLong_IsInvalid()
     {
         var result = _validator.Validate(new CreateSavedSearchCommand(
-            new string('x', SavedSearch.NameMaxLength + 1), "12345", null, null,
+            new string('x', SavedSearch.NameMaxLength + 1), ["12345"], null, null,
             JobAdSortBy.PublishedAtDesc, false));
         result.IsValid.ShouldBeFalse();
     }
@@ -42,7 +42,7 @@ public class CreateSavedSearchCommandValidatorTests
     public void Validate_WithUndefinedSortBy_IsInvalid()
     {
         var result = _validator.Validate(new CreateSavedSearchCommand(
-            "Mitt sök", "12345", null, null, (JobAdSortBy)999, false));
+            "Mitt sök", ["12345"], null, null, (JobAdSortBy)999, false));
         result.IsValid.ShouldBeFalse();
     }
 }
@@ -89,7 +89,7 @@ public class UpdateSavedSearchCommandValidatorTests
     {
         var result = _validator.Validate(new UpdateSavedSearchCommand(
             Guid.NewGuid(), null, null,
-            new SavedSearchCriteriaInput("12345", null, null, (JobAdSortBy)999)));
+            new SavedSearchCriteriaInput(["12345"], null, null, (JobAdSortBy)999)));
         result.IsValid.ShouldBeFalse();
     }
 }

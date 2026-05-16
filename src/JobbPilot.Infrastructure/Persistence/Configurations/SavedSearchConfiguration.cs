@@ -28,12 +28,18 @@ public sealed class SavedSearchConfiguration : IEntityTypeConfiguration<SavedSea
             .HasMaxLength(SavedSearch.NameMaxLength)
             .IsRequired();
 
-        // ADR 0039 §16 — criteria jsonb. Owned-type-to-json speglar
-        // JobSeekerConfiguration.Preferences-mönstret (.ToJson()).
-        builder.OwnsOne(s => s.Criteria, criteria =>
-        {
-            criteria.ToJson();
-        });
+        // ADR 0039 §16 — criteria jsonb. ADR 0042 Beslut B (CTO Yta A3
+        // 2026-05-16): Ssyk/Region single→multi. `OwnsOne(...).ToJson()` mappar
+        // inte IReadOnlyList<string> stabilt i Npgsql (#3129) → property-level
+        // ValueConverter mot jsonb-kolumn med tolerant default-deny-converter
+        // (läser gammal skalär + ny array, ingen data-migration). Comparern
+        // bär VO:ts strukturella record-equality (SavedSearch jsonb-dedupe).
+        var criteria = builder.Property(s => s.Criteria)
+            .HasConversion(SearchCriteriaConversion.Converter)
+            .HasColumnType("jsonb")
+            .HasColumnName("criteria")
+            .IsRequired();
+        criteria.Metadata.SetValueComparer(SearchCriteriaConversion.Comparer);
 
         builder.Property(s => s.NotificationEnabled)
             .IsRequired()
