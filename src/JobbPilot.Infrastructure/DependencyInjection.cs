@@ -147,10 +147,9 @@ public static class DependencyInjection
         return services;
     }
 
-    // Process-wide rate-limiter för JobStream (1 req/min, ingen queue). FixedWindow
-    // är rätt val per dotnet-architect 2026-05-12 — vi accepterar att burst-anrop
-    // misslyckas direkt (QueueLimit=0), bättre än att queueras och eskalera till
-    // JobTech:s 429.
+    // Process-wide rate-limiter för JobStream (1 req/min). FixedWindow är rätt val
+    // per dotnet-architect 2026-05-12. QueueLimit=2 (motiverat vid fältet nedan)
+    // serialiserar stream/snapshot-krock mot 1/min istället för hård rejection.
     //
     // TESTBARHETSNOT (code-reviewer 2026-05-12 Min-3): static-livscykel betyder att
     // alla tester som använder hela DI-stacken delar samma limiter över hela test-
@@ -159,12 +158,19 @@ public static class DependencyInjection
     // P8c-Hangfire-jobben kommer dela samma limiter i prod, vilket är den
     // önskade semantiken. IDisposable-warning vid host-shutdown är accepterad
     // bagatell — limitern lever app-lifetime.
+    // QueueLimit=2 (var 0): stream(*/10) + snapshot(0 2) krockar på JobTechs
+    // 1-req/min-gräns kl 02:00. Med QueueLimit=0 fick förloraren hård
+    // RateLimiterRejected → 3 retries inom samma fönster → jobb-fail. Nu
+    // serialiseras de mot 1/min istället (root-cause-fix 2026-05-16 del (b),
+    // senior-cto-advisor + dotnet-architect). Worst-case väntan QueueLimit×Window
+    // = 2 min; CancellationToken bryter väntan. OldestFirst = FIFO-rättvisa.
     private static readonly FixedWindowRateLimiter _streamRateLimiter = new(
         new FixedWindowRateLimiterOptions
         {
             PermitLimit = 1,
             Window = TimeSpan.FromMinutes(1),
-            QueueLimit = 0,
+            QueueLimit = 2,
+            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
             AutoReplenishment = true,
         });
 
