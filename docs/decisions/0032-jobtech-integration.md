@@ -547,3 +547,58 @@ Original §8 specade ett `JobAdsSyncedDomainEvent` som skulle skrivas till `audi
 - `docs/runbooks/recruiter-pii-erasure.md` — operativ procedur
 - `docs/runbooks/gdpr-processing-register.md` — JobTech-entry
 - senior-cto-advisor 2026-05-13 (TD-73-batch, 13 beslut entydigt mot principer)
+
+---
+
+## Amendment 2026-05-16 — §5 clarification: batch-orchestrator MÅSTE köra child-scope per item
+
+**Datum:** 2026-05-16
+**Källa:** Root-cause-utredning F2 jobb-ingestion-gap (~5k av ~47k annonser)
+**Trigger:** CloudWatch-evidens `/aws/ecs/jobbpilot-dev/worker` — `SyncPlatsbankenSnapshotJob` 60 starts / 0 completes över 4 dygn
+**Beslutsfattare:** senior-cto-advisor 2026-05-16 (Variant B, entydigt mot principer) + Klas Olsson (godkänd 2026-05-16)
+
+### Kontext
+
+§5:s dedup-flöde (optimistisk INSERT + `DbUpdateException`-catch på 23505 +
+reload + `UpdateFromSource`) är korrekt **men förutsätter implicit
+single-command-scope per item**. `UpsertExternalJobAdCommandHandler`s catch
+isolerar bara om `SaveChanges` opererar över *en* entitet.
+
+`SyncPlatsbankenSnapshotJob` körde hela ~47k-snapshot-loopen i EN DI-scope →
+ett scoped `IAppDbContext` vars EF change-tracker ackumulerade över alla items.
+`UnitOfWorkBehavior` kör dessutom en andra `SaveChangesAsync` efter varje
+`mediator.Send`, utanför handlerns try/catch, över hela den ackumulerade grafen.
+När snapshot ⊇ det stream redan infogat (tusentals dubbletter) gav första
+kollisionen en 23505 som per-command-catchen inte kunde isolera vid batch-skala
+→ uncaught `DbUpdateException` → `Hangfire.AutomaticRetry`-loop. Korpus
+fastnade på stream-ackumulerade ~5k.
+
+### Clarification (förtydligar §5, ändrar inte dedup-mekaniken)
+
+§5:s upsert-flöde förutsätter **single-command-scope per item** — handlerns
+23505-catch isolerar endast om `SaveChanges` opererar över *en* entitet.
+Batch-orchestratorer (snapshot, ~47k items) MÅSTE därför köra **child-scope
+per item** via `IServiceScopeFactory.CreateAsyncScope()` (eget
+`IAppDbContext` → change-tracker lever och dör med ett item). Annars bryter
+ackumulerad EF change-tracker + `UnitOfWorkBehavior`-SaveChanges
+per-command-isoleringen → uncaught 23505. Verifierat: 60 starts / 0 completes
+på dev innan fixen (commit `347b238` 2026-05-16).
+
+UNIQUE-index, catch, reload, `Detach`, `IDbExceptionInspector` — allt
+oförändrat. Detta är "få §5 att faktiskt fungera vid batch-skala", inte ny
+dedup-strategi.
+
+### Implementations-trail
+
+- `src/JobbPilot.Application/JobAds/Jobs/SyncPlatsbanken/SyncPlatsbankenSnapshotJob.cs` (child-scope per item)
+- `src/JobbPilot.Application/JobAds/Abstractions/IJobSource.cs` + `JobTechStreamClient` (IAsyncEnumerable-streaming, ~300 MB-OOM-defekt — del a)
+- `src/JobbPilot.Infrastructure/DependencyInjection.cs` (`_streamRateLimiter` QueueLimit 0→2 — del b)
+- Regressionstest `RunAsync_WhenSnapshotContainsDuplicates_IsolatesPerItemScope_AndCompletes`
+- Commits `347b238` + `70a7c54` (2026-05-16)
+
+### Referenser
+
+- Martin Fowler, *PoEAA* (2002) — "Unit of Work" (UoW-gräns = en logiskt atomär förändring)
+- Robert C. Martin, *Clean Architecture* (2017) kap. 7 (SRP)
+- Microsoft Learn — *Handle concurrency conflicts* (EF Core)
+- senior-cto-advisor 2026-05-16 (Variant B, root-cause-fix)
