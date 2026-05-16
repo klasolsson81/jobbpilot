@@ -1,4 +1,5 @@
 using FluentValidation;
+using JobbPilot.Domain.SavedSearches;
 
 namespace JobbPilot.Application.JobAds.Queries.ListJobAds;
 
@@ -7,6 +8,9 @@ public sealed class ListJobAdsQueryValidator : AbstractValidator<ListJobAdsQuery
     // JobTech v2 concept-id-format: kort sträng, alfanumerisk + `_-`, observerade
     // exempel ~12 tecken (`MVqp_eS8_kDZ`). Sätter 1-32 som defense-in-depth-yta
     // (Saltzer/Schroeder 1975 default-deny). CTO-rond 2026-05-13 Q7a/Q7b.
+    // ADR 0042 Beslut B — multi: per-element-regex + maxantal-cap speglar
+    // SearchCriteria.Create (Domain = sanningskälla; detta = defense-in-depth
+    // pre-handler-yta, samma mönster som single-värde-validatorn hade).
     private const string ConceptIdPattern = @"^[A-Za-z0-9_-]{1,32}$";
 
     public ListJobAdsQueryValidator()
@@ -15,14 +19,26 @@ public sealed class ListJobAdsQueryValidator : AbstractValidator<ListJobAdsQuery
         RuleFor(q => q.PageSize).InclusiveBetween(1, 100);
         RuleFor(q => q.SortBy).IsInEnum();
 
-        RuleFor(q => q.Ssyk)
+        // Maxantal-cap (invariant 2) — IN(...)-blowup/jsonb-stuffing-DoS-tak.
+        // Refererar Domain-konstanten (single source).
+        RuleFor(q => q.Ssyk!)
+            .Must(l => l.Count <= SearchCriteria.MaxConceptIds)
+            .When(q => q.Ssyk is not null)
+            .WithMessage($"Max {SearchCriteria.MaxConceptIds} yrkesområden per sökning.");
+
+        RuleForEach(q => q.Ssyk)
             .Matches(ConceptIdPattern)
-            .When(q => !string.IsNullOrWhiteSpace(q.Ssyk))
+            .When(q => q.Ssyk is not null)
             .WithMessage("Ssyk måste vara en giltig JobTech concept-id (1-32 tecken, alfanumeriskt + _-).");
 
-        RuleFor(q => q.Region)
+        RuleFor(q => q.Region!)
+            .Must(l => l.Count <= SearchCriteria.MaxConceptIds)
+            .When(q => q.Region is not null)
+            .WithMessage($"Max {SearchCriteria.MaxConceptIds} regioner per sökning.");
+
+        RuleForEach(q => q.Region)
             .Matches(ConceptIdPattern)
-            .When(q => !string.IsNullOrWhiteSpace(q.Region))
+            .When(q => q.Region is not null)
             .WithMessage("Region måste vara en giltig JobTech location-concept-id (1-32 tecken, alfanumeriskt + _-).");
 
         // q MinLength(2) hindrar `?q=a` (matchar närapå hela tabellen → DoS-yta).

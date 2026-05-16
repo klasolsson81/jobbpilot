@@ -27,8 +27,10 @@ public static class JobAdsEndpoints
             int page = 1,
             int pageSize = 20,
             JobAdSortBy sortBy = JobAdSortBy.PublishedAtDesc,
-            string? ssyk = null,
-            string? region = null,
+            // ADR 0042 Beslut B — multi: upprepad query-string ?ssyk=a&ssyk=b
+            // binds av ASP.NET Core minimal API till string[].
+            string[]? ssyk = null,
+            string[]? region = null,
             string? q = null,
             CancellationToken ct = default) =>
         {

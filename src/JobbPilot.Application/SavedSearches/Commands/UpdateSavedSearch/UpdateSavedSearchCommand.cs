@@ -25,8 +25,9 @@ public sealed record UpdateSavedSearchCommand(
     public Guid ExtractAggregateId(Result response) => Id;
 }
 
+// ADR 0042 Beslut B — Ssyk/Region single→multi (IReadOnlyList).
 public sealed record SavedSearchCriteriaInput(
-    string? Ssyk,
-    string? Region,
+    IReadOnlyList<string>? Ssyk,
+    IReadOnlyList<string>? Region,
     string? Q,
     JobAdSortBy SortBy);

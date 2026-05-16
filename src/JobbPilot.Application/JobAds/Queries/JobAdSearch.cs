@@ -23,19 +23,29 @@ internal static class JobAdSearch
     // Shadow-properties refereras via EF.Property<string?>(...) eftersom de
     // inte är top-level Domain-fält (Evans 2003 §14 ACL — JobTech-taxonomi
     // är inte JobbPilots ubiquitous language).
+    // ADR 0042 Beslut B — Ssyk/Region multi. Listan översätts till SQL
+    // IN(...) via list.Contains(EF.Property<string?>(...)) (klassisk EF
+    // Contains-mot-skalär-kolumn-translation; shadow-prop är text computed
+    // column, ej jsonb-array → ej npgsql/efcore.pg #3745-scenariot —
+    // verifierat via integrationstest ListJobAdsMultiFilterTests). Tom lista
+    // = inget filter (analog dagens whitespace→null). ADR 0039 Beslut 1 (SPOT)
+    // hålls — ListJobAdsQueryHandler + RunSavedSearchQueryHandler delar metoden.
     public static IQueryable<JobAd> ApplyCriteria(
-        IQueryable<JobAd> source, string? ssyk, string? region, string? q)
+        IQueryable<JobAd> source,
+        IReadOnlyList<string> ssyk,
+        IReadOnlyList<string> region,
+        string? q)
     {
-        if (!string.IsNullOrWhiteSpace(ssyk))
+        if (ssyk.Count > 0)
         {
-            var ssykValue = ssyk;
-            source = source.Where(j => EF.Property<string?>(j, "SsykConceptId") == ssykValue);
+            var ssykValues = ssyk;
+            source = source.Where(j => ssykValues.Contains(EF.Property<string?>(j, "SsykConceptId")));
         }
 
-        if (!string.IsNullOrWhiteSpace(region))
+        if (region.Count > 0)
         {
-            var regionValue = region;
-            source = source.Where(j => EF.Property<string?>(j, "RegionConceptId") == regionValue);
+            var regionValues = region;
+            source = source.Where(j => regionValues.Contains(EF.Property<string?>(j, "RegionConceptId")));
         }
 
         if (!string.IsNullOrWhiteSpace(q))

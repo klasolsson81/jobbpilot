@@ -22,7 +22,7 @@ public class ListSavedSearchesQueryHandlerTests
     private static SavedSearch NewSaved(JobSeekerId seekerId, string name) =>
         SavedSearch.Create(
             seekerId, name,
-            SearchCriteria.Create("12345", null, null, JobAdSortBy.PublishedAtDesc).Value,
+            SearchCriteria.Create(["12345"], null, null, JobAdSortBy.PublishedAtDesc).Value,
             false, FakeDateTimeProvider.Default).Value;
 
     [Fact]

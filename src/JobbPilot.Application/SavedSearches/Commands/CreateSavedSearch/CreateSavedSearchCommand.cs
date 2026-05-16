@@ -6,10 +6,12 @@ using Mediator;
 
 namespace JobbPilot.Application.SavedSearches.Commands.CreateSavedSearch;
 
+// ADR 0042 Beslut B — Ssyk/Region single→multi (IReadOnlyList). null = ej
+// angivet (SearchCriteria.Create normaliserar → tom lista = inget filter).
 public sealed record CreateSavedSearchCommand(
     string Name,
-    string? Ssyk,
-    string? Region,
+    IReadOnlyList<string>? Ssyk,
+    IReadOnlyList<string>? Region,
     string? Q,
     JobAdSortBy SortBy,
     bool NotificationEnabled)

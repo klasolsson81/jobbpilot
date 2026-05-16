@@ -85,9 +85,10 @@ public static class SavedSearchesEndpoints
         bool? NotificationEnabled,
         UpdateSavedSearchCriteriaBody? Criteria);
 
+    // ADR 0042 Beslut B — Ssyk/Region single→multi (JSON-array).
     private sealed record UpdateSavedSearchCriteriaBody(
-        string? Ssyk,
-        string? Region,
+        IReadOnlyList<string>? Ssyk,
+        IReadOnlyList<string>? Region,
         string? Q,
         JobAdSortBy SortBy);
 }

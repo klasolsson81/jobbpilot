@@ -10,9 +10,19 @@ namespace JobbPilot.Domain.SavedSearches;
 /// runtime-pagination, inte del av sökningens identitet. SortBy ingår
 /// (determinerar paginerat resultat → del av användarens avsikt).
 ///
-/// Record → värde-likhet (Evans 2003 kap. 5). Invarianter speglar
-/// ListJobAdsQueryValidator så en sparad sökning aldrig kan vara mer
-/// tillåtande än motsvarande live-sökning.
+/// <para>
+/// <b>ADR 0042 Beslut B (Accepted 2026-05-16) — Ssyk/Region single→multi:</b>
+/// <see cref="Ssyk"/>/<see cref="Region"/> är <c>IReadOnlyList&lt;string&gt;</c>
+/// (aldrig null; tom lista = inget filter). Fyra invarianter upprätthålls i
+/// <see cref="Create"/>: (1) normalisering sorterad+distinct ordinal (annars
+/// bryts SavedSearch jsonb-dedupe — record-collection-equality är referens-
+/// baserad), (2) maxantal-cap <see cref="MaxConceptIds"/> (query-blowup/
+/// IN(...)-DoS-skydd, speglas i ListJobAdsQueryValidator), (3) generaliserad
+/// tom-invariant (minst en icke-tom lista ELLER Q), (4) jsonb-bakåtkompat
+/// hanteras i Infrastructure-converter (CTO Yta A3). <c>Equals</c>/
+/// <c>GetHashCode</c> överrids explicit med ordinal sekvensjämförelse —
+/// SavedSearch jsonb-dedupe vilar på strukturell VO-likhet (Evans 2003 kap. 5).
+/// </para>
 /// </summary>
 public sealed record SearchCriteria
 {
@@ -24,8 +34,12 @@ public sealed record SearchCriteria
     private const int QMinLength = 2;
     private const int QMaxLength = 100;
 
-    public string? Ssyk { get; private init; }
-    public string? Region { get; private init; }
+    /// <summary>Maxantal concept-ids per lista (ADR 0042 Beslut B invariant 2 —
+    /// query-blowup/IN(...)-DoS-tak). Speglas i ListJobAdsQueryValidator.</summary>
+    public const int MaxConceptIds = 10;
+
+    public IReadOnlyList<string> Ssyk { get; private init; } = [];
+    public IReadOnlyList<string> Region { get; private init; } = [];
     public string? Q { get; private init; }
     public JobAdSortBy SortBy { get; private init; }
 
@@ -33,30 +47,49 @@ public sealed record SearchCriteria
     private SearchCriteria() { }
 
     public static Result<SearchCriteria> Create(
-        string? ssyk, string? region, string? q, JobAdSortBy sortBy)
+        IEnumerable<string>? ssyk,
+        IEnumerable<string>? region,
+        string? q,
+        JobAdSortBy sortBy)
     {
         if (!Enum.IsDefined(sortBy))
             return Result.Failure<SearchCriteria>(DomainError.Validation(
                 "SearchCriteria.InvalidSortBy", "Ogiltig sortering."));
 
-        var normSsyk = Normalize(ssyk);
-        var normRegion = Normalize(region);
-        var normQ = Normalize(q);
+        var normSsyk = NormalizeList(ssyk);
+        var normRegion = NormalizeList(region);
+        var normQ = NormalizeString(q);
 
-        if (normSsyk is null && normRegion is null && normQ is null)
+        if (normSsyk.Length == 0 && normRegion.Length == 0 && normQ is null)
             return Result.Failure<SearchCriteria>(DomainError.Validation(
                 "SearchCriteria.Empty",
                 "Minst ett sökkriterium (yrkesområde, region eller fritext) krävs."));
 
-        if (normSsyk is not null && !ConceptIdPattern.IsMatch(normSsyk))
+        if (normSsyk.Length > MaxConceptIds)
             return Result.Failure<SearchCriteria>(DomainError.Validation(
-                "SearchCriteria.InvalidSsyk",
-                "Yrkesområde måste vara en giltig JobTech concept-id (1-32 tecken, alfanumeriskt + _-)."));
+                "SearchCriteria.TooManySsyk",
+                $"Max {MaxConceptIds} yrkesområden per sökning."));
 
-        if (normRegion is not null && !ConceptIdPattern.IsMatch(normRegion))
+        if (normRegion.Length > MaxConceptIds)
             return Result.Failure<SearchCriteria>(DomainError.Validation(
-                "SearchCriteria.InvalidRegion",
-                "Region måste vara en giltig JobTech location-concept-id (1-32 tecken, alfanumeriskt + _-)."));
+                "SearchCriteria.TooManyRegion",
+                $"Max {MaxConceptIds} regioner per sökning."));
+
+        foreach (var s in normSsyk)
+        {
+            if (!ConceptIdPattern.IsMatch(s))
+                return Result.Failure<SearchCriteria>(DomainError.Validation(
+                    "SearchCriteria.InvalidSsyk",
+                    "Yrkesområde måste vara en giltig JobTech concept-id (1-32 tecken, alfanumeriskt + _-)."));
+        }
+
+        foreach (var r in normRegion)
+        {
+            if (!ConceptIdPattern.IsMatch(r))
+                return Result.Failure<SearchCriteria>(DomainError.Validation(
+                    "SearchCriteria.InvalidRegion",
+                    "Region måste vara en giltig JobTech location-concept-id (1-32 tecken, alfanumeriskt + _-)."));
+        }
 
         if (normQ is not null && (normQ.Length < QMinLength || normQ.Length > QMaxLength))
             return Result.Failure<SearchCriteria>(DomainError.Validation(
@@ -71,6 +104,54 @@ public sealed record SearchCriteria
         });
     }
 
-    private static string? Normalize(string? s) =>
+    // Invariant 1 (ADR 0042 Beslut B): trim per element, droppa tom/whitespace,
+    // distinct ordinal, sortera ordinal. Deterministisk normalisering gör två
+    // logiskt lika kriterie-uppsättningar strukturellt lika → SavedSearch
+    // jsonb-dedupe fungerar (record-collection-equality är annars referens-
+    // baserad). Tom/null input → tom lista (= inget filter, analogt med
+    // whitespace→null för Q).
+    private static string[] NormalizeList(IEnumerable<string>? values)
+    {
+        if (values is null)
+            return [];
+
+        return values
+            .Where(static v => !string.IsNullOrWhiteSpace(v))
+            .Select(static v => v.Trim())
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(static v => v, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private static string? NormalizeString(string? s) =>
         string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+
+    // Strukturell VO-likhet (Evans 2003 kap. 5). record med IReadOnlyList får
+    // default REFERENS-equality → SavedSearch jsonb-dedupe skulle aldrig hitta
+    // dubbletter. Listorna är redan normaliserade (sorterad+distinct ordinal)
+    // i Create → sekvensjämförelse är deterministisk.
+    public bool Equals(SearchCriteria? other)
+    {
+        if (other is null)
+            return false;
+        if (ReferenceEquals(this, other))
+            return true;
+
+        return SortBy == other.SortBy
+            && string.Equals(Q, other.Q, StringComparison.Ordinal)
+            && Ssyk.SequenceEqual(other.Ssyk, StringComparer.Ordinal)
+            && Region.SequenceEqual(other.Region, StringComparer.Ordinal);
+    }
+
+    public override int GetHashCode()
+    {
+        var hash = new HashCode();
+        hash.Add(SortBy);
+        hash.Add(Q, StringComparer.Ordinal);
+        foreach (var s in Ssyk)
+            hash.Add(s, StringComparer.Ordinal);
+        foreach (var r in Region)
+            hash.Add(r, StringComparer.Ordinal);
+        return hash.ToHashCode();
+    }
 }
