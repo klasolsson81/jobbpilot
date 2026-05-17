@@ -37,5 +37,9 @@ public sealed class ResumeVersion : Entity<ResumeVersionId>
         UpdatedAt = clock.UtcNow;
     }
 
-    internal void SoftDelete(IDateTimeProvider clock) => DeletedAt = clock.UtcNow;
+    internal void SoftDelete(IDateTimeProvider clock)
+    {
+        if (DeletedAt.HasValue) return;
+        DeletedAt = clock.UtcNow;
+    }
 }

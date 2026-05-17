@@ -1,8 +1,8 @@
 # JobbPilot
 
-> **Svensk jobbansökningshanterare byggd som civic utility.**
+> **Svensk jobbansökningshanterare byggd som civic utility — och ett portfolio-bevis på agent-orkestrerad ingenjörsdisciplin.**
 > Platsbanken-integration, AI-assisterad CV/brev-skräddarsydning, end-to-end pipeline-tracker.
-> EU-data-residens, GDPR-säker, Bring-Your-Own-Key för AI.
+> Clean Architecture med maskinellt verifierade lager-gränser, EU-data-residens, GDPR-säker, Bring-Your-Own-Key för AI.
 
 [![.NET](https://img.shields.io/badge/.NET-10-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
 [![C#](https://img.shields.io/badge/C%23-14-239120?logo=csharp&logoColor=white)](https://learn.microsoft.com/dotnet/csharp/)
@@ -10,7 +10,11 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18.3-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![AWS](https://img.shields.io/badge/AWS-eu--north--1-FF9900?logo=amazonwebservices&logoColor=white)](https://aws.amazon.com/)
-[![Status](https://img.shields.io/badge/status-Fas%201-blue)](docs/steg-tracker.md)
+[![Arkitektur](https://img.shields.io/badge/arkitektur-Clean%20%2B%20DDD-2C3E50)](docs/decisions/0001-clean-architecture.md)
+[![Tester](https://img.shields.io/badge/tester-1%20156%20gröna-success)](docs/decisions/0044-test-coverage-policy.md)
+[![Coverage](https://img.shields.io/badge/first--party%20line-92,1%25-success)](docs/decisions/0044-test-coverage-policy.md)
+[![ADR](https://img.shields.io/badge/ADR-44%20beslut-informational)](docs/decisions/README.md)
+[![Status](https://img.shields.io/badge/fas-2%20klar%20·%203%20planerad-blue)](docs/steg-tracker.md)
 [![dev](https://img.shields.io/badge/dev-live-success)](https://dev.jobbpilot.se/api/ready)
 [![License](https://img.shields.io/badge/license-proprietary-lightgrey)](#licens)
 
@@ -19,6 +23,9 @@
 ## Snabblänkar
 
 - [Vad är JobbPilot](#vad-är-jobbpilot)
+- [Om utvecklingsmodellen](#om-utvecklingsmodellen)
+- [Agent-orkestrering](#agent-orkestrering)
+- [Ingenjörsprinciper i praktiken](#ingenjörsprinciper-i-praktiken)
 - [Position och anti-position](#position-och-anti-position)
 - [Funktioner](#funktioner)
 - [Arkitektur](#arkitektur)
@@ -31,8 +38,6 @@
 - [Säkerhet och GDPR](#säkerhet-och-gdpr)
 - [Status och roadmap](#status-och-roadmap)
 - [Dokumentation](#dokumentation)
-- [AI-driven utveckling](#ai-driven-utveckling)
-- [Bidra](#bidra)
 - [Författare](#författare)
 - [Licens](#licens)
 
@@ -42,15 +47,158 @@
 
 JobbPilot är en komplett jobbsök- och ansökningshanterare för den svenska arbetsmarknaden. Appen kombinerar JobTech/Platsbanken-integration med modern AI-assistans men positioneras medvetet som en *civic utility* — ett verktyg som signalerar tillit och pålitlighet snarare än hajp.
 
-Målet är att stressade jobbsökare får ett verktyg som känns som en förlängning av svensk offentlig digital service (1177, Försäkringskassan, Digg) snarare än ett av hundra AI-produkter som alla ser likadana ut.
+Målet är att stressade jobbsökare får ett verktyg som känns som en förlängning av svensk offentlig digital service (1177, Försäkringskassan, Digg) snarare än ett av hundra AI-produkter som alla ser likadana ut. Den medvetna icke-differentieringen är ett designval, inte en brist på ambition.
+
+> [!NOTE]
+> Detta repo är publikt för portfölj-syfte. Det är ett **pågående arbete** — Fas 0–2 är levererade, Fas 3 är planerad (se [Status och roadmap](#status-och-roadmap)). README beskriver det faktiska tillståndet, inte ett mål-tillstånd.
 
 ### Målgrupp
 
-| Fas | Användare |
-|-----|-----------|
+| Tier | Användare |
+|------|-----------|
 | **v1 (primär)** | Aktiva jobbsökare i Sverige — initial kohort: produktägaren + ~20 klasskamrater på NBI/Handelsakademin |
 | **v2** | Bredare svensk arbetsmarknad — tjänstemän, utvecklare, kunskapsarbetare. Freemium. |
 | **framtid** | Internationella användare via `IJobSource`-adapters för NAV (Norge), Arbejdsformidlingen (Danmark), EURES (EU) |
+
+---
+
+## Om utvecklingsmodellen
+
+Jag har byggt JobbPilot med **Claude Code som primär utvecklingspartner** i en agent-orkestrerad modell — inte "AI som autocompletear", utan en governance-struktur där specialiserade review-agenter har veto-rätt, en CTO-agent är decision-maker vid arkitektur-tradeoffs, och varje arkitekturbeslut historieförs som en immutable ADR. Modellen är dokumenterad i sin helhet i [`CLAUDE.md §9`](CLAUDE.md) och verifierbar mot katalogen [`.claude/`](.claude/).
+
+Positionen jag tränar i detta projekt: **AI-Augmented Fullstack Engineer med fokus på agent-orkestrering** över .NET, React och TypeScript. Differentiatorn är inte att AI används — det gör många. Differentiatorn är att utvecklingsflödet har *granskningsspärrar, beslutsdisciplin och spårbarhet* som håller för en kodgranskning på Mastercard-nivå. Resten av denna README är evidensen för det påståendet.
+
+---
+
+## Agent-orkestrering
+
+JobbPilot kör **direct-push till `main` utan PR-flöde** ([ADR 0019](docs/decisions/0019-solo-direct-push-to-main.md)). Granskningsvärdet ett PR-flöde ger ersätts inte av tillit — det ersätts av en orkestrerad agent-struktur med skrivna mandat. Roster verifierad i [`.claude/agents/`](.claude/agents/): **12 specialiserade agenter** med distinkta, icke-överlappande mandat.
+
+```mermaid
+flowchart TB
+    Klas["Klas Olsson<br/>Agent-orkeströr · sista ordet"]
+
+    CTO["senior-cto-advisor<br/>decision-maker (ej advisor)<br/>multi-approach-val · fynd-triage"]
+
+    subgraph Veto["Review-agenter — veto-rätt före commit"]
+        CR["code-reviewer<br/>Clean Arch / DDD / CQRS / coverage"]
+        SA["security-auditor<br/>PII · auth · secrets · GDPR"]
+        DR["design-reviewer<br/>civic-utility · WCAG 2.1 AA"]
+    end
+
+    subgraph Advisor["Arkitektur-rådgivning före kod"]
+        DA["dotnet-architect<br/>aggregat · bounded contexts · EF Core"]
+    end
+
+    subgraph Builders["Builder-agenter"]
+        TW["test-writer<br/>xUnit v3 · TDD-först"]
+        TR["test-runner<br/>dotnet test · svensk summering"]
+        DM["db-migration-writer<br/>EF Core-migrations · GDPR-schema"]
+        UI["nextjs-ui-engineer<br/>RSC · shadcn · Tailwind 4"]
+        AP["ai-prompt-engineer<br/>Bedrock-prompts · token-budget"]
+    end
+
+    subgraph Keepers["Dokumentations-keepers"]
+        AK["adr-keeper<br/>ADR-livscykel · status-flips"]
+        DK["docs-keeper<br/>kod↔docs-synk · cross-refs"]
+    end
+
+    Klas --> CTO
+    CTO --> Veto
+    CTO --> Advisor
+    CTO --> Builders
+    Klas --> Keepers
+    Veto -.->|blockerar commit| Klas
+```
+
+### Modellen i sex steg
+
+1. **Plan-design** — scope, sekvens, risker och alternativ designas i chat innan kod skrivs. Ingen kod utan plan.
+2. **STOPP-disciplin** — Claude Code stannar vid varje övergång. Inga `str_replace`, inga commits, ingen analys mellan STOPP och GO ([CLAUDE.md §6.3](CLAUDE.md)).
+3. **Agent-veto** — `code-reviewer`, `security-auditor` och `design-reviewer` har **blockerande** veto vid relevant scope. En review-agents auktoritet är skriven regel (CLAUDE.md), inte konsensus eller deadline.
+4. **In-block-fix-disciplin** — fynd fixas i samma commit-batch som default. Teknisk skuld lyfts endast vid genuin fas- eller dependency-orsak ([CLAUDE.md §9.6](CLAUDE.md)) — TD-listan är inte ett dumpningsställe.
+5. **ADR-historik** — alla arkitekturbeslut är immutable ADRs. En ändring skapar en ny ADR som *superseder* den gamla, aldrig en tyst redigering ([docs/decisions/](docs/decisions/)).
+6. **Session-protokoll** — varje session börjar med `docs/current-work.md` + senaste session-logg + git-log-verifiering, och avslutas med synkroniserad docs-state ([CLAUDE.md §1.5](CLAUDE.md)).
+
+Detta är governance-mognad — inte "jag använder AI". Chat-historiken (produktägare + webb-Claude) är den primära granskningstrailen; agent-rapporterna sparas i [`docs/reviews/`](docs/reviews/) och bifogas varje STOPP-rapport så att granskning sker parallellt.
+
+---
+
+## Ingenjörsprinciper i praktiken
+
+Den här sektionen är portfolions kärna. Varje princip nedan är kopplad till en **verifierbar mekanism** — ett arkitekturtest som failar bygget, en ADR som låser beslutet, eller en namngiven kod-path. Inga påståenden utan referent.
+
+### Clean Architecture — maskinellt enforced, inte beskrivet
+
+De flesta kodbaser *beskriver* sin lager-separation. JobbPilot **failar bygget** om den bryts. [`JobbPilot.Architecture.Tests`](tests/JobbPilot.Architecture.Tests/) innehåller **53 NetArchTest-fakta över 10 filer** som körs i CI. Den hårdaste regeln, `DomainLayerTests.Domain_should_not_depend_on_any_other_project` (en av 7 fakta i `DomainLayerTests.cs`), asserterar att domänlagret har noll beroende på EF Core, ASP.NET Core, Mediator, FluentValidation eller något högre lager:
+
+```csharp
+// tests/JobbPilot.Architecture.Tests/DomainLayerTests.cs
+Types.InAssembly(typeof(JobbPilot.Domain.Common.Entity<>).Assembly)
+    .ShouldNot()
+    .HaveDependencyOnAny(
+        "Microsoft.EntityFrameworkCore", "Microsoft.AspNetCore",
+        "Mediator", "FluentValidation",
+        "JobbPilot.Application", "JobbPilot.Infrastructure",
+        "JobbPilot.Api", "JobbPilot.Worker")
+    .GetResult();
+```
+
+Samma testklass enforcar att Application inte beror på Infrastructure, inte på ASP.NET, inte på konkreta EF Core-providers, och att inget aggregat exponerar en publik setter. Lager-strukturen är ett **kört kontrakt** (Martin, *Clean Architecture* 2017, kap. 22 — en gräns som inte enforcas är ingen gräns). Beslutet är låst i [ADR 0001](docs/decisions/0001-clean-architecture.md).
+
+### SOLID — demonstrerat, inte deklarerat
+
+| Princip | Mekanism | Var |
+|---------|----------|-----|
+| **DIP** — Application definierar portar, Infrastructure implementerar | `ICurrentUser`, `IJobSource`, `IAppDbContext` deklareras i Application; konkreta implementationer ligger i Infrastructure. Arch-testet `Application_should_not_depend_on_Infrastructure` failar om riktningen vänds. | `src/JobbPilot.Application/Common/Abstractions/` → `src/JobbPilot.Infrastructure/` |
+| **OCP** — beteende läggs till utan att ändra handlers | Cross-cutting concerns är Mediator-pipeline-behaviors i låst ordning (`Logging → Validation → Authorization → AdminAuthorization → UnitOfWork → Audit`). Ny behavior = ny rad i `InOrder`, ingen handler rörs. Ordningen delas av Api + Worker så de inte kan drifta isär, verifierad av ett arch-test. | `MediatorPipelineBehaviors.InOrder` i `src/JobbPilot.Application/Common/`, låst av [ADR 0008](docs/decisions/0008-pipeline-behavior-order.md) |
+| **SRP** — en behavior, ett ändringsskäl | Varje pipeline-behavior bär exakt ett cross-cutting concern (en anledning att ändras, Martin 2017 kap. 7). En command-handler komponerar inte flöden — komplexa flöden komponeras av flera commands, aldrig en fet handler ([CLAUDE.md §2.3](CLAUDE.md)). | `src/JobbPilot.Application/Common/Behaviors/` |
+
+### DRY — delade SPOT-moduler, inga magiska primitiver
+
+Primitive obsession motverkas av strongly-typed IDs som `readonly record struct` ([ADR 0011](docs/decisions/0011-strongly-typed-ids.md)) — ett `ApplicationId` kan aldrig av misstag skickas där ett `JobSeekerId` förväntas, kompilatorn fångar det:
+
+```csharp
+// src/JobbPilot.Domain/Applications/ApplicationId.cs
+public readonly record struct ApplicationId(Guid Value)
+{
+    public static ApplicationId New() => new(Guid.NewGuid());
+    public override string ToString() => Value.ToString();
+}
+```
+
+Sökkriterier är inte lösa strängar utan ett `SearchCriteria`-value-object som normaliserar och validerar invarianter (concept-id-format, term-längd, sort-precondition) på konstruktion — en enda sanningspunkt för sök-semantik, återanvänd av samtliga SavedSearch-commands och -queries ([ADR 0039](docs/decisions/0039-savedsearch-aggregate-and-query-run-semantics.md)).
+
+### SoC / DDD / CQRS — aggregat skyddar invarianter
+
+Affärsregler bor i domänen, inte i handlers. `Application`-aggregatet är en state-maskin: en olaglig statusövergång kan inte ske, eftersom `TransitionTo` avvisar den och raisar inget event:
+
+```csharp
+// src/JobbPilot.Domain/Applications/Application.cs — TransitionTo
+if (!Status.AllowedTransitions.Contains(target))
+    return Result.Failure(DomainError.Validation(
+        "Application.InvalidTransition",
+        $"Övergång från {Status.Name} till {target.Name} är inte tillåten."));
+...
+RaiseDomainEvent(
+    new ApplicationStatusTransitionedDomainEvent(Id, JobSeekerId, previous, target, clock.UtcNow));
+```
+
+- **CQRS** — commands returnerar `Result<T>`, queries returnerar DTOs direkt; inga domänobjekt passerar Application-gränsen ([CLAUDE.md §2.3](CLAUDE.md)). Pipeline-ordningen är låst av [ADR 0008](docs/decisions/0008-pipeline-behavior-order.md).
+- **Domain events som sanning** — state-ändringar raisar events; handlers reagerar, de driver inte sanningen ([ADR 0022](docs/decisions/0022-audit-log-pipeline-behavior.md), audit via pipeline-behavior + marker-interface).
+- **Anticorruption Layer** — JobTech-taxonomins instabila vokabulär läcker aldrig in i domänens ubiquitous language. Kommentaren i sök-query-vägen citerar källan explicit i koden:
+
+```csharp
+// src/JobbPilot.Application/JobAds/Queries/JobAdSearch.cs
+// Shadow-properties refereras via EF.Property<string?>(...) eftersom de
+// inte är top-level Domain-fält (Evans 2003 §14 ACL — JobTech-taxonomi
+// är inte JobbPilots ubiquitous language).
+```
+
+ACL:n är formaliserad i [ADR 0043](docs/decisions/0043-taxonomy-acl-for-search-surface.md) (lokal taxonomi-snapshot bakom port — externt taxonomi-API aldrig på sök-vägen).
+
+> [!IMPORTANT]
+> Varje rad ovan pekar på en namngiven artefakt (testklass, ADR, fil + medlem) — aldrig ett radnummer som ruttnar vid nästa redigering. En granskare kan öppna referenten och verifiera påståendet. Det är skillnaden mellan att kunna vokabulären och att ha fattat besluten.
 
 ---
 
@@ -118,7 +266,7 @@ Detaljerad scope finns i [`BUILD.md §2`](BUILD.md). Sammanfattning:
 
 ## Arkitektur
 
-JobbPilot följer **Clean Architecture** med strikt lager-separation och **DDD** med aggregates som invariant-skydd.
+JobbPilot följer **Clean Architecture** med strikt lager-separation och **DDD** med aggregates som invariant-skydd. Lager-gränserna är inte en konvention — de är [maskinellt verifierade](#clean-architecture--maskinellt-enforced-inte-beskrivet).
 
 ```mermaid
 flowchart TB
@@ -179,12 +327,12 @@ flowchart LR
     App --> Domain
 ```
 
-**Regler:**
+**Regler (arch-test-enforced):**
 - `Domain` beror på **ingenting** — inga ORM, inga frameworks
 - `Application` definierar interfaces; `Infrastructure` implementerar
-- `Api` och `Worker` är komposition-rots — de bygger DI-containern
+- `Api` och `Worker` är separata komposition-rots ([ADR 0010](docs/decisions/0010-worker-composition-root.md)) — de bygger DI-containern; pipeline-ordningen delas så de inte driftar isär
 
-Mer detaljerat: [`BUILD.md §4`](BUILD.md), [`docs/decisions/`](docs/decisions/), [`CLAUDE.md §2`](CLAUDE.md).
+44 arkitekturbeslut är historieförda som ADRs under [`docs/decisions/`](docs/decisions/) — index i [`docs/decisions/README.md`](docs/decisions/README.md). Mer detaljerat: [`BUILD.md §4`](BUILD.md), [`CLAUDE.md §2`](CLAUDE.md).
 
 ---
 
@@ -195,10 +343,10 @@ JobbPilot byggs med en uttalad kvalitetsstandard: varje commit ska kunna försva
 ### Test-disciplin
 
 - **Clean Architecture-gränser verifieras maskinellt.** NetArchTest-regler i `JobbPilot.Architecture.Tests` failar bygget om Domain importerar EF Core, om Application känner till Infrastructure, eller om ett aggregat exponerar en publik setter.
-- **Domänlogik testas utan databas.** Aggregat och value objects bär sina invarianter; handlers testas mot fake `IAppDbContext` med NSubstitute. Om något kräver en startad ASP.NET-host för att testas betraktas designen som fel (CLAUDE.md §2.4).
+- **Domänlogik testas utan databas.** Aggregat och value objects bär sina invarianter; handlers testas mot fake `IAppDbContext` med NSubstitute. Om något kräver en startad ASP.NET-host för att testas betraktas designen som fel ([CLAUDE.md §2.4](CLAUDE.md)).
 - **TDD där det bär.** Nya domäntyper och handlers får tester först; produktionskod skrivs för att passera.
 - **Integrationstester mot riktig Postgres.** Testcontainers startar PostgreSQL 18.3 och Valkey per integrations-svit — ingen in-memory-attrapp som döljer provider-skillnader.
-- **Granskningsspärrar utan PR-flöde.** Direct-push till `main` ([ADR 0019](docs/decisions/0019-solo-direct-push-to-main.md)) kompenseras av plan-design, STOPP-disciplin, specialiserade review-agenter med veto-rätt (code-reviewer, security-auditor, dotnet-architect), manuell diff-granskning och pre-push-hooks.
+- **Granskningsspärrar utan PR-flöde.** Direct-push till `main` ([ADR 0019](docs/decisions/0019-solo-direct-push-to-main.md)) kompenseras av plan-design, STOPP-disciplin, specialiserade review-agenter med veto-rätt (code-reviewer, security-auditor, design-reviewer), manuell diff-granskning och pre-push-hooks.
 
 Backend-sviten omfattar **1 156 tester** (Domain, Application, Architecture, Api-integration, Worker, Migrate) — 0 failed.
 
@@ -414,7 +562,7 @@ jobbpilot/
 │
 ├── docs/
 │   ├── current-work.md               # Single source of truth för session-state
-│   ├── steg-tracker.md               # Långsiktig STEG-progression
+│   ├── steg-tracker.md               # Långsiktig fas/STEG-progression
 │   ├── tech-debt.md                  # TD-register
 │   ├── decisions/                    # ADR (Architecture Decision Records)
 │   ├── reviews/                      # Auto-genererade agent-reviews
@@ -447,6 +595,9 @@ dotnet test tests/JobbPilot.Domain.UnitTests
 dotnet test tests/JobbPilot.Application.UnitTests
 dotnet test tests/JobbPilot.Api.IntegrationTests
 dotnet test --filter "Category=Architecture"
+
+# Coverage (reproducerbar in-repo-mekanism, ADR 0044)
+bash scripts/coverage.sh          # Windows: scripts/coverage.ps1
 
 # Format-check (pre-commit hook kör detta automatiskt)
 dotnet format --verify-no-changes
@@ -497,7 +648,7 @@ terraform output
 | `staging` | Pre-prod | Auto via tag `v*-rc*` på `main` | `staging.jobbpilot.se` |
 | `prod` | Produktion | Manuell approval på tag `v*` | `jobbpilot.se` |
 
-Branch-strategi: **direct-push till `main`** med Conventional Commits per [ADR 0019](docs/decisions/0019-solo-direct-push-to-main.md). Inga PR-flöden i nuvarande fas — granskningsspärrar via plan-design + agent-reviews + manuell diff-review + pre-commit/pre-push-hooks.
+Branch-strategi: **direct-push till `main`** med Conventional Commits per [ADR 0019](docs/decisions/0019-solo-direct-push-to-main.md). Inga PR-flöden i nuvarande fas — granskningsspärrar via plan-design + agent-reviews + manuell diff-review + pre-commit/pre-push-hooks. Trigger för återgång till PR-flöde är dokumenterad i ADR 0019.
 
 ---
 
@@ -516,29 +667,27 @@ JobbPilot är byggd för svensk arbetsmarknad och är därför **GDPR-säker by 
 - **Rate-limiting:** auth-write 20/min/IP, auth-loose 30/min/IP, account-deletion 1/60s/UserId
 - **Subprocessor-kedja:** AWS (eu-north-1), Anthropic (Bedrock EU), Sentry (EU), PostHog self-hosted, Vercel (EU). Inga US-baserade processors för PII
 
-Detaljer: [`BUILD.md §13`](BUILD.md), [`docs/decisions/0024-*`](docs/decisions/), [`docs/decisions/0017-*`](docs/decisions/).
+Detaljer: [`BUILD.md §13`](BUILD.md), [`docs/decisions/0024-*`](docs/decisions/), [`docs/decisions/0031-*`](docs/decisions/).
 
 ---
 
 ## Status och roadmap
 
-Aktuell status: **Fas 1 (Core Domain)** — Fas 0 stängd 2026-05-10.
+JobbPilot är ett **pågående arbete**. Faserna nedan följer den auktoritativa progressionen i [`docs/steg-tracker.md`](docs/steg-tracker.md); aktuell session-state alltid i [`docs/current-work.md`](docs/current-work.md).
 
-Långsiktig planering följer en STEG-progression dokumenterad i [`docs/steg-tracker.md`](docs/steg-tracker.md). Aktuell session-state alltid i [`docs/current-work.md`](docs/current-work.md).
+| Fas | Innehåll | Milstolpe | Status |
+|-----|----------|-----------|--------|
+| **Fas 0** | Foundation — AWS-infra, container-pipeline, DNS + TLS, CI/CD | Registrera + logga in på dev.jobbpilot.se | **Klar 2026-05-10** |
+| **Fas 1** | Core Domain — auth, kärn-CRUD, aggregat, audit | CV manuellt + "fake" ansökningar i admin-audit | **Klar 2026-05-11** |
+| **Fas 2** | JobTech Integration — Platsbanken-sök, sparade sökningar, taxonomi-ACL | Söka jobb på Platsbanken via appen | **Klar 2026-05-17** |
+| **Fas 3** | Application Management — fullständig ansökningshantering (utan AI) | Pipeline-tracker end-to-end | Planerad |
+| **Fas 4** | AI Layer — alla AI-features end-to-end + dogfood | CV/brev-skräddarsydning live | Planerad |
+| **Fas 5** | Integrationer — Gmail auto-logg, Google Calendar | Intervjuer i kalendern | Planerad |
+| **Fas 6** | Admin & Analytics — admin-panel komplett | Impersonation + token-statistik | Planerad |
+| **Fas 7** | Internal Beta — 3 användare aktivt 14 dagar | Dogfood-validering | Planerad |
+| **Fas 8** | Klass-launch — 20 klasskamrater onboardade | v1 klar | Planerad |
 
-### Faser (övergripande)
-
-| Fas | Innehåll | Status |
-|-----|----------|--------|
-| **Fas 0** | AWS-infrastruktur, container-pipeline, DNS + TLS, CI/CD | **Klar 2026-05-10** |
-| **Fas 1** | Auth, kärn-CRUD, dashboard, JobTech-integration, basal AI | Pågående |
-| **Fas 2** | Multi-tenant, OAuth, Gmail-sync, kalender | Planerad |
-| **Fas 3** | Admin-yta, BYOK-onboarding, kostnadstak | Planerad |
-| **Fas 4** | Public launch, betalning, internationell expansion | Framtid |
-
-Live dev-miljö: [`https://dev.jobbpilot.se/api/ready`](https://dev.jobbpilot.se/api/ready) — auto-deploy via tag `v*-dev` på `main`.
-
-Arkitektur-beslut historieförs som **ADRs** under [`docs/decisions/`](docs/decisions/) — index i [`docs/decisions/README.md`](docs/decisions/README.md).
+Live dev-miljö: [`https://dev.jobbpilot.se/api/ready`](https://dev.jobbpilot.se/api/ready) — auto-deploy via tag `v*-dev` på `main`. Projektet är pre-MVP; inga publika användare ännu.
 
 ---
 
@@ -547,58 +696,29 @@ Arkitektur-beslut historieförs som **ADRs** under [`docs/decisions/`](docs/deci
 | Fil | Syfte |
 |-----|-------|
 | [`BUILD.md`](BUILD.md) | Huvudspec — feature-scope, datamodell, API-design, integrationer, deployment |
-| [`CLAUDE.md`](CLAUDE.md) | Coding conventions, anti-patterns, AI-utvecklings-workflow |
+| [`CLAUDE.md`](CLAUDE.md) | Coding conventions, anti-patterns, agent-orkestrerings-workflow |
 | [`DESIGN.md`](DESIGN.md) | Design-system-index — civic-utility-tone, design tokens, komponenter |
-| [`docs/current-work.md`](docs/current-work.md) | Session-state, senaste commits, aktiv STEG |
-| [`docs/steg-tracker.md`](docs/steg-tracker.md) | Långsiktig STEG-progression |
+| [`docs/current-work.md`](docs/current-work.md) | Session-state, senaste commits, aktiv fas |
+| [`docs/steg-tracker.md`](docs/steg-tracker.md) | Långsiktig fas/STEG-progression |
 | [`docs/tech-debt.md`](docs/tech-debt.md) | TD-register med prioriteringar |
-| [`docs/decisions/`](docs/decisions/) | Architecture Decision Records (ADRs) |
-| [`docs/reviews/`](docs/reviews/) | Auto-genererade agent-reviews per STEG |
+| [`docs/decisions/`](docs/decisions/) | 44 Architecture Decision Records (ADRs) |
+| [`docs/reviews/`](docs/reviews/) | Auto-genererade agent-reviews |
 | [`docs/runbooks/`](docs/runbooks/) | Operativa procedurer (AWS-setup, lokal-dev, etc.) |
 | [`docs/sessions/`](docs/sessions/) | Per-session retrospektiv-loggar |
+| [`.claude/`](.claude/) | Agent-definitioner, skills, hooks, slash-kommandon |
 | [`prompts/`](prompts/) | AI-prompts som versionerade `.prompt.md`-filer |
-
----
-
-## AI-driven utveckling
-
-JobbPilot byggs med **Claude Code** som primär utvecklings-partner. Workflow är dokumenterat i [`CLAUDE.md §9`](CLAUDE.md):
-
-- **Plan-design:** webb-Claude och produktägaren designar scope och sekvens innan kod skrivs
-- **STOPP-disciplin:** Claude Code halt vid varje övergång; ingen kod-skrivning eller commit utan explicit GO
-- **Specialiserade agents:** code-reviewer, security-auditor, dotnet-architect, db-migration-writer, test-writer, adr-keeper, docs-keeper med veto-rätt vid relevant scope
-- **Direct-push till `main`:** ingen PR-flow ([ADR 0019](docs/decisions/0019-solo-direct-push-to-main.md)). Granskningsvärdet ersätts av agent-reviews + manuell diff-granskning + pre-push hooks (gitleaks, dotnet format, lint-staged)
-- **ADR-disciplin:** alla arkitekturbeslut historieförs i [`docs/decisions/`](docs/decisions/)
-- **Session-protocol:** varje session börjar med [`docs/current-work.md`](docs/current-work.md) + senaste session-logg + git-log-verifiering
-
-Claude Code-konfiguration ligger under [`.claude/`](.claude/):
-
-| Path | Innehåll |
-|------|----------|
-| `.claude/agents/` | Subagent-definitioner (code-reviewer, security-auditor, ...) |
-| `.claude/skills/` | Domain-specific skills (jobbpilot-design-tokens, jobbpilot-design-components, ...) |
-| `.claude/hooks/` | Pre/post-tool-hooks (session-start, post-todo-review, ...) |
-| `.claude/commands/` | Egna slash-kommandon |
-
----
-
-## Bidra
-
-Projektet är i pre-MVP-fas och drivs av en solo-utvecklare. **Externa bidrag accepteras inte i nuvarande fas.**
-
-Om du ändå vill diskutera kod, arkitektur eller designval: öppna ett issue eller hör av dig direkt (kontakt nedan).
-
-Vid framtida öppning för bidrag kommer fluxen att bytas från direct-push till PR-baserad — trigger för det är dokumenterad i [ADR 0019](docs/decisions/0019-solo-direct-push-to-main.md).
 
 ---
 
 ## Författare
 
-**Klas Olsson**
+**Klas Olsson** — AI-Augmented Fullstack Engineer · agent-orkestrering · .NET / React / TypeScript
 .NET / fullstack-student, NBI/Handelsakademin Göteborg
 
 - GitHub: [@klasolsson81](https://github.com/klasolsson81)
 - Email: klasolsson81@gmail.com
+
+JobbPilot drivs av en solo-utvecklare i pre-MVP-fas. Externa bidrag accepteras inte i nuvarande fas; vid framtida öppning byts flödet från direct-push till PR-baserat (trigger dokumenterad i [ADR 0019](docs/decisions/0019-solo-direct-push-to-main.md)). Vill du diskutera kod, arkitektur eller designval — hör av dig direkt.
 
 ---
 

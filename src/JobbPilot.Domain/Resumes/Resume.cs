@@ -162,6 +162,8 @@ public sealed class Resume : AggregateRoot<ResumeId>
 
     public void SoftDelete(IDateTimeProvider clock)
     {
+        if (DeletedAt.HasValue) return;
+
         DeletedAt = clock.UtcNow;
         foreach (var v in _versions)
             v.SoftDelete(clock);

@@ -564,6 +564,69 @@ public class ResumeTests
         evt.OccurredAt.ShouldBe(laterClock.UtcNow);
     }
 
+    [Fact]
+    public void SoftDelete_WhenAlreadyDeleted_KeepsFirstDeletedAtTimestamp()
+    {
+        // Idempotens-invariant: andra anropet får INTE skriva över DeletedAt
+        // med en ny timestamp. Klockorna ger olika UtcNow så överskrivning
+        // är detekterbar.
+        var resume = CreateValidResume();
+        var firstClock = FakeDateTimeProvider.At(Clock.UtcNow.AddDays(1));
+        var secondClock = FakeDateTimeProvider.At(Clock.UtcNow.AddDays(2));
+
+        resume.SoftDelete(firstClock);
+        resume.SoftDelete(secondClock);
+
+        resume.DeletedAt.ShouldBe(firstClock.UtcNow);
+    }
+
+    [Fact]
+    public void SoftDelete_WhenAlreadyDeleted_IsIdempotentAndDoesNotRaiseEvent()
+    {
+        // Exakt ETT ResumeDeletedDomainEvent över två anrop — andra anropet
+        // får inte raisa ett falskt historiskt faktum.
+        var resume = CreateValidResume();
+        var firstClock = FakeDateTimeProvider.At(Clock.UtcNow.AddDays(1));
+        var secondClock = FakeDateTimeProvider.At(Clock.UtcNow.AddDays(2));
+
+        resume.SoftDelete(firstClock);
+        resume.ClearDomainEvents();
+        resume.SoftDelete(secondClock);
+
+        resume.DomainEvents.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void SoftDelete_WhenAlreadyDeleted_KeepsFirstDeletedAtOnAllVersions()
+    {
+        // Cascaden får inte skriva om versionernas DeletedAt vid andra anropet.
+        var resume = CreateValidResume();
+        var firstClock = FakeDateTimeProvider.At(Clock.UtcNow.AddDays(1));
+        var secondClock = FakeDateTimeProvider.At(Clock.UtcNow.AddDays(2));
+
+        resume.SoftDelete(firstClock);
+        resume.SoftDelete(secondClock);
+
+        resume.Versions.ShouldAllBe(v => v.DeletedAt == firstClock.UtcNow);
+    }
+
+    [Fact]
+    public void SoftDelete_WhenActive_SetsDeletedAtCascadesAndRaisesExactlyOneEvent()
+    {
+        // Happy-path-komplettering: första anropet sätter DeletedAt,
+        // cascade:ar versioner och raisar exakt ett ResumeDeletedDomainEvent.
+        var resume = CreateValidResume();
+        resume.ClearDomainEvents();
+        var laterClock = FakeDateTimeProvider.At(Clock.UtcNow.AddDays(1));
+
+        resume.SoftDelete(laterClock);
+
+        resume.DeletedAt.ShouldBe(laterClock.UtcNow);
+        resume.Versions.ShouldAllBe(v => v.DeletedAt == laterClock.UtcNow);
+        resume.DomainEvents.ShouldHaveSingleItem()
+            .ShouldBeOfType<ResumeDeletedDomainEvent>();
+    }
+
     // ---------------------------------------------------------------
     // MasterVersion — invariant
     // ---------------------------------------------------------------
