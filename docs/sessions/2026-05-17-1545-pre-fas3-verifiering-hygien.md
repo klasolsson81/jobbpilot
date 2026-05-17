@@ -2,7 +2,7 @@
 session: Pre-Fas-3-verifiering + hygien-städning
 datum: 2026-05-17
 slug: pre-fas3-verifiering-hygien
-status: levererad (med eskalerad cross-CC-avvikelse — Klas-beslutad)
+status: levererad & stängd (cross-CC-incident Klas-kvitterad, baseline godkänd pristine)
 commits:
   - (Resume.SoftDelete-fix svept in i 62c9dc7 av parallell CC — se Avvikelse nedan)
   - (denna docs-commit — session-end-synk + steg-tracker §4/§5-frysning)
@@ -113,3 +113,14 @@ lyfts EJ som TD denna session (doc-drift/process, §9.7; noteras för Klas-proce
 - Endast kvarvarande avvikelse: 62c9dc7 commit-hygien (Klas-accepterad, ej
   blocker — kosmetisk historik-blemma, koden korrekt).
 - Process-observation till Klas: parallell-CC working-tree-isolering.
+
+## Session-stängning 2026-05-17
+
+Klas kvitterade process-incidenten medvetet och retroaktivt: accepterar att
+Resume.SoftDelete-guarden nådde `main` via delat git-index utan föreskriven
+pre-commit-ordning. Motivering (Klas): CTO BESLUT 1b korrekt (N-1-konformering,
+ej nytt domänkontrakt) + trippel-rensad kod + netto-positiv Art.17-stängning;
+kvarstod = ren commit-hygien, framåt-dokumenterad. **Baseline godkänd som
+pristine. Sessionen stängd.** FAS 3 (Application Management) fri att starta —
+kräver explicit strategisk Klas-GO för sessionsbyte (§9.2). Inga blockers,
+inga nya TDs. Process-lärdomen lever som memory `pathspec-commit-when-parallel-cc`.
