@@ -94,3 +94,20 @@ run). ADR 0032-amendment gate-def (storm-borta + korpus-trajektoria + 5005)
   visual-verify post-deploy + Klas skärmbilds-approve.
 - docs-keeper: ADR-index 0043-rad + cross-ref-verifiering.
 - TD-19/23/24/62/63/74/82 "Fas 2"→Trigger etikett-städning (kvarstår).
+
+---
+
+## Forts. — Klas "GO allt enligt rek" → Fynd 2 fullt deployad (2026-05-17 fm)
+
+- **ADR 0043 Proposed→Accepted** (adr-keeper `8c7e582`, docs-keeper index `5075439`, Klas review-GO). Endast statusfält — brödtext immutable.
+- **Backend deploy:** tagg `v0.2.11-dev` → GH `deploy-dev` run `25983313208` **success**. Verifierat: `/api/ready` 200, `GET /api/v1/job-ads/taxonomy` 200 + `Cache-Control: private` + ETag, träd 21 län/21 yrkesområden/2323 yrken (migration F2TaxonomySnapshot + TaxonomySnapshotSeeder körda korrekt — funktionellt bevis via live-endpoint).
+- **Frontend:** nextjs-ui-engineer (`c79aace`) — `region-picker`/`occupation-picker`/`taxonomy-chip-list` + server-side träd/reverse-lookup i page.tsx, Beslut B URL-multi oförändrat, FE-säkerhetsflagga följd (label som text). vitest 387→ (efter död-kod-rm) job-ads 70/70, tsc 0, lint 0. Död `JobAdMultiSelect` borttagen (`1fc3b1b`). design-reviewer kod-review APPROVED 0/0/0.
+- **Push:** `782414d` på origin/main (Vercel auto-deploy). pre-commit/pre-push gröna.
+- **visual-verify:** 56 shots live mot https://www.jobbpilot.se (`C:\tmp\jobbpilot-visual\20260517-0849`). design-reviewer post-deploy skärmbilds-granskning **APPROVED 0/0/2** — Klas kan slutgodkänna.
+
+### Pending Klas / uppföljning
+1. **Klas slutgodkänn skärmbilderna** (Batch 6-grind — inneboende Klas-steg).
+2. **saved-search-list `criteriaSummary` rå concept-id** + Spara-sökning "SSYK-kod"-copy → separat förhandlad batch (bulk-namnuppslag överskrider ADR 0043 Beslut D-cap; §9.6 saknad funktion-dependency, CTO/Klas-triage). EJ autonomt.
+3. **visual-verify `jobb-chip-filled` stale** → `selectOption` istället för `.fill()` (harness-uppföljning, nextjs-ui-engineer/CC).
+
+Fynd 2 är funktionellt komplett och deployad på dev; återstår Klas skärmbilds-approve + de två uppföljningarna ovan (ej blockerande mot leveransen).
