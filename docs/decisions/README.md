@@ -57,6 +57,7 @@ Architecture Decision Records (ADRs) dokumenterar arkitekturella val som påverk
 | 0042 | Sök-yta-informationsarkitektur: kollaps-filter, multi-värde-kriterier, typeahead, relevans-sort (Beslut 3 i ADR 0039 delvis superseded; impl-notat 2026-05-17 — Beslut C index=btree functional partial-index (Variant A) / dedikerad SuggestPolicy 30/10s / typeahead self-contained debounce-hook ej TanStack / Beslut B jsonb Yta A3 tolerant converter / Beslut E since fast rullande 7d serverstyrt) | Accepted | 2026-05-16 | [0042-search-surface-information-architecture.md](./0042-search-surface-information-architecture.md) |
 | 0043 | Taxonomi-ACL för sök-ytan (lokal taxonomi-snapshot + Anticorruption Layer; utvidgar ADR 0042 Beslut C-datakälla, domänkontrakt OFÖRÄNDRAT — superseder ingen ADR; additiva korsref-notat i ADR 0042/0039) | Accepted | 2026-05-17 | [0043-taxonomy-acl-for-search-surface.md](./0043-taxonomy-acl-for-search-surface.md) |
 | 0044 | Test-coverage-policy: reproducerbar in-repo-mätning (MTP CodeCoverage + ReportGenerator local tool), first-party-filter och per-lager icke-regression-ratchet-gate (Hangfire-test-approach korsref, ej eget ADR) | Accepted | 2026-05-17 | [0044-test-coverage-policy.md](./0044-test-coverage-policy.md) |
+| 0045 | Performance-budgetar och fitness functions (latens/CWV/Worker-mem + mät-metod + observe-only-ratchet) | Accepted | 2026-05-17 | [0045-performance-budget-and-fitness-functions.md](./0045-performance-budget-and-fitness-functions.md) |
 
 ## Planerade ADRs
 
