@@ -68,7 +68,7 @@ Notera task-def-ARN (t.ex. `arn:aws:ecs:eu-north-1:<account>:task-definition/job
 
 ```powershell
 $taskDefArn = "<arn-från-2.2>"
-$clusterName = "jobbpilot-dev"
+$clusterName = "jobbpilot-dev-cluster"  # rättad 2026-05-17: faktisk cluster-ARN är jobbpilot-dev-cluster (aws ecs list-clusters); tidigare drift "jobbpilot-dev" gav ClusterNotFoundException
 $subnetId = "<private-subnet-id-från-terraform>"
 $securityGroupId = "<migrate-sg-id-från-terraform>"
 
@@ -94,11 +94,11 @@ Notera task-ARN från output (t.ex. `arn:aws:ecs:eu-north-1:<account>:task/jobbp
 $taskArn = "<arn-från-2.3>"
 
 aws ecs wait tasks-stopped `
-    --cluster jobbpilot-dev `
+    --cluster jobbpilot-dev-cluster `
     --tasks $taskArn
 
 aws ecs describe-tasks `
-    --cluster jobbpilot-dev `
+    --cluster jobbpilot-dev-cluster `
     --tasks $taskArn `
     --query "tasks[0].{LastStatus:lastStatus,ExitCode:containers[0].exitCode,StoppedReason:stoppedReason}"
 ```

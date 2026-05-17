@@ -2,7 +2,7 @@
 session: F2 samlad — ingestion payload-trunkerings-fix (hybrid) + sök-yta-omdesign B–E
 datum: 2026-05-16
 slug: f2-ingestion-hybrid-and-search-redesign
-status: PÅGÅENDE — Batch 1 Part 1 + ADR-amendment klart, pending deploy (STOPP 3)
+status: KLAR — FAS 2 FORMELLT STÄNGD 2026-05-17 (Batch 0–6 levererat, deployat, alla gates, Klas input-regel; cron-grön async-followup pending)
 commits:
   - "feat(jobads): Batch 1 Part 1 — snapshot-trunkerings-resiliens (denna session)"
   - "docs(ADR 0032): amendment 2026-05-16 hybrid + Batch 1 docs-synk (denna session)"
