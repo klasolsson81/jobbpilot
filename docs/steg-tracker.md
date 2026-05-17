@@ -91,6 +91,12 @@ STEG-numrering följer faktisk arbetsutveckling och mappar inte exakt mot fas-gr
 
 ## 4. Mellan-arbete
 
+> **Fryst 2026-05-17.** Denna tabell underhålls inte längre kronologiskt.
+> Mellan-arbete från och med 2026-05-13 (F2-P8c och framåt) dokumenteras
+> auktoritativt i `docs/current-work.md` och per-session i `docs/sessions/`.
+> Posterna nedan bevaras som historik t.o.m. 2026-05-13 (F2-P8b) — de utökas
+> inte. Skäl: enskild sanningskälla (DRY); session-loggarna är granskningstrail.
+
 Cleanup-passningar, disciplin-uppgraderingar och dokumentations-arbete som inte hör till någon enskild STEG. Klas använder begreppet "Fas 0.x" för cleanup-arbete mellan officiella faser.
 
 | Period | Beskrivning | Källor | Status |
@@ -106,6 +112,11 @@ Cleanup-passningar, disciplin-uppgraderingar och dokumentations-arbete som inte 
 | 2026-05-13 natt | **F2-P8b JobTech Infrastructure-leverans.** 5 commits — IJobSource Application-port + Refit-baserad IJobTechSearchClient + typed IJobTechStreamClient + PlatsbankenJobSource + JobTechPayloadSanitizer (TD-73 punkt 1) + Microsoft.Extensions.Http.Resilience + custom Polly-pipeline för Stream (RateLimiter → Retry → CB) + admin-trigger-endpoint POST /api/v1/admin/job-ads/sync/platsbanken + gdpr-processing-register.md (TD-73 punkt 3) + AdminBootstrap-Terraform-sync. Tag `v0.2.2.1-dev` LIVE på dev (efter `v0.2.2-dev`-fail pga global.json `rollForward=latestPatch` för strikt mot container-SDK 10.0.300 → fixad till `latestFeature`). **Reviewers INLINE per CLAUDE.md §9.2** (disciplin-fix från F2-P8a) — dotnet-architect INNAN kod + code-reviewer/security-auditor INNAN commit, alla Major + Minor in-block-fixade. **Klas-fynd via curl:** JobStream 2.1.1 har deprecated v1-paths → v2 path-migration (commit 8d89ded + 139a85e) + v2-shape (webpage_url ersätter source_links + 3 nya v2-PII-regression-tester). **CTO-rond 5:** ALB-timeout-beslut Variant B (acceptera 504, vänta P8c) — synkron HTTP är fel transport för 50-100 MB snapshot (Martin 2017 Boundaries + Fowler 2002 Async Messaging). Pipeline-mekanik verifierad i CloudWatch (CT-propagation OK, no partial-persist). Backend 522 → 528 grönt (273 Application + 218 Domain + 37 Architecture). **TD-73 progress:** punkt 1 + 3 levererade; punkt 2 + 4 kvar i P8c-acceptance-criteria som planerat arbete (inte TD per §9.6). | docs/sessions/2026-05-13-0600-f2-p8b-jobtech-infra.md | ✓ Klart |
 
 ## 5. Aktuellt
+
+> **Fryst 2026-05-17.** Aktuell status underhålls auktoritativt i
+> `docs/current-work.md` (status-header + "Active now"). Innehållet nedan
+> speglar läget 2026-05-13 (F2-P8b) och uppdateras inte. Se current-work.md
+> för nuläge.
 
 **STEG-fokus:** **F2-P8b KOMPLETT 2026-05-13.** JobTech-integration Infrastructure-lager levererat: IJobSource Application-port + Refit JobSearch-klient + typed JobStream-klient + PlatsbankenJobSource + sanitizer + admin-trigger-endpoint. Tag `v0.2.2.1-dev` live på `https://dev.jobbpilot.se/api/ready` (HTTP 200). Backend 528 tester gröna. 3 ADRs (0032 + amendments + 0033 + 0034) etablerade. TD-73 punkt 1 + 3 levererade.
 
