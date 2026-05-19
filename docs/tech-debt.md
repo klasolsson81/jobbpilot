@@ -23,6 +23,7 @@ tidsbegränsning per touch — fas-tillhörighet styr. Default = fixa in-block.
 | TD-23 | RedisSessionStore atomicitet via MULTI/EXEC eller Lua | Minor | 2 | Säkerhet/Robusthet |
 | TD-24 | DeleteAccountCommand cascade-paginering vid power-user | Minor | 2 | Skalbarhet |
 | TD-27 | EmailHash → HMAC med roterande nyckel | Minor | 2 | Säkerhet/GDPR |
+| TD-85 | github_oidc prod-drift (OIDC-provider + deploy_dev-roll) | Minor | Trigger | Infra/IaC |
 | TD-82 | Översikt/Dashboard-sida (post-login-landningsvy) | Minor | 2 | Frontend/Feature |
 | TD-74 | Strikta DML-GRANTs på public + identity istället för GRANT ALL | Minor | 2 (opportunistisk) | Säkerhet/Least Privilege |
 | TD-72 | Auto-trigga Migrate bootstrap-mode i deploy-dev.yml | Minor | Trigger | Operations/CI-CD |
@@ -690,6 +691,17 @@ sustained i Fas 7 internal beta (tidig varning-signal).
 ## Minor — Efter MVP / Trigger-baserade
 
 Adresseras vid faktisk användarsignal, skala-tröskel eller opportunistisk touch.
+
+## TD-85: github_oidc prod-drift (OIDC-provider + deploy_dev-roll)
+**Kategori:** Infra/IaC
+**Severity:** Minor
+**Fas:** Trigger (separat IaC-session)
+**Källa:** Incidentellt upptäckt i `terraform plan` på prod/baseline-stacken under TD-13 STOPP V KMS-IaC-apply (2026-05-19). EJ TD-13-scope.
+
+`terraform plan` (environments/prod) visar `module.github_oidc.aws_iam_openid_connect_provider.github` + `module.github_oidc.aws_iam_role.deploy_dev` som "update in-place" — pre-existing state↔config-drift (sannolikt AWS-provider-version-bump eller manuell ändring). TD-13:s KMS-apply kördes **targeted** (`-target=module.kms.aws_kms_key.td13_field` + alias) för att medvetet INTE svepa med denna drift (prod CI/CD-auth-resurser, utanför KMS-IaC-GO-scopen).
+
+**Föreslagen åtgärd:** separat architect/senior-cto-advisor-triage (§9.2 IaC-obligatorisk) — diffa drift-detalj, avgör om benign provider-normalisering (apply rakt av) eller substantiell auth-ändring (kräver Klas-GO). Egen IaC-session, ej buntad med TD-13.
+**Trigger:** nästa prod-stack-apply ELLER dedikerad IaC-housekeeping-session (drift blockerar ren prod-apply tills löst).
 
 ## TD-8: GetPipeline saknar fullständig paginering
 **Kategori:** Scalability
