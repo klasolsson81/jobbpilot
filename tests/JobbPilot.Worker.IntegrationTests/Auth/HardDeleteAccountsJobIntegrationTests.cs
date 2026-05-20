@@ -1,7 +1,10 @@
 using JobbPilot.Application.Auth.Jobs.HardDeleteAccounts;
 using JobbPilot.Domain.Auditing;
 using JobbPilot.Domain.Common;
+using JobbPilot.Domain.JobAds;
 using JobbPilot.Domain.JobSeekers;
+using JobbPilot.Domain.RecentJobSearches;
+using JobbPilot.Domain.SavedSearches;
 using JobbPilot.Infrastructure.Identity;
 using JobbPilot.Infrastructure.Persistence;
 using JobbPilot.Worker.IntegrationTests.Common;
@@ -119,6 +122,58 @@ public class HardDeleteAccountsJobIntegrationTests(WorkerTestFixture fixture)
             var orphan = await userManager.FindByIdAsync(orphanUserId.ToString());
             orphan.ShouldBeNull("orphan Identity-rad ska rensas av Steg 0");
         }
+    }
+
+    [Fact]
+    public async Task RunAsync_CascadesHardDelete_ToSavedSearchesAndRecentJobSearches()
+    {
+        // GDPR Art. 17-cascade (ADR 0060 Mekanik-not 5 + ADR 0024-amend
+        // 2026-05-20): SavedSearches och RecentJobSearches saknar databas-FK
+        // till JobSeekers (ADR 0011 strongly-typed soft-reference). De måste
+        // raderas explicit i HardDeleteAccountAsync — annars orphan-PII (q-
+        // fritext, namn-värdig sökterm) blir kvar efter konto-radering.
+        var ct = TestContext.Current.CancellationToken;
+        var now = DateTimeOffset.UtcNow;
+        var oldDeletedAt = now.AddDays(-(RestoreWindowDays + 1));
+
+        var (userId, jobSeekerId) = await SeedSoftDeletedAccountAsync(oldDeletedAt, ct);
+
+        // Seed SavedSearch + RecentJobSearch för seekern
+        Guid savedSearchId;
+        Guid recentSearchId;
+        using (var scope = _fixture.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var clock = new FixedClock(oldDeletedAt.AddDays(-2));
+            var criteria = SearchCriteria.Create(
+                ["12345"], ["stockholm"], "developer", JobAdSortBy.PublishedAtDesc).Value;
+
+            var saved = SavedSearch.Create(jobSeekerId, "Mitt sök", criteria, false, clock).Value;
+            db.SavedSearches.Add(saved);
+
+            var recent = RecentJobSearch.Capture(jobSeekerId, criteria, 10, clock.UtcNow);
+            db.RecentJobSearches.Add(recent);
+
+            await db.SaveChangesAsync(ct);
+            savedSearchId = saved.Id.Value;
+            recentSearchId = recent.Id.Value;
+        }
+
+        await RunJobAsync(now, ct);
+
+        using var verifyScope = _fixture.Services.CreateScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var savedAfter = await verifyDb.SavedSearches
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Id == new SavedSearchId(savedSearchId), ct);
+        savedAfter.ShouldBeNull("SavedSearch ska cascade-raderas vid hard-delete (GDPR Art. 17)");
+
+        var recentAfter = await verifyDb.RecentJobSearches
+            .AsNoTracking()
+            .FirstOrDefaultAsync(r => r.Id == new RecentJobSearchId(recentSearchId), ct);
+        recentAfter.ShouldBeNull("RecentJobSearch ska cascade-raderas vid hard-delete (GDPR Art. 17)");
     }
 
     // ─── Helpers ───

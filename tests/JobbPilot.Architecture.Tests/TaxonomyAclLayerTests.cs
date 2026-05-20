@@ -102,6 +102,9 @@ public class TaxonomyAclLayerTests
         consumers.ShouldBe(
         [
             nameof(JobbPilot.Application.JobAds.Queries.GetTaxonomyTree.GetTaxonomyTreeQueryHandler),
+            // ADR 0060 (2026-05-20) — fjärde legitim konsument: RecentJobSearches-
+            // listans label-berikning, identiskt mönster med SavedSearch-listan.
+            nameof(JobbPilot.Application.RecentJobSearches.Queries.ListRecentSearches.ListRecentSearchesQueryHandler),
             nameof(JobbPilot.Application.SavedSearches.Queries.ListSavedSearches.ListSavedSearchesQueryHandler),
             nameof(JobbPilot.Application.JobAds.Queries.GetTaxonomyTree.ResolveTaxonomyLabelsQueryHandler),
         ]);

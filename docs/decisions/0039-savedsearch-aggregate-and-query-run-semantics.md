@@ -85,3 +85,9 @@ Accepted 2026-05-16 efter Klas-GO på samtliga fyra beslut + domänform. Impleme
 ---
 
 *Referenser: Robert C. Martin, Clean Architecture (2017) kap. 7, 22; Eric Evans, DDD (2003) kap. 5, 14; Vaughn Vernon, IDDD (2013) kap. 6; Fowler, Refactoring 2nd ed (2018) Extract Function; Hunt/Thomas, Pragmatic Programmer (1999) DRY; Nygard, Documenting Architecture Decisions (2011); Microsoft Learn — CQRS pattern. CLAUDE.md §2.3, §9.2, §9.6; ADR 0008.*
+
+---
+
+## Amendment 2026-05-20 — Frontend slutar konsumera SavedSearch (per ADR 0060)
+
+Per [ADR 0060](./0060-recent-job-searches-auto-capture.md) Beslut 1 (Klas-direktiv F6 P4a 2026-05-20): frontend (Next.js) slutar konsumera SavedSearch-domänen i samma commit-batch som F6 P4a frontend levereras — `/sokningar`-routen konsumerar `RecentJobSearches` istället (auto-capture-semantik per Platsbanken-paritet). Backend-domän + endpoints (`/api/v1/saved-searches`, CRUD + run) **förblir live oförändrade** — ingen breaking change mot framtida konsumenter eller eventuella server-API-kallare. ADR 0039 övriga beslut (Domain-aggregat, jsonb-criteria, run-semantik, last_run_at Fas 5) **består**. Backend-cleanup framtida fas om städ blir prioriterat.
