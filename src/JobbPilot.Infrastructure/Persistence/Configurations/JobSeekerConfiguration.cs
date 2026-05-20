@@ -1,4 +1,5 @@
 using JobbPilot.Domain.JobSeekers;
+using JobbPilot.Domain.Resumes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -24,6 +25,18 @@ public sealed class JobSeekerConfiguration : IEntityTypeConfiguration<JobSeeker>
         {
             prefs.ToJson();
         });
+
+        // ADR 0058 + ADR 0059: primary-state ägs av JobSeeker-aggregatet
+        // (Alt A2 per senior-cto-advisor 2026-05-20). Ingen FK till resumes
+        // — soft-delete-mönster + cascade-handler i DeleteResumeCommandHandler
+        // håller konsistens (motivering i ADR 0059 + architect-design).
+        builder.Property(js => js.PrimaryResumeId)
+            .HasConversion(
+                id => id.HasValue ? id.Value.Value : (Guid?)null,
+                value => value.HasValue ? new ResumeId(value.Value) : null)
+            .HasColumnName("primary_resume_id");
+
+        builder.HasIndex(js => js.PrimaryResumeId);
 
         builder.Property(js => js.CreatedAt).IsRequired();
         builder.Property(js => js.UpdatedAt);

@@ -101,4 +101,57 @@ public class DeleteResumeCommandHandlerTests
         await Should.ThrowAsync<NotFoundException>(
             () => handler.Handle(command, CancellationToken.None).AsTask());
     }
+
+    // ---------------------------------------------------------------
+    // F6 Prompt 3 — cascade-unset av JobSeeker.PrimaryResumeId
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public async Task Handle_DeletingPrimaryResume_UnsetsJobSeekerPrimaryResumeId()
+    {
+        var db = TestAppDbContextFactory.Create();
+        var seeker = JobSeeker.Register(_userId, "Test User", FakeDateTimeProvider.Default).Value;
+        db.JobSeekers.Add(seeker);
+        var resume = Resume.Create(seeker.Id, "Mitt CV", "Klas Olsson", FakeDateTimeProvider.Default).Value;
+        db.Resumes.Add(resume);
+        await db.SaveChangesAsync(CancellationToken.None);
+        seeker.SetPrimaryResume(resume.Id, FakeDateTimeProvider.Default);
+        await db.SaveChangesAsync(CancellationToken.None);
+        seeker.PrimaryResumeId.ShouldBe(resume.Id);
+
+        var handler = new DeleteResumeCommandHandler(
+            db, _currentUser, FakeDateTimeProvider.Default, Substitute.For<IFailedAccessLogger>());
+        var command = new DeleteResumeCommand(resume.Id.Value);
+
+        var result = await handler.Handle(command, CancellationToken.None);
+        await db.SaveChangesAsync(CancellationToken.None);
+
+        result.IsSuccess.ShouldBeTrue();
+        seeker.PrimaryResumeId.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task Handle_DeletingNonPrimaryResume_DoesNotChangeJobSeekerPrimaryResumeId()
+    {
+        var db = TestAppDbContextFactory.Create();
+        var seeker = JobSeeker.Register(_userId, "Test User", FakeDateTimeProvider.Default).Value;
+        db.JobSeekers.Add(seeker);
+        var primary = Resume.Create(seeker.Id, "Primary", "Klas Olsson", FakeDateTimeProvider.Default).Value;
+        var other = Resume.Create(seeker.Id, "Other", "Klas Olsson", FakeDateTimeProvider.Default).Value;
+        db.Resumes.Add(primary);
+        db.Resumes.Add(other);
+        await db.SaveChangesAsync(CancellationToken.None);
+        seeker.SetPrimaryResume(primary.Id, FakeDateTimeProvider.Default);
+        await db.SaveChangesAsync(CancellationToken.None);
+
+        var handler = new DeleteResumeCommandHandler(
+            db, _currentUser, FakeDateTimeProvider.Default, Substitute.For<IFailedAccessLogger>());
+        var command = new DeleteResumeCommand(other.Id.Value);
+
+        var result = await handler.Handle(command, CancellationToken.None);
+        await db.SaveChangesAsync(CancellationToken.None);
+
+        result.IsSuccess.ShouldBeTrue();
+        seeker.PrimaryResumeId.ShouldBe(primary.Id);
+    }
 }

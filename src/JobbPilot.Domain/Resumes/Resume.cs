@@ -13,9 +13,18 @@ public sealed class Resume : AggregateRoot<ResumeId>
 {
     public JobSeekerId JobSeekerId { get; private set; }
     public string Name { get; private set; } = null!;
+    public ResumeLanguage Language { get; private set; } = ResumeLanguage.Sv;
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
     public DateTimeOffset? DeletedAt { get; private set; }
+
+    // Denormaliserade projektion-fält per ADR 0059 — drivs av ADR 0049
+    // envelope-encryption som gör Content opaque för SQL. Mutation sker
+    // endast via ApplyDenormalizedProjection (synkront i samma aggregat-metod).
+    public string? LatestRole { get; private set; }
+    public int SectionCount { get; private set; }
+    private readonly List<string> _topSkills = [];
+    public IReadOnlyList<string> TopSkills => _topSkills.AsReadOnly();
 
     private readonly List<ResumeVersion> _versions = [];
     public IReadOnlyList<ResumeVersion> Versions => _versions.AsReadOnly();
@@ -94,6 +103,7 @@ public sealed class Resume : AggregateRoot<ResumeId>
         var initialContent = ResumeContent.Empty(fullName.Trim());
         var master = ResumeVersion.CreateMaster(initialContent, clock);
         resume._versions.Add(master);
+        resume.ApplyDenormalizedProjection(initialContent);
 
         resume.RaiseDomainEvent(new ResumeCreatedDomainEvent(id, jobSeekerId, resume.Name, now));
         resume.RaiseDomainEvent(new ResumeVersionCreatedDomainEvent(
@@ -125,8 +135,24 @@ public sealed class Resume : AggregateRoot<ResumeId>
 
         var master = MasterVersion;
         master.UpdateContent(content, clock);
+        ApplyDenormalizedProjection(content);
         UpdatedAt = clock.UtcNow;
         RaiseDomainEvent(new ResumeContentUpdatedDomainEvent(Id, master.Id, clock.UtcNow));
+        return Result.Success();
+    }
+
+    public Result SetLanguage(ResumeLanguage language, IDateTimeProvider clock)
+    {
+        if (language is null)
+            return Result.Failure(DomainError.Validation(
+                "Resume.LanguageRequired", "Språk krävs."));
+
+        if (Language == language)
+            return Result.Success();
+
+        Language = language;
+        UpdatedAt = clock.UtcNow;
+        RaiseDomainEvent(new ResumeLanguageChangedDomainEvent(Id, language, clock.UtcNow));
         return Result.Success();
     }
 
@@ -168,6 +194,36 @@ public sealed class Resume : AggregateRoot<ResumeId>
         foreach (var v in _versions)
             v.SoftDelete(clock);
         RaiseDomainEvent(new ResumeDeletedDomainEvent(Id, clock.UtcNow));
+    }
+
+    private static (string? latestRole, int sectionCount, IReadOnlyList<string> topSkills)
+        ComputeDenormalizedProjection(ResumeContent content)
+    {
+        var latestRole = content.Experiences
+            .OrderByDescending(e => e.StartDate)
+            .FirstOrDefault()?.Role;
+
+        var sectionCount =
+            (!string.IsNullOrWhiteSpace(content.Summary) ? 1 : 0) +
+            (content.Experiences.Count > 0 ? 1 : 0) +
+            (content.Educations.Count > 0 ? 1 : 0) +
+            (content.Skills.Count > 0 ? 1 : 0);
+
+        var topSkills = content.Skills
+            .Take(5)
+            .Select(s => s.Name)
+            .ToList();
+
+        return (latestRole, sectionCount, topSkills);
+    }
+
+    private void ApplyDenormalizedProjection(ResumeContent content)
+    {
+        var (latestRole, sectionCount, topSkills) = ComputeDenormalizedProjection(content);
+        LatestRole = latestRole;
+        SectionCount = sectionCount;
+        _topSkills.Clear();
+        _topSkills.AddRange(topSkills);
     }
 
     private static Result ValidateContent(ResumeContent content)

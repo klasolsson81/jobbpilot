@@ -498,6 +498,188 @@ public class ResumesEndpointsTests(ApiFactory factory)
         getA.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
 
+    // ---- F6 Prompt 3 — Language + Primary-CV --------------------------
+
+    [Fact]
+    public async Task PUT_resume_language_without_auth_returns_401()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var response = await _client.PutAsJsonAsync(
+            $"/api/v1/resumes/{Guid.NewGuid()}/language",
+            new { language = "Sv" },
+            ct);
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task PUT_resume_language_invalid_value_returns_400()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await AuthenticateAsync(ct);
+
+        var post = await _client.PostAsJsonAsync("/api/v1/resumes", CreateBody(), ct);
+        var id = (await post.Content.ReadFromJsonAsync<JsonElement>(ct)).GetProperty("id").GetString()!;
+
+        var put = await _client.PutAsJsonAsync(
+            $"/api/v1/resumes/{id}/language",
+            new { language = "Fr" },
+            ct);
+
+        put.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task PUT_resume_language_happy_path_returns_204_and_appears_in_get_resumes()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await AuthenticateAsync(ct);
+
+        var post = await _client.PostAsJsonAsync("/api/v1/resumes", CreateBody(), ct);
+        var id = (await post.Content.ReadFromJsonAsync<JsonElement>(ct)).GetProperty("id").GetString()!;
+
+        var put = await _client.PutAsJsonAsync(
+            $"/api/v1/resumes/{id}/language",
+            new { language = "En" },
+            ct);
+
+        put.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        var list = await _client.GetAsync("/api/v1/resumes", ct);
+        list.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var listJson = await list.Content.ReadFromJsonAsync<JsonElement>(ct);
+        var item = listJson.GetProperty("items").EnumerateArray()
+            .First(r => r.GetProperty("id").GetString() == id);
+        item.GetProperty("language").GetString().ShouldBe("En");
+    }
+
+    [Fact]
+    public async Task PUT_set_as_primary_without_auth_returns_401()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var response = await _client.PutAsync(
+            $"/api/v1/resumes/{Guid.NewGuid()}/set-as-primary",
+            content: null,
+            ct);
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task PUT_set_as_primary_happy_path_returns_204_and_appears_in_get_resumes()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await AuthenticateAsync(ct);
+
+        var postA = await _client.PostAsJsonAsync("/api/v1/resumes", CreateBody("CV-A"), ct);
+        var idA = (await postA.Content.ReadFromJsonAsync<JsonElement>(ct)).GetProperty("id").GetString()!;
+        var postB = await _client.PostAsJsonAsync("/api/v1/resumes", CreateBody("CV-B"), ct);
+        var idB = (await postB.Content.ReadFromJsonAsync<JsonElement>(ct)).GetProperty("id").GetString()!;
+
+        var put = await _client.PutAsync($"/api/v1/resumes/{idB}/set-as-primary", content: null, ct);
+        put.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        var list = await _client.GetAsync("/api/v1/resumes", ct);
+        var listJson = await list.Content.ReadFromJsonAsync<JsonElement>(ct);
+        var items = listJson.GetProperty("items").EnumerateArray().ToList();
+        var itemA = items.First(r => r.GetProperty("id").GetString() == idA);
+        var itemB = items.First(r => r.GetProperty("id").GetString() == idB);
+        itemA.GetProperty("isPrimary").GetBoolean().ShouldBeFalse();
+        itemB.GetProperty("isPrimary").GetBoolean().ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task UpdateMasterContent_WithExperiencesAndSkills_DenormFieldsAppearInGetResumes()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await AuthenticateAsync(ct);
+
+        var post = await _client.PostAsJsonAsync("/api/v1/resumes", CreateBody(), ct);
+        var id = (await post.Content.ReadFromJsonAsync<JsonElement>(ct)).GetProperty("id").GetString()!;
+
+        var content = new
+        {
+            personalInfo = new
+            {
+                fullName = "Klas Olsson",
+                email = "klas@example.se",
+                phone = (string?)null,
+                location = "Stockholm",
+            },
+            experiences = new[]
+            {
+                new
+                {
+                    company = "Acme",
+                    role = "Junior",
+                    startDate = "2018-01-01",
+                    endDate = (string?)"2020-12-31",
+                    description = (string?)null,
+                },
+                new
+                {
+                    company = "Beta",
+                    role = "Senior Backend",
+                    startDate = "2024-01-01",
+                    endDate = (string?)null,
+                    description = (string?)null,
+                },
+            },
+            educations = Array.Empty<object>(),
+            skills = new[]
+            {
+                new { name = "C#", yearsExperience = (int?)10 },
+                new { name = "PostgreSQL", yearsExperience = (int?)5 },
+                new { name = "TypeScript", yearsExperience = (int?)7 },
+                new { name = "Docker", yearsExperience = (int?)4 },
+                new { name = "AWS", yearsExperience = (int?)3 },
+                new { name = "Kubernetes", yearsExperience = (int?)2 },
+            },
+            summary = "Sammanfattning av profil.",
+        };
+
+        var put = await _client.PutAsJsonAsync($"/api/v1/resumes/{id}/master", content, ct);
+        put.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        var list = await _client.GetAsync("/api/v1/resumes", ct);
+        var listJson = await list.Content.ReadFromJsonAsync<JsonElement>(ct);
+        var item = listJson.GetProperty("items").EnumerateArray()
+            .First(r => r.GetProperty("id").GetString() == id);
+
+        item.GetProperty("latestRole").GetString().ShouldBe("Senior Backend");
+        // Experience + Skill + Summary populerade
+        item.GetProperty("sectionCount").GetInt32().ShouldBe(3);
+        var topSkills = item.GetProperty("topSkills").EnumerateArray()
+            .Select(s => s.GetString()).ToList();
+        topSkills.Count.ShouldBe(5);
+        topSkills[0].ShouldBe("C#");
+    }
+
+    [Fact]
+    public async Task DeletePrimaryResume_CascadeNullsJobSeekerPrimaryResumeId_NextGetReturnsIsPrimaryFalse()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await AuthenticateAsync(ct);
+
+        var postA = await _client.PostAsJsonAsync("/api/v1/resumes", CreateBody("CV-A"), ct);
+        var idA = (await postA.Content.ReadFromJsonAsync<JsonElement>(ct)).GetProperty("id").GetString()!;
+        var postB = await _client.PostAsJsonAsync("/api/v1/resumes", CreateBody("CV-B"), ct);
+        var idB = (await postB.Content.ReadFromJsonAsync<JsonElement>(ct)).GetProperty("id").GetString()!;
+
+        // Sätt CV-A som primary, sen radera CV-A
+        var setPrimary = await _client.PutAsync($"/api/v1/resumes/{idA}/set-as-primary", content: null, ct);
+        setPrimary.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        var del = await _client.DeleteAsync($"/api/v1/resumes/{idA}", ct);
+        del.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        // CV-B kvar; verifiera att inga resumes har IsPrimary=true (cascade-unset)
+        var list = await _client.GetAsync("/api/v1/resumes", ct);
+        var listJson = await list.Content.ReadFromJsonAsync<JsonElement>(ct);
+        var items = listJson.GetProperty("items").EnumerateArray().ToList();
+        items.Count.ShouldBe(1);
+        items[0].GetProperty("id").GetString().ShouldBe(idB);
+        items[0].GetProperty("isPrimary").GetBoolean().ShouldBeFalse();
+    }
+
     // ---- Komplett livscykel -------------------------------------------
 
     [Fact]

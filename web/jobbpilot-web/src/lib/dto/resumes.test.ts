@@ -3,6 +3,7 @@ import {
   getResumesResultSchema,
   resumeContentDtoSchema,
   resumeDetailDtoSchema,
+  resumeLanguageSchema,
   resumeListItemDtoSchema,
   resumeVersionKindSchema,
 } from "./resumes";
@@ -34,6 +35,11 @@ const validListItem = {
   versionCount: 1,
   createdAt: "2026-05-11T10:00:00Z",
   updatedAt: "2026-05-11T10:00:00Z",
+  isPrimary: true,
+  language: "Sv",
+  latestRole: "Backend-utvecklare",
+  sectionCount: 3,
+  topSkills: ["C#", "TypeScript", "PostgreSQL"],
 };
 
 describe("resumeVersionKindSchema", () => {
@@ -71,6 +77,18 @@ describe("resumeContentDtoSchema", () => {
   });
 });
 
+describe("resumeLanguageSchema", () => {
+  it("accepts Sv and En", () => {
+    expect(resumeLanguageSchema.safeParse("Sv").success).toBe(true);
+    expect(resumeLanguageSchema.safeParse("En").success).toBe(true);
+  });
+
+  it("rejects unknown languages", () => {
+    expect(resumeLanguageSchema.safeParse("sv").success).toBe(false);
+    expect(resumeLanguageSchema.safeParse("Fr").success).toBe(false);
+  });
+});
+
 describe("resumeListItemDtoSchema", () => {
   it("accepts valid list item", () => {
     expect(resumeListItemDtoSchema.safeParse(validListItem).success).toBe(true);
@@ -83,6 +101,50 @@ describe("resumeListItemDtoSchema", () => {
         versionCount: -1,
       }).success
     ).toBe(false);
+  });
+
+  it("accepts latestRole null and topSkills empty array", () => {
+    expect(
+      resumeListItemDtoSchema.safeParse({
+        ...validListItem,
+        latestRole: null,
+        topSkills: [],
+        sectionCount: 0,
+      }).success
+    ).toBe(true);
+  });
+
+  it("rejects sectionCount above 4", () => {
+    expect(
+      resumeListItemDtoSchema.safeParse({
+        ...validListItem,
+        sectionCount: 5,
+      }).success
+    ).toBe(false);
+  });
+
+  it("rejects topSkills exceeding 5 entries", () => {
+    expect(
+      resumeListItemDtoSchema.safeParse({
+        ...validListItem,
+        topSkills: ["a", "b", "c", "d", "e", "f"],
+      }).success
+    ).toBe(false);
+  });
+
+  it("rejects invalid language enum value", () => {
+    expect(
+      resumeListItemDtoSchema.safeParse({
+        ...validListItem,
+        language: "Fr",
+      }).success
+    ).toBe(false);
+  });
+
+  it("rejects when isPrimary missing", () => {
+    const { isPrimary, ...rest } = validListItem;
+    void isPrimary;
+    expect(resumeListItemDtoSchema.safeParse(rest).success).toBe(false);
   });
 });
 

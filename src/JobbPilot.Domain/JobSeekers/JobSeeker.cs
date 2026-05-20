@@ -1,5 +1,6 @@
 using JobbPilot.Domain.Common;
 using JobbPilot.Domain.JobSeekers.Events;
+using JobbPilot.Domain.Resumes;
 
 namespace JobbPilot.Domain.JobSeekers;
 
@@ -8,6 +9,7 @@ public sealed class JobSeeker : AggregateRoot<JobSeekerId>
     public Guid UserId { get; private set; }
     public string DisplayName { get; private set; } = null!;
     public Preferences Preferences { get; private set; } = null!;
+    public ResumeId? PrimaryResumeId { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset? UpdatedAt { get; private set; }
     public DateTimeOffset? DeletedAt { get; private set; }
@@ -72,6 +74,44 @@ public sealed class JobSeeker : AggregateRoot<JobSeekerId>
     {
         Preferences = preferences;
         UpdatedAt = clock.UtcNow;
+    }
+
+    /// <summary>
+    /// Sätter primary Resume för denna JobSeeker. Atomic swap — invarianten
+    /// "exakt 1 primary per JobSeeker" hålls trivialt eftersom state ägs här
+    /// (ADR 0058 + senior-cto-advisor 2026-05-20 Alt A2). Handler ansvarar
+    /// för cross-aggregat-validering att <paramref name="resumeId"/> tillhör
+    /// denna JobSeeker — Resume har ingen knowledge om sin egen primary-status.
+    /// Idempotent vid samma ID.
+    /// </summary>
+    public Result SetPrimaryResume(ResumeId resumeId, IDateTimeProvider clock)
+    {
+        if (resumeId == default)
+            return Result.Failure(DomainError.Validation(
+                "JobSeeker.PrimaryResumeIdRequired", "Resume-id krävs."));
+
+        if (PrimaryResumeId == resumeId)
+            return Result.Success();
+
+        PrimaryResumeId = resumeId;
+        UpdatedAt = clock.UtcNow;
+        RaiseDomainEvent(new PrimaryResumeSetDomainEvent(Id, resumeId, clock.UtcNow));
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// Nullar primary Resume. Anropas av <c>DeleteResumeCommandHandler</c> som
+    /// del av cascade när den primary-markerade Resume soft-raderas. Idempotent.
+    /// </summary>
+    public Result UnsetPrimaryResume(IDateTimeProvider clock)
+    {
+        if (PrimaryResumeId is null)
+            return Result.Success();
+
+        PrimaryResumeId = null;
+        UpdatedAt = clock.UtcNow;
+        RaiseDomainEvent(new PrimaryResumeSetDomainEvent(Id, null, clock.UtcNow));
+        return Result.Success();
     }
 
     public void SoftDelete(IDateTimeProvider clock)
