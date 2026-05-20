@@ -144,4 +144,86 @@ public class GetResumesQueryHandlerTests
     // EF InMemory applicerar inte global query filter på relaterade collections som Postgres
     // gör, vilket gjorde testet vilseledande. Verifiering av soft-delete-räkning sker
     // naturligare i integration-tester när Tailored-flödet öppnas i Fas 4.
+
+    // ---------------------------------------------------------------
+    // F6 Prompt 3 — IsPrimary + Language + denormaliserade fält
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public async Task Handle_ReturnsDtoWithIsPrimaryTrueOnlyForJobSeekerPrimaryResume()
+    {
+        var db = TestAppDbContextFactory.Create();
+        var seeker = await SeedSeekerAsync(db, _userId);
+        var resumeA = await AddResumeAsync(db, seeker, "CV-A", FakeDateTimeProvider.Default);
+        var resumeB = await AddResumeAsync(db, seeker, "CV-B", FakeDateTimeProvider.Default);
+
+        // Markera CV-B som primary
+        seeker.SetPrimaryResume(resumeB.Id, FakeDateTimeProvider.Default);
+        await db.SaveChangesAsync(CancellationToken.None);
+
+        var handler = new GetResumesQueryHandler(db, _currentUser);
+
+        var result = await handler.Handle(new GetResumesQuery(), CancellationToken.None);
+
+        result.Items.Count.ShouldBe(2);
+        var dtoA = result.Items.Single(i => i.Id == resumeA.Id.Value);
+        var dtoB = result.Items.Single(i => i.Id == resumeB.Id.Value);
+        dtoA.IsPrimary.ShouldBeFalse();
+        dtoB.IsPrimary.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task Handle_JobSeekerWithoutPrimary_AllDtosHaveIsPrimaryFalse()
+    {
+        var db = TestAppDbContextFactory.Create();
+        var seeker = await SeedSeekerAsync(db, _userId);
+        await AddResumeAsync(db, seeker, "CV-A", FakeDateTimeProvider.Default);
+        await AddResumeAsync(db, seeker, "CV-B", FakeDateTimeProvider.Default);
+
+        var handler = new GetResumesQueryHandler(db, _currentUser);
+
+        var result = await handler.Handle(new GetResumesQuery(), CancellationToken.None);
+
+        result.Items.Count.ShouldBe(2);
+        result.Items.ShouldAllBe(dto => dto.IsPrimary == false);
+    }
+
+    [Fact]
+    public async Task Handle_PopulatesLanguageLatestRoleSectionCountTopSkillsFromResume()
+    {
+        var db = TestAppDbContextFactory.Create();
+        var seeker = await SeedSeekerAsync(db, _userId);
+        var resume = await AddResumeAsync(db, seeker, "Profil", FakeDateTimeProvider.Default);
+
+        // Sätt språk + populera content för denorm-fält
+        resume.SetLanguage(ResumeLanguage.En, FakeDateTimeProvider.Default);
+        var content = new ResumeContent(
+            new PersonalInfo("Klas Olsson", null, null, null),
+            experiences: new[]
+            {
+                new Experience("Acme", "Senior Backend", new DateOnly(2023, 1, 1), null, null),
+                new Experience("Beta", "Junior", new DateOnly(2018, 1, 1), new DateOnly(2020, 1, 1), null),
+            },
+            skills: new[]
+            {
+                new Skill("C#", 10),
+                new Skill("PostgreSQL", 5),
+                new Skill("Docker", 3),
+            },
+            summary: "Sammanfattning.");
+        resume.UpdateMasterContent(content, FakeDateTimeProvider.Default);
+        await db.SaveChangesAsync(CancellationToken.None);
+
+        var handler = new GetResumesQueryHandler(db, _currentUser);
+
+        var result = await handler.Handle(new GetResumesQuery(), CancellationToken.None);
+
+        var dto = result.Items.ShouldHaveSingleItem();
+        dto.Language.ShouldBe("En");
+        dto.LatestRole.ShouldBe("Senior Backend");
+        // Experience + Skill + Summary populerade
+        dto.SectionCount.ShouldBe(3);
+        dto.TopSkills.Count.ShouldBe(3);
+        dto.TopSkills[0].ShouldBe("C#");
+    }
 }

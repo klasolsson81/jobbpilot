@@ -5,4 +5,9 @@ public sealed record ResumeListItemDto(
     string Name,
     int VersionCount,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    bool IsPrimary,
+    string Language,
+    string? LatestRole,
+    int SectionCount,
+    IReadOnlyList<string> TopSkills);

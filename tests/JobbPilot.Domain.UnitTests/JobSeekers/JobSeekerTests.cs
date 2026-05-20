@@ -1,5 +1,6 @@
 using JobbPilot.Domain.JobSeekers;
 using JobbPilot.Domain.JobSeekers.Events;
+using JobbPilot.Domain.Resumes;
 using JobbPilot.Domain.UnitTests.JobAds;
 using Shouldly;
 
@@ -110,5 +111,114 @@ public class JobSeekerTests
         result.Value.Preferences.Language.ShouldBe("sv");
         result.Value.Preferences.EmailNotifications.ShouldBeTrue();
         result.Value.Preferences.WeeklySummary.ShouldBeFalse();
+    }
+
+    // ---------------------------------------------------------------
+    // F6 Prompt 3 — PrimaryResumeId (ADR 0058 + senior-cto-advisor Alt A2)
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public void SetPrimaryResume_FromNull_SetsAndRaisesEventAndUpdatesTimestamp()
+    {
+        var seeker = JobSeeker.Register(ValidUserId, "Klas", Clock).Value;
+        seeker.ClearDomainEvents();
+        var resumeId = ResumeId.New();
+        var laterClock = FakeDateTimeProvider.At(Clock.UtcNow.AddHours(1));
+
+        var result = seeker.SetPrimaryResume(resumeId, laterClock);
+
+        result.IsSuccess.ShouldBeTrue();
+        seeker.PrimaryResumeId.ShouldBe(resumeId);
+        seeker.UpdatedAt.ShouldBe(laterClock.UtcNow);
+        var evt = seeker.DomainEvents.ShouldHaveSingleItem()
+            .ShouldBeOfType<PrimaryResumeSetDomainEvent>();
+        evt.JobSeekerId.ShouldBe(seeker.Id);
+        evt.NewPrimaryResumeId.ShouldBe(resumeId);
+        evt.OccurredAt.ShouldBe(laterClock.UtcNow);
+    }
+
+    [Fact]
+    public void SetPrimaryResume_OverwritePrevious_RaisesEventWithNewId()
+    {
+        var seeker = JobSeeker.Register(ValidUserId, "Klas", Clock).Value;
+        var firstResume = ResumeId.New();
+        var secondResume = ResumeId.New();
+        seeker.SetPrimaryResume(firstResume, Clock);
+        seeker.ClearDomainEvents();
+        var laterClock = FakeDateTimeProvider.At(Clock.UtcNow.AddHours(2));
+
+        var result = seeker.SetPrimaryResume(secondResume, laterClock);
+
+        result.IsSuccess.ShouldBeTrue();
+        seeker.PrimaryResumeId.ShouldBe(secondResume);
+        seeker.UpdatedAt.ShouldBe(laterClock.UtcNow);
+        var evt = seeker.DomainEvents.ShouldHaveSingleItem()
+            .ShouldBeOfType<PrimaryResumeSetDomainEvent>();
+        evt.NewPrimaryResumeId.ShouldBe(secondResume);
+    }
+
+    [Fact]
+    public void SetPrimaryResume_DefaultGuid_ReturnsValidationFailure()
+    {
+        var seeker = JobSeeker.Register(ValidUserId, "Klas", Clock).Value;
+
+        var result = seeker.SetPrimaryResume(default, Clock);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe("JobSeeker.PrimaryResumeIdRequired");
+    }
+
+    [Fact]
+    public void SetPrimaryResume_SameResumeId_IsIdempotentNoEvent()
+    {
+        var seeker = JobSeeker.Register(ValidUserId, "Klas", Clock).Value;
+        var resumeId = ResumeId.New();
+        seeker.SetPrimaryResume(resumeId, Clock);
+        var prevUpdatedAt = seeker.UpdatedAt;
+        seeker.ClearDomainEvents();
+        var laterClock = FakeDateTimeProvider.At(Clock.UtcNow.AddHours(3));
+
+        var result = seeker.SetPrimaryResume(resumeId, laterClock);
+
+        result.IsSuccess.ShouldBeTrue();
+        seeker.PrimaryResumeId.ShouldBe(resumeId);
+        seeker.UpdatedAt.ShouldBe(prevUpdatedAt);
+        seeker.DomainEvents.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void UnsetPrimaryResume_FromSet_NullifiesAndRaisesEventWithNull()
+    {
+        var seeker = JobSeeker.Register(ValidUserId, "Klas", Clock).Value;
+        seeker.SetPrimaryResume(ResumeId.New(), Clock);
+        seeker.ClearDomainEvents();
+        var laterClock = FakeDateTimeProvider.At(Clock.UtcNow.AddHours(2));
+
+        var result = seeker.UnsetPrimaryResume(laterClock);
+
+        result.IsSuccess.ShouldBeTrue();
+        seeker.PrimaryResumeId.ShouldBeNull();
+        seeker.UpdatedAt.ShouldBe(laterClock.UtcNow);
+        var evt = seeker.DomainEvents.ShouldHaveSingleItem()
+            .ShouldBeOfType<PrimaryResumeSetDomainEvent>();
+        evt.JobSeekerId.ShouldBe(seeker.Id);
+        evt.NewPrimaryResumeId.ShouldBeNull();
+        evt.OccurredAt.ShouldBe(laterClock.UtcNow);
+    }
+
+    [Fact]
+    public void UnsetPrimaryResume_AlreadyNull_IsIdempotent()
+    {
+        var seeker = JobSeeker.Register(ValidUserId, "Klas", Clock).Value;
+        var initialUpdatedAt = seeker.UpdatedAt;
+        seeker.ClearDomainEvents();
+        var laterClock = FakeDateTimeProvider.At(Clock.UtcNow.AddHours(1));
+
+        var result = seeker.UnsetPrimaryResume(laterClock);
+
+        result.IsSuccess.ShouldBeTrue();
+        seeker.PrimaryResumeId.ShouldBeNull();
+        seeker.UpdatedAt.ShouldBe(initialUpdatedAt);
+        seeker.DomainEvents.ShouldBeEmpty();
     }
 }

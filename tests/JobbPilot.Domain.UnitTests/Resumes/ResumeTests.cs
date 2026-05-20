@@ -628,6 +628,222 @@ public class ResumeTests
     }
 
     // ---------------------------------------------------------------
+    // F6 Prompt 3 — Language (Sv/En) default + SetLanguage
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public void Create_DefaultsLanguageToSv()
+    {
+        var result = Resume.Create(ValidJobSeekerId, ValidName, ValidFullName, Clock);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.Language.ShouldBe(ResumeLanguage.Sv);
+    }
+
+    [Fact]
+    public void Create_EmptyContent_DenormFieldsAreInitial()
+    {
+        var resume = CreateValidResume();
+
+        resume.LatestRole.ShouldBeNull();
+        resume.SectionCount.ShouldBe(0);
+        resume.TopSkills.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void UpdateMasterContent_WithExperiences_LatestRoleMatchesMostRecentByStartDate()
+    {
+        var resume = CreateValidResume();
+        var content = new ResumeContent(
+            new PersonalInfo(ValidFullName, null, null, null),
+            experiences: new[]
+            {
+                new Experience("Acme", "Junior", new DateOnly(2018, 1, 1), new DateOnly(2020, 1, 1), null),
+                new Experience("Beta", "Lead", new DateOnly(2024, 6, 1), null, null),
+                new Experience("Gamma", "Mid", new DateOnly(2021, 1, 1), new DateOnly(2024, 5, 1), null),
+            });
+
+        var result = resume.UpdateMasterContent(content, Clock);
+
+        result.IsSuccess.ShouldBeTrue();
+        resume.LatestRole.ShouldBe("Lead");
+    }
+
+    [Fact]
+    public void UpdateMasterContent_WithExperiencesSameStartDate_LatestRoleIsStableFirst()
+    {
+        // OrderByDescending är stable i LINQ-to-Objects — vid lika nyckel
+        // behålls input-ordningen. Första experience i input ska vinna.
+        var sameStart = new DateOnly(2024, 1, 1);
+        var resume = CreateValidResume();
+        var content = new ResumeContent(
+            new PersonalInfo(ValidFullName, null, null, null),
+            experiences: new[]
+            {
+                new Experience("Acme", "Role-First", sameStart, null, null),
+                new Experience("Beta", "Role-Second", sameStart, null, null),
+            });
+
+        var result = resume.UpdateMasterContent(content, Clock);
+
+        result.IsSuccess.ShouldBeTrue();
+        resume.LatestRole.ShouldBe("Role-First");
+    }
+
+    [Fact]
+    public void UpdateMasterContent_WithSixSkills_TopSkillsLimitedToFive()
+    {
+        var resume = CreateValidResume();
+        var content = new ResumeContent(
+            new PersonalInfo(ValidFullName, null, null, null),
+            skills: new[]
+            {
+                new Skill("C#", 10),
+                new Skill("PostgreSQL", 5),
+                new Skill("TypeScript", 7),
+                new Skill("Docker", 4),
+                new Skill("AWS", 3),
+                new Skill("Kubernetes", 2),
+            });
+
+        var result = resume.UpdateMasterContent(content, Clock);
+
+        result.IsSuccess.ShouldBeTrue();
+        resume.TopSkills.Count.ShouldBe(5);
+        resume.TopSkills[0].ShouldBe("C#");
+        resume.TopSkills[1].ShouldBe("PostgreSQL");
+        resume.TopSkills[2].ShouldBe("TypeScript");
+        resume.TopSkills[3].ShouldBe("Docker");
+        resume.TopSkills[4].ShouldBe("AWS");
+    }
+
+    [Fact]
+    public void UpdateMasterContent_WithAllFourSections_SectionCountIsFour()
+    {
+        var resume = CreateValidResume();
+        var content = new ResumeContent(
+            new PersonalInfo(ValidFullName, null, null, null),
+            experiences: new[]
+            {
+                new Experience("Acme", "Dev", new DateOnly(2020, 1, 1), null, null),
+            },
+            educations: new[]
+            {
+                new Education("KTH", "MSc CS", new DateOnly(2015, 9, 1), new DateOnly(2018, 6, 1)),
+            },
+            skills: new[] { new Skill("C#", 10) },
+            summary: "Sammanfattning.");
+
+        var result = resume.UpdateMasterContent(content, Clock);
+
+        result.IsSuccess.ShouldBeTrue();
+        resume.SectionCount.ShouldBe(4);
+    }
+
+    [Fact]
+    public void UpdateMasterContent_WithOnlySummary_SectionCountIsOne()
+    {
+        var resume = CreateValidResume();
+        var content = new ResumeContent(
+            new PersonalInfo(ValidFullName, null, null, null),
+            summary: "Bara en sammanfattning.");
+
+        var result = resume.UpdateMasterContent(content, Clock);
+
+        result.IsSuccess.ShouldBeTrue();
+        resume.SectionCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public void UpdateMasterContent_WithWhitespaceSummary_SectionCountDoesNotIncrement()
+    {
+        // Whitespace-only summary räknas inte som en sektion
+        // (IsNullOrWhiteSpace-check i ComputeDenormalizedProjection).
+        var resume = CreateValidResume();
+        var content = new ResumeContent(
+            new PersonalInfo(ValidFullName, null, null, null),
+            summary: "   ");
+
+        var result = resume.UpdateMasterContent(content, Clock);
+
+        result.IsSuccess.ShouldBeTrue();
+        resume.SectionCount.ShouldBe(0);
+    }
+
+    [Fact]
+    public void UpdateMasterContent_FromPopulatedToEmpty_DenormFieldsReset()
+    {
+        // Regression-skydd: ApplyDenormalizedProjection måste nolla state.
+        var resume = CreateValidResume();
+        var populated = new ResumeContent(
+            new PersonalInfo(ValidFullName, null, null, null),
+            experiences: new[]
+            {
+                new Experience("Acme", "Senior", new DateOnly(2024, 1, 1), null, null),
+            },
+            skills: new[] { new Skill("C#", 10), new Skill("SQL", 5) },
+            summary: "Något.");
+        resume.UpdateMasterContent(populated, Clock).IsSuccess.ShouldBeTrue();
+        resume.LatestRole.ShouldBe("Senior");
+        resume.TopSkills.Count.ShouldBe(2);
+        resume.SectionCount.ShouldBe(3);
+
+        var empty = new ResumeContent(new PersonalInfo(ValidFullName, null, null, null));
+        var result = resume.UpdateMasterContent(empty, Clock);
+
+        result.IsSuccess.ShouldBeTrue();
+        resume.LatestRole.ShouldBeNull();
+        resume.SectionCount.ShouldBe(0);
+        resume.TopSkills.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void SetLanguage_ChangesLanguage_RaisesEventAndUpdatesTimestamp()
+    {
+        var resume = CreateValidResume();
+        resume.ClearDomainEvents();
+        var laterClock = FakeDateTimeProvider.At(Clock.UtcNow.AddHours(3));
+
+        var result = resume.SetLanguage(ResumeLanguage.En, laterClock);
+
+        result.IsSuccess.ShouldBeTrue();
+        resume.Language.ShouldBe(ResumeLanguage.En);
+        resume.UpdatedAt.ShouldBe(laterClock.UtcNow);
+        var evt = resume.DomainEvents.ShouldHaveSingleItem()
+            .ShouldBeOfType<ResumeLanguageChangedDomainEvent>();
+        evt.ResumeId.ShouldBe(resume.Id);
+        evt.NewLanguage.ShouldBe(ResumeLanguage.En);
+        evt.OccurredAt.ShouldBe(laterClock.UtcNow);
+    }
+
+    [Fact]
+    public void SetLanguage_Null_ReturnsValidationFailure()
+    {
+        var resume = CreateValidResume();
+
+        var result = resume.SetLanguage(null!, Clock);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe("Resume.LanguageRequired");
+    }
+
+    [Fact]
+    public void SetLanguage_SameLanguage_NoEventNoTimestampUpdate()
+    {
+        var resume = CreateValidResume();
+        var initialUpdatedAt = resume.UpdatedAt;
+        resume.ClearDomainEvents();
+        var laterClock = FakeDateTimeProvider.At(Clock.UtcNow.AddHours(5));
+
+        var result = resume.SetLanguage(ResumeLanguage.Sv, laterClock);
+
+        result.IsSuccess.ShouldBeTrue();
+        resume.Language.ShouldBe(ResumeLanguage.Sv);
+        resume.UpdatedAt.ShouldBe(initialUpdatedAt);
+        resume.DomainEvents.ShouldBeEmpty();
+    }
+
+    // ---------------------------------------------------------------
     // MasterVersion — invariant
     // ---------------------------------------------------------------
 

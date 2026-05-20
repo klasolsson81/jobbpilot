@@ -57,12 +57,20 @@ export const resumeVersionDtoSchema = z.object({
 });
 export type ResumeVersionDto = z.infer<typeof resumeVersionDtoSchema>;
 
+export const resumeLanguageSchema = z.enum(["Sv", "En"]);
+export type ResumeLanguage = z.infer<typeof resumeLanguageSchema>;
+
 export const resumeListItemDtoSchema = z.object({
   id: z.string(),
   name: z.string(),
   versionCount: z.number().int().nonnegative(),
   createdAt: z.string(),
   updatedAt: z.string(),
+  isPrimary: z.boolean(),
+  language: resumeLanguageSchema,
+  latestRole: z.string().nullable(),
+  sectionCount: z.number().int().min(0).max(4),
+  topSkills: z.array(z.string()).max(5),
 });
 export type ResumeListItemDto = z.infer<typeof resumeListItemDtoSchema>;
 

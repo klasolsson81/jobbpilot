@@ -14,14 +14,18 @@ public sealed class GetResumesQueryHandler(IAppDbContext db, ICurrentUser curren
         if (!currentUser.UserId.HasValue)
             return Empty(query);
 
-        var jobSeekerId = await db.JobSeekers
+        // Hämta jobSeeker-Id + PrimaryResumeId i ett steg (en query).
+        var jobSeekerInfo = await db.JobSeekers
             .AsNoTracking()
             .Where(js => js.UserId == currentUser.UserId.Value)
-            .Select(js => js.Id)
+            .Select(js => new { js.Id, js.PrimaryResumeId })
             .FirstOrDefaultAsync(cancellationToken);
 
-        if (jobSeekerId == default)
+        if (jobSeekerInfo is null)
             return Empty(query);
+
+        var primaryResumeId = jobSeekerInfo.PrimaryResumeId;
+        var jobSeekerId = jobSeekerInfo.Id;
 
         var baseQuery = db.Resumes
             .AsNoTracking()
@@ -30,17 +34,26 @@ public sealed class GetResumesQueryHandler(IAppDbContext db, ICurrentUser curren
         // Separat count-query per CLAUDE.md §3.6.
         var totalCount = await baseQuery.CountAsync(cancellationToken);
 
-        var resumes = await baseQuery
+        // Hämta page tracked-fritt; SmartEnum-projektion till string + IReadOnlyList<string>
+        // för TopSkills kräver in-memory-mapping efter ToListAsync (EF-translateability
+        // bevisad pre-design; status quo bevaras — paging begränsar overhead).
+        var page = await baseQuery
             .OrderByDescending(r => r.UpdatedAt)
             .Skip((query.Page - 1) * query.PageSize)
             .Take(query.PageSize)
-            .Select(r => new ResumeListItemDto(
-                r.Id.Value,
-                r.Name,
-                r.Versions.Count(v => v.DeletedAt == null),
-                r.CreatedAt,
-                r.UpdatedAt))
             .ToListAsync(cancellationToken);
+
+        var resumes = page.Select(r => new ResumeListItemDto(
+            r.Id.Value,
+            r.Name,
+            r.Versions.Count(v => v.DeletedAt == null),
+            r.CreatedAt,
+            r.UpdatedAt,
+            primaryResumeId is not null && r.Id == primaryResumeId,
+            r.Language.Name,
+            r.LatestRole,
+            r.SectionCount,
+            r.TopSkills.ToList())).ToList();
 
         return new PagedResult<ResumeListItemDto>(resumes, totalCount, query.Page, query.PageSize);
     }

@@ -1,7 +1,9 @@
+using JobbPilot.Application.JobSeekers.Commands.SetPrimaryResume;
 using JobbPilot.Application.Resumes.Commands.CreateResume;
 using JobbPilot.Application.Resumes.Commands.DeleteResume;
 using JobbPilot.Application.Resumes.Commands.DeleteResumeVersion;
 using JobbPilot.Application.Resumes.Commands.RenameResume;
+using JobbPilot.Application.Resumes.Commands.SetResumeLanguage;
 using JobbPilot.Application.Resumes.Commands.UpdateMasterContent;
 using JobbPilot.Application.Resumes.Queries;
 using JobbPilot.Application.Resumes.Queries.GetResumeById;
@@ -59,6 +61,24 @@ public static class ResumesEndpoints
                 : Results.Problem(detail: result.Error.Message, title: result.Error.Code, statusCode: 400);
         }).RequireAuthorization();
 
+        group.MapPut("/{id:guid}/language", async (
+            Guid id, SetLanguageBody body, IMediator mediator, CancellationToken ct) =>
+        {
+            var result = await mediator.Send(new SetResumeLanguageCommand(id, body.Language), ct);
+            return result.IsSuccess
+                ? Results.NoContent()
+                : Results.Problem(detail: result.Error.Message, title: result.Error.Code, statusCode: 400);
+        }).RequireAuthorization();
+
+        group.MapPut("/{id:guid}/set-as-primary", async (
+            Guid id, IMediator mediator, CancellationToken ct) =>
+        {
+            var result = await mediator.Send(new SetPrimaryResumeCommand(id), ct);
+            return result.IsSuccess
+                ? Results.NoContent()
+                : Results.Problem(detail: result.Error.Message, title: result.Error.Code, statusCode: 400);
+        }).RequireAuthorization();
+
         group.MapDelete("/{id:guid}", async (
             Guid id, IMediator mediator, CancellationToken ct) =>
         {
@@ -80,4 +100,5 @@ public static class ResumesEndpoints
 
     private sealed record CreateResumeBody(string Name, string FullName);
     private sealed record RenameResumeBody(string Name);
+    private sealed record SetLanguageBody(string Language);
 }
