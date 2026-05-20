@@ -125,3 +125,11 @@ senior-cto-advisor Beslut 4.)
   searchParams-sync). `pnpm build`-gate per AGENTS.md.
 - ADR 0042 Beslut A markeras superseded i index; ADR 0042 övriga beslut +
   ADR 0043 förblir Accepted och orörda.
+
+---
+
+## Amendment 2026-05-20 — Senaste-hero-chip BE-stöd levererat (per ADR 0060)
+
+Per [ADR 0060](./0060-recent-job-searches-auto-capture.md) Beslut 8 (F6 P4a backend-leverans 2026-05-20) är backend-stödet för "Senaste sökningar"-hero-chip nu levererat: `RecentJobSearches`-domän + `/api/v1/me/recent-searches` GET/DELETE + `RecentJobSearchCaptureBehavior` post-handler auto-capture på `ListJobAdsQuery`. ADR 0055:s tidigare deferral av Senaste-chip (amendment 2026-05-19 — "deferrad tills BE-stöd") **flyttas från deferral-listan**. Frontend-rendering av Senaste-chip kan aktiveras i F6 P4a frontend-batch (separat session efter F6 P4a backend-merge).
+
+**"Sparade"-chip kvar deferred** tills F6 P4b SavedJobAds-domän (per-annons-bookmark) är levererad — separat backend-prompt. Övriga ADR 0055-beslut (tvåkolumns-popover, live-commit, ingen Använd-knapp, ingen Spara-sökning-knapp i /jobb, supersession av ADR 0042 Beslut A) **består oförändrade**.

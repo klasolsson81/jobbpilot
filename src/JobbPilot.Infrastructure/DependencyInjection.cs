@@ -311,6 +311,13 @@ public static class DependencyInjection
         // ownership-mismatch för CloudWatch-baserad anomaly-detection (TD-68).
         services.AddSingleton<IFailedAccessLogger, FailedAccessLogger>();
 
+        // ADR 0060 — RecentJobSearches auto-capture-port. Scoped (delar
+        // IAppDbContext-livstid; egen SaveChangesAsync per capture per CTO-dom).
+        // Konsumeras av RecentJobSearchCaptureBehavior i pipeline.
+        services.AddScoped<
+            JobbPilot.Application.RecentJobSearches.Abstractions.IRecentJobSearchCapturer,
+            RecentJobSearches.RecentJobSearchCapturer>();
+
         // TD-13 (ADR 0049) — KMS-envelope fält-kryptering. Registrerad i
         // AddPersistence: per-användare-DEK + interceptor-paret (C3) lever på
         // AppDbContext-livscykeln; måste vara tillgänglig i både Api och

@@ -476,3 +476,36 @@ För **rekryterar-PII i `job_ads.raw_payload`** (icke-användar-data där JobbPi
 ### Aktiveringspolicy
 
 `ApplicationUser`-anonymisering kvarstår oförändrat i ADR 0024 D3 + D6. Rekryterar-erasure kvarstår oberoende av kontoraderings-flödet eftersom rekryterare inte har JobbPilot-konton i Fas 2.
+
+---
+
+## Amendment 2026-05-20 — Cascade utökad till SavedSearches + RecentJobSearches (per ADR 0060)
+
+**Datum:** 2026-05-20
+**Källa:** F6 P4a security-auditor GDPR-1 fynd 2026-05-20
+**Trigger:** [ADR 0060](./0060-recent-job-searches-auto-capture.md) — ny PII-domän (RecentJobSearches) införd, samtidigt pre-existing latent cascade-lucka för SavedSearches (ADR 0039) upptäckt
+
+### Bakgrund
+
+`SavedSearches` (ADR 0039) och `RecentJobSearches` (ADR 0060) saknar databas-FK till `job_seekers` ([ADR 0011](./0011-strongly-typed-ids.md) strongly-typed soft-reference-mönster). De har **inte** `ON DELETE CASCADE` — rader skulle bli orphans efter `HardDeleteAccountsJob` om de inte raderas explicit. För RecentJobSearches lagrar `q`-fältet (varchar 100) PII (söktermer kan innehålla person-/företagsnamn) och utgör därför GDPR Art. 17-cascade-blocker.
+
+### Beslut
+
+`AccountHardDeleter.HardDeleteAccountAsync` uppdaterad 2026-05-20 till att explicit `RemoveRange` både `db.SavedSearches` och `db.RecentJobSearches` per JobSeeker innan `db.JobSeekers.Remove(jobSeeker)`. Operationerna deltar i samma `BeginTransactionAsync`-transaktion → atomic Art. 17-erasure för hela user-trädet (paritet med Applications + Resumes-cascade).
+
+Integration-test `HardDeleteAccountsJobIntegrationTests.RunAsync_CascadesHardDelete_ToSavedSearchesAndRecentJobSearches` verifierar end-to-end.
+
+Cascade-tabellen utökad:
+
+| Aggregat | Mekanik | Driver |
+|---|---|---|
+| Application + barn (FollowUp/Note) | DB-CASCADE (HasMany→WithOne→Cascade) | EF Core |
+| Resume + Versions | DB-CASCADE | EF Core |
+| SavedSearch | Explicit `RemoveRange` (ingen DB-FK) | `AccountHardDeleter.HardDeleteAccountAsync` |
+| RecentJobSearch | Explicit `RemoveRange` (ingen DB-FK) | `AccountHardDeleter.HardDeleteAccountAsync` |
+| audit_log | Anonymisering (D3) | `IAuditTrailEraser` |
+| user_data_keys (TD-13/ADR 0049) | Crypto-erasure (delete DEK) | `IUserDataKeyStore.DeleteDataKeysAsync` |
+
+### Pre-existing lucka (SavedSearches)
+
+SavedSearches saknade cascade i `HardDeleteAccountAsync` redan innan F6 P4a — pre-existing GDPR Art. 17-lucka som inte upptäcktes tidigare (low-volume-domän, ingen security-audit hade triggat genom det specifika delete-flödet med seedade SavedSearches). In-block-fix i samma commit-batch som RecentJobSearches per CLAUDE.md §9.6 (samma fas, samma blast-radius). Ingen separat TD lyfts.

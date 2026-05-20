@@ -4,6 +4,7 @@ using JobbPilot.Domain.Auditing;
 using JobbPilot.Domain.Invitations;
 using JobbPilot.Domain.JobAds;
 using JobbPilot.Domain.JobSeekers;
+using JobbPilot.Domain.RecentJobSearches;
 using JobbPilot.Domain.Resumes;
 using JobbPilot.Domain.SavedSearches;
 using JobbPilot.Domain.Waitlist;
@@ -22,6 +23,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<Invitation> Invitations => Set<Invitation>();
     public DbSet<WaitlistEntry> WaitlistEntries => Set<WaitlistEntry>();
     public DbSet<SavedSearch> SavedSearches => Set<SavedSearch>();
+    public DbSet<RecentJobSearch> RecentJobSearches => Set<RecentJobSearch>();
 
     public void Detach(object entity) => Entry(entity).State = EntityState.Detached;
 

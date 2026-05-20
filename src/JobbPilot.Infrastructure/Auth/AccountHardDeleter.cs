@@ -111,6 +111,21 @@ public sealed class AccountHardDeleter(
             .Where(r => r.JobSeekerId == jsId)
             .ToListAsync(cancellationToken);
 
+        // GDPR Art. 17-cascade för aggregat utan databas-FK (ADR 0011
+        // strongly-typed soft-reference-mönster). SavedSearches/RecentJobSearches
+        // saknar HasOne-FK till JobSeekers → måste raderas explicit för att inte
+        // lämna orphaned rader vid hard-delete (security-auditor F6 P4a 2026-05-20).
+        // Pre-existing SavedSearches-lucka fixas in-block (CLAUDE.md §9.6 —
+        // samma fas, samma blast-radius som RecentJobSearches-introduktionen).
+        var savedSearches = await db.SavedSearches
+            .IgnoreQueryFilters()
+            .Where(s => s.JobSeekerId == jsId)
+            .ToListAsync(cancellationToken);
+
+        var recentSearches = await db.RecentJobSearches
+            .Where(r => r.JobSeekerId == jsId)
+            .ToListAsync(cancellationToken);
+
         // Steg 2 a — Öppna explicit transaction (UoWBehavior är inte i pipelinen
         // för worker-jobb-anrop direkt mot porten).
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
@@ -124,6 +139,8 @@ public sealed class AccountHardDeleter(
             // Steg 2 c-e — Hard-delete domain-aggregat (FK CASCADE tar barnen).
             db.Applications.RemoveRange(applications);
             db.Resumes.RemoveRange(resumes);
+            db.SavedSearches.RemoveRange(savedSearches);
+            db.RecentJobSearches.RemoveRange(recentSearches);
             db.JobSeekers.Remove(jobSeeker);
 
             // Steg 2 e2 — Crypto-erasure (TD-13 ADR 0049 Beslut 2 + C6,

@@ -2,6 +2,7 @@ using JobbPilot.Domain.Auditing;
 using JobbPilot.Domain.Invitations;
 using JobbPilot.Domain.JobAds;
 using JobbPilot.Domain.JobSeekers;
+using JobbPilot.Domain.RecentJobSearches;
 using JobbPilot.Domain.Resumes;
 using JobbPilot.Domain.SavedSearches;
 using JobbPilot.Domain.Waitlist;
@@ -24,6 +25,7 @@ public interface IAppDbContext
     DbSet<Invitation> Invitations { get; }
     DbSet<WaitlistEntry> WaitlistEntries { get; }
     DbSet<SavedSearch> SavedSearches { get; }
+    DbSet<RecentJobSearch> RecentJobSearches { get; }
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 
     /// <summary>

@@ -256,6 +256,7 @@ app.MapAdminWaitlistEndpoints();
 app.MapAdminJobAdsEndpoints();
 app.MapJobAdsEndpoints();
 app.MapSavedSearchesEndpoints();
+app.MapRecentSearchesEndpoints();
 
 app.Run();
 
