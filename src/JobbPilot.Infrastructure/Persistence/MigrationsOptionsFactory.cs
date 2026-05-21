@@ -24,7 +24,16 @@ public static class MigrationsOptionsFactory
     public static DbContextOptions<AppDbContext> BuildAppOptions(string connectionString) =>
         new DbContextOptionsBuilder<AppDbContext>()
             .UseNpgsql(connectionString, npgsql =>
-                npgsql.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName))
+            {
+                npgsql.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName);
+                // F6 P4 (2026-05-20) — migration-tids-CommandTimeout 600s.
+                // Npgsql-default är 30s; tunga DDL-migrations (GIN-trigram-index
+                // på job_ads.description, ~52k rader stor fri-text) överskrider
+                // det. Gäller ENBART migration-tid (BuildAppOptions konsumeras av
+                // Migrate schema-mode + dotnet ef-CLI) — runtime-appens DbContext
+                // byggs via separat options-väg och påverkas inte.
+                npgsql.CommandTimeout(600);
+            })
             .UseSnakeCaseNamingConvention()
             .Options;
 
