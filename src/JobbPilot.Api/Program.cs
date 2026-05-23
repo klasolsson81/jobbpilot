@@ -257,6 +257,7 @@ app.MapAdminJobAdsEndpoints();
 app.MapJobAdsEndpoints();
 app.MapSavedSearchesEndpoints();
 app.MapRecentSearchesEndpoints();
+app.MapSavedJobAdsEndpoints();
 
 app.Run();
 

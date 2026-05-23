@@ -4,6 +4,7 @@ using JobbPilot.Domain.JobAds;
 using JobbPilot.Domain.JobSeekers;
 using JobbPilot.Domain.RecentJobSearches;
 using JobbPilot.Domain.Resumes;
+using JobbPilot.Domain.SavedJobAds;
 using JobbPilot.Domain.SavedSearches;
 using JobbPilot.Domain.Waitlist;
 using Microsoft.EntityFrameworkCore;
@@ -26,6 +27,7 @@ public interface IAppDbContext
     DbSet<WaitlistEntry> WaitlistEntries { get; }
     DbSet<SavedSearch> SavedSearches { get; }
     DbSet<RecentJobSearch> RecentJobSearches { get; }
+    DbSet<SavedJobAd> SavedJobAds { get; }
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 
     /// <summary>

@@ -176,6 +176,44 @@ public class HardDeleteAccountsJobIntegrationTests(WorkerTestFixture fixture)
         recentAfter.ShouldBeNull("RecentJobSearch ska cascade-raderas vid hard-delete (GDPR Art. 17)");
     }
 
+    [Fact]
+    public async Task RunAsync_CascadesHardDelete_ToSavedJobAds()
+    {
+        // F6 P5 Punkt 2 Del A — SavedJobAd cascade-paritet (ADR 0024-amend
+        // 2026-05-23): saved_job_ads saknar databas-FK till job_seekers
+        // (ADR 0011 strongly-typed soft-reference). Måste raderas explicit i
+        // HardDeleteAccountAsync — annars orphan-rader efter konto-radering.
+        var ct = TestContext.Current.CancellationToken;
+        var now = DateTimeOffset.UtcNow;
+        var oldDeletedAt = now.AddDays(-(RestoreWindowDays + 1));
+
+        var (_, jobSeekerId) = await SeedSoftDeletedAccountAsync(oldDeletedAt, ct);
+
+        Guid savedJobAdId;
+        using (var scope = _fixture.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var savedJobAdJobAdId = new JobbPilot.Domain.JobAds.JobAdId(Guid.NewGuid());
+            var saved = JobbPilot.Domain.SavedJobAds.SavedJobAd.Save(
+                jobSeekerId, savedJobAdJobAdId, oldDeletedAt.AddDays(-2));
+            db.SavedJobAds.Add(saved);
+            await db.SaveChangesAsync(ct);
+            savedJobAdId = saved.Id.Value;
+        }
+
+        await RunJobAsync(now, ct);
+
+        using var verifyScope = _fixture.Services.CreateScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var savedJobAdAfter = await verifyDb.SavedJobAds
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                s => s.Id == new JobbPilot.Domain.SavedJobAds.SavedJobAdId(savedJobAdId), ct);
+        savedJobAdAfter.ShouldBeNull(
+            "SavedJobAd ska cascade-raderas vid hard-delete (GDPR Art. 17, ADR 0024 amend 2026-05-23)");
+    }
+
     // ─── Helpers ───
 
     private async Task<(Guid UserId, JobSeekerId JobSeekerId)> SeedSoftDeletedAccountAsync(

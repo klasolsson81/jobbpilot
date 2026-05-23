@@ -126,6 +126,14 @@ public sealed class AccountHardDeleter(
             .Where(r => r.JobSeekerId == jsId)
             .ToListAsync(cancellationToken);
 
+        // F6 P5 Punkt 2 Del A — SavedJobAd cascade-paritet (ADR 0024 amend
+        // 2026-05-23): saved_job_ads saknar DB-FK till job_seekers per
+        // ADR 0011 strongly-typed soft-reference-mönster, samma blast-radius
+        // som SavedSearches/RecentJobSearches.
+        var savedJobAds = await db.SavedJobAds
+            .Where(s => s.JobSeekerId == jsId)
+            .ToListAsync(cancellationToken);
+
         // Steg 2 a — Öppna explicit transaction (UoWBehavior är inte i pipelinen
         // för worker-jobb-anrop direkt mot porten).
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
@@ -141,6 +149,7 @@ public sealed class AccountHardDeleter(
             db.Resumes.RemoveRange(resumes);
             db.SavedSearches.RemoveRange(savedSearches);
             db.RecentJobSearches.RemoveRange(recentSearches);
+            db.SavedJobAds.RemoveRange(savedJobAds);
             db.JobSeekers.Remove(jobSeeker);
 
             // Steg 2 e2 — Crypto-erasure (TD-13 ADR 0049 Beslut 2 + C6,
