@@ -46,6 +46,8 @@ tidsbegränsning per touch — fas-tillhörighet styr. Default = fixa in-block.
 | TD-20 | `AuditPartitionMaintainer.DropPartitionsOlderThanAsync` defensiv refactor | Minor | Opportunistiskt | Code quality |
 | TD-39 | Error-summary-mönster för stora formulär | Minor | Trigger | A11y/UX |
 | TD-86 | Sök/filter-hardening: recall-gap vs Platsbanken, common-term-perf, query-token-parser m.m. | Minor | Trigger | Performance/Product quality/Search |
+| TD-87 | Rate-limit för `/me/*`-endpoints batch (saved-job-ads + job-ad-status + recent-searches) | **Major** | F6 P5 P2-fas-stängning | Säkerhet/DoS-skydd |
+| TD-88 | DOM-mutation via onMouseOver i RecentSearchesHeroChip + SavedJobAdsHeroChip — flytta till CSS `:hover` | Minor | Trigger | Frontend/React-disciplin |
 
 ---
 
@@ -74,6 +76,68 @@ det att fas-regeln bryts (TDs lyfts som dumpning istället för att fixas in-blo
 
 
 ## Major — Fas 2
+
+## Major — F6 P5 Punkt 2-fas-stängning
+
+## TD-87: Rate-limit för `/me/*`-endpoints batch
+
+**Kategori:** Säkerhet/DoS-skydd
+**Severity:** Major
+**Fas:** F6 P5 Punkt 2-fas-stängning (innan tag-push `v0.2.60-dev` eller motsv.)
+**Källa:** code-reviewer PR5-rapport 2026-05-23 (agentId `a873a1b68679b9b07`) Major 1; ADR 0063 §Implementation rad 150 (uppdaterad 2026-05-23 — "lyfts som TD-87").
+
+ADR 0063 §Implementation föreskriver rate-limit per user för
+`POST /api/v1/me/job-ad-status`. Endpointen saknar `.RequireRateLimiting(...)`.
+Fas-konsistent gap: `SavedJobAdsEndpoints` + `RecentSearchesEndpoints`
+saknar också rate-limit-attribut. Tre endpoints kan batchas i en fix-commit.
+
+Plus: efter CTO-dom Minor 9 Variant A 2026-05-23 är `/me/job-ad-status`
+**anonym-tillgänglig** — rate-limit per anonym IP behövs (annars
+enumeration/DoS-vektor utan auth-paus). Existing `ListReadPolicy`
+har userId-partition + anonymous→NoLimiter; behöver ny policy med
+IP-fallback för anonyma.
+
+**Föreslagen åtgärd:**
+
+1. Ny rate-limit-policy `MeStatusReadPolicy` med dual-partition
+   (userId om auth, IP-baserad om anonym). Mönstra på `AuthLoosePolicy`
+   (IP) + `ListReadPolicy` (userId).
+2. Applicera `.RequireRateLimiting(...)` på:
+   - `POST /api/v1/me/saved-job-ads/{jobAdId}` (write)
+   - `DELETE /api/v1/me/saved-job-ads/{jobAdId}` (write)
+   - `GET /api/v1/me/saved-job-ads` (read)
+   - `POST /api/v1/me/job-ad-status` (anonym-tolerant batch — primär TD-driver)
+   - `GET /api/v1/me/applications/has-applied/{jobAdId}` (auth-gated)
+   - `GET /api/v1/me/recent-searches`
+   - `DELETE /api/v1/me/recent-searches/{id}`
+3. Update ADR 0063 §Implementation: ändra "Rate-limit per anonym IP + per
+   user lyfts som TD-87" → "implementerad via MeStatusReadPolicy".
+4. Integration-test: 429 efter N requests inom window.
+
+**Trigger:** Innan F6 P5 Punkt 2-fas-stängning (`v0.2.60-dev` eller motsv.
+fas-stängnings-tag).
+
+
+## TD-88: DOM-mutation via onMouseOver i hero-chips — flytta till CSS :hover
+
+**Kategori:** Frontend/React-disciplin
+**Severity:** Minor
+**Fas:** Trigger (opportunistisk när hero-chip-yta touch:as)
+**Källa:** code-reviewer PR5-rapport 2026-05-23 (agentId `a873a1b68679b9b07`) Minor 7.
+
+`SavedJobAdsHeroChip` + `RecentSearchesHeroChip` muterar
+`e.currentTarget.style.background` direkt på `onMouseOver`/`onMouseOut`
+i `HeroChip`-renderItem-callbacks. Bryter CLAUDE.md §5.2
+"React är sanningen". Civic-utility-lösning: CSS `:hover { background:
+var(--jp-surface-3); }` via klassnamn (paritets-fix båda komponenter
+samtidigt — fas-konsistent ändring).
+
+**Föreslagen åtgärd:** lägg till `.jp-herochip-item` class i globals.css
+med `:hover`-stil + applicera klass i båda hero-chip-renderItem.
+
+**Trigger:** Vid nästa hero-chip-touch (ny chip-typ, layout-ändring) eller
+F6 P5 Punkt 2-fas-stängnings-polish.
+
 
 ## Major — Fas 3+
 
