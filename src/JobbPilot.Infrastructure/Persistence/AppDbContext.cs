@@ -6,6 +6,7 @@ using JobbPilot.Domain.JobAds;
 using JobbPilot.Domain.JobSeekers;
 using JobbPilot.Domain.RecentJobSearches;
 using JobbPilot.Domain.Resumes;
+using JobbPilot.Domain.SavedJobAds;
 using JobbPilot.Domain.SavedSearches;
 using JobbPilot.Domain.Waitlist;
 using Microsoft.EntityFrameworkCore;
@@ -24,6 +25,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<WaitlistEntry> WaitlistEntries => Set<WaitlistEntry>();
     public DbSet<SavedSearch> SavedSearches => Set<SavedSearch>();
     public DbSet<RecentJobSearch> RecentJobSearches => Set<RecentJobSearch>();
+    public DbSet<SavedJobAd> SavedJobAds => Set<SavedJobAd>();
 
     public void Detach(object entity) => Entry(entity).State = EntityState.Detached;
 
