@@ -56,6 +56,7 @@ tidsbegränsning per touch — fas-tillhörighet styr. Default = fixa in-block.
 | TD-97 | Integration-test för STORED column-re-evaluation i BackfillJobAdSsykJob mot Testcontainers Postgres | Minor | Fas 1 (efter MVP-demo) | Test coverage |
 | TD-98 | Dedikerad rate-limit-policy för admin-endpoints (`AdminWritePolicy`, partition på UserId) | Minor | Trigger | Säkerhet/DoS-skydd |
 | TD-99 | Rename Postgres-roll `jobbpilot_worker` → `jobbpilot_hangfire` + secret-namn (legacy-bagage; rollen är hangfire-only sedan STEG 6 delas mellan Api+Worker) | Minor | STEG 14 (prod-DDL-cutover) | Code-hygiene/Naming |
+| TD-100 | Yrkesgrupp/yrke-dropdown-UI med 100%-Platsbanken-paritet + SSYK-filter-verifiering (komplement till synonym-mapping från STEG 6 Approach B; ger användaren explicit precision-väg) | Minor | Trigger (när FE bygger yrkesfilter-UI) | Frontend/Search UX |
 
 ---
 
@@ -1305,6 +1306,79 @@ Samlad TD för sök-/filter-/taxonomi-ytan. F6 P4 FTS-skiftet (ADR 0062) leverer
 **Not 2026-05-23:** Korpus-storlek-delen (punkt 1 recall-gap + indirekt punkt 2 common-term-perf via mindre korpus) adresseras indirekt av [ADR 0032-amendment 2026-05-23](./decisions/0032-jobtech-integration.md#amendment-2026-05-23--snapshot-retention-defense-in-depth-miss-cleanup--expiresat-cron--applycriteria-statusactive-spot) snapshot-retention (defense-in-depth miss-cleanup + ExpiresAt-cron) som arkiverar historiska Platsbanken-poster utan stream-removal-event. Förväntad korpus-konvergens ~56k → ~40k över ~72h efter deploy. Detta **stänger inte TD-86** — recall-gap-rotorsak (ingest-filter vs JobTech `/search`-respons) kräver fortfarande discovery, och common-term-perf-problemet (seq scan vid 25 % match-frekvens) är ortogonalt mot korpus-storlek. Re-mät punkt 1 + 2 efter retention konvergerat.
 
 **Trigger:** Klas-GO för sök-fas-2 / strategisk re-prioritering av sök-/filter-yta. Påverkar BUILD.md §18 "Söka jobb"-Fas 2-milstolpe om publik launch övervägs innan #1 (recall-gap) är löst.
+
+---
+
+## TD-100: Yrkesgrupp/yrke-dropdown-UI med 100%-Platsbanken-paritet + SSYK-filter-verifiering
+
+**Kategori:** Frontend / Search UX / Product quality
+**Severity:** Minor
+**Fas:** Trigger (när FE bygger yrkesfilter-UI — egen punkt eller del av sök-fas-2)
+**Källa:** Klas-direktiv 2026-05-24 (post-STEG 6 reflektion): "när vi bygger dropdown yrken — matcha Platsbanken till 100% gällande val av yrkesgrupper och yrken samt att SSYK ska filtrera rätt".
+
+### Bakgrund
+
+STEG 6 Approach B (commit `c1e4876`) levererade **synonym-mapping för fritext-sökning** ("systemutvecklare" → 9 utvecklar-occupation-concept_ids OR-additivt i Q-grenen). Detta är **en av två komplementära mekanismer** för sök-UX:
+
+| Användarsituation | Mekanism | Status |
+|---|---|---|
+| Typar fritext "systemutvecklare" | Synonym-expansion (Approach B) | ✓ Levererad i STEG 6 |
+| Klickar SSYK-chip "Mjukvaruutvecklare" i UI | Explicit filter via `?ssyk=concept_id` | ✓ Backend finns (`JobAdSearchQuery.ApplyCriteria` Ssyk-gren, F2 P9) — UI saknas |
+| Bläddrar Platsbankens yrkeshierarki | Yrkesgrupp/yrke-dropdown | ✗ Saknas helt |
+
+### Klas-spec
+
+När yrkesfilter-UI byggs i FE (egen punkt eller del av sök-fas-2):
+
+1. **100%-paritet med Platsbankens yrkesgrupp + yrke-hierarki** — användaren ska kunna välja samma yrkesgrupper/yrken som på arbetsformedlingen.se/platsbanken. Inga "vår egen" subset eller filter-yta.
+2. **SSYK-filter ska filtrera rätt** — när användaren väljer en yrkesgrupp eller specifikt yrke i dropdown, ska resulterande sökning ge samma träffar som Platsbankens motsvarande filter (modulo legitima skillnader pga vår snapshot-tidpunkt vs Platsbankens realtid).
+3. **Validering mot Platsbanken** — automatiserad eller manuell stickprovs-verifiering att val X i vår UI ger samma annonser som val X på Platsbanken.
+
+### Föreslagen åtgärd
+
+1. **Discovery:**
+   - JobTech taxonomy-API: `https://taxonomy.api.jobtechdev.se/v1/taxonomy/main/concepts?type=occupation-group` (yrkesgrupp-koncept-ids) + occupation-name under varje grupp.
+   - Verifiera mot Platsbankens UI: matchar hierarki + namn på svenska?
+   - Identifiera ev. luckor (yrkesgrupper som inte syns på Platsbanken men finns i taxonomy, eller tvärtom).
+
+2. **Backend:**
+   - Validera att existing `JobAdSearchQuery.ApplyCriteria` Ssyk-gren (sedan F2 P9) ger korrekt resultat för dropdown-val. Skriv integration-test mot Testcontainers som verifierar `?ssyk=<grupp-id>` ger förväntat count + sample-träffar.
+   - Ev. utvidga `ITaxonomyReadModel` (ADR 0043) om grupp-hierarki behöver exponeras till FE.
+
+3. **FE:**
+   - Bygg yrkesgrupp + yrke-dropdown/multi-select i `/jobb`-sidans filter-yta.
+   - Källan: `ITaxonomyReadModel` via ny endpoint, ELLER embedded JSON-snapshot vid build-tid (paritet `taxonomy-snapshot.json` per ADR 0043).
+   - UX: hierarkisk picker (grupp → yrke) eller flat lista med categories.
+
+4. **Verifiering:**
+   - Stickprovs-jämförelse: välj samma yrkesgrupp i vår UI och på Platsbanken, jämför hit-count + topp-5 träffar. Acceptanskriterium: > 95% paritet (modulo timing-skillnader).
+   - Integration-test: `?ssyk=<id>` returnerar samma rader som direkt-query mot dev-RDS.
+
+### Cross-refs
+
+- **TD-86 punkt 7** ("Ort/yrkesgrupper-pickers (ADR 0043 kommun-trigger)") — relaterad men handlar om geografi-pickers + ADR 0043-payload-verifiering. TD-100 är specifik om yrkesfilter-UI med Platsbanken-paritet.
+- **STEG 6 Approach B** — synonym-mapping är komplement, inte ersättning. Båda behövs: fritext (synonym) + explicit (dropdown).
+- **ADR 0042** — sökytans informations-arkitektur. Ev. amendment om dropdown-UI ändrar filter-flöde.
+- **ADR 0043** — taxonomi-ACL. `ITaxonomyReadModel` är källan för occupation-name + occupation-group-data.
+- **ADR 0055** — Platsbanken-popover ersätter disclosure-filter (befintlig sök-UX-disciplin).
+
+### Beroenden
+
+- ADR 0043 taxonomi-snapshot uppdaterad med occupation-group-hierarki (om inte redan).
+- Existing `ssyk_concept_id`-shadow-property + index (F2 P9, finns).
+- STEG 6 Approach A backfill (~88% korpus-coverage med SSYK satt — ger meningsfull filter-yta).
+
+### Trigger
+
+(a) Klas-GO för yrkesfilter-UI som egen FE-punkt, eller
+(b) sök-fas-2 (TD-86 återupptas) inkluderar dropdown-UI, eller
+(c) användarsignal post-MVP om filter-precision behövs.
+
+### Anti-pattern att undvika
+
+- "Vår egen subset av yrken" (förvirrande för användare som känner Platsbanken)
+- Stale taxonomy-data (bygg cache-invaliderings-strategi för JobTech taxonomy-updates)
+- Dropdown utan validering mot Platsbanken (vi tror vi har paritet men har inte)
 
 ---
 
