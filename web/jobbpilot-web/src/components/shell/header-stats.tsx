@@ -119,7 +119,7 @@ export function HeaderStats({
         <span className="jp-header-stats__num">
           {formatLandingNumber(stats.activeCount)}
         </span>
-        <span className="jp-header-stats__label">aktiva</span>
+        <span className="jp-header-stats__label">aktiva annonser</span>
       </div>
       <span
         className="jp-header-stats__sep"
