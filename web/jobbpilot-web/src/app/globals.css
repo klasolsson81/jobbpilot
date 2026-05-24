@@ -3443,3 +3443,120 @@ a:hover { color: var(--jp-navy-600); }
 .jp-notice-group__count::after {
   content: ")";
 }
+
+/* ------------------------------------------------------------------
+   .jp-demo-banner — DEMO-bandet ovanför inre gäst-sidor (F-Pre Punkt 5,
+   2026-05-24). Civic-utility: lugn navy-stripe + tydlig "DEMO"-etikett.
+   Ingen emoji, inget utropstecken, ingen gradient/glow. CTA på höger sida
+   leder till /vantelista (konvertering).
+   ------------------------------------------------------------------ */
+.jp-demo-banner {
+  background: var(--jp-navy-700);
+  color: #fff;
+  border-bottom: 1px solid var(--jp-navy-800, #0A2647);
+}
+.jp-demo-banner__inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 10px 24px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.jp-demo-banner__label {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 3px;
+  background: #fff;
+  color: var(--jp-navy-700);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+.jp-demo-banner__text {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.45;
+  flex: 1 1 auto;
+  min-width: 240px;
+  color: rgba(255, 255, 255, 0.92);
+}
+.jp-demo-banner__cta {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.jp-demo-banner__cta:hover {
+  text-decoration-thickness: 2px;
+}
+.jp-demo-banner :focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+/* design-reviewer M4 2026-05-24: explicit fokusring för CTA-länken — bredare
+   offset + lätt bakgrundskontrast så ringen syns tydligt mot navy-700-bg
+   (WCAG 2.4.7 Focus Visible). */
+.jp-demo-banner__cta:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+}
+
+/* ------------------------------------------------------------------
+   Gäst-mode komponent-stilar (F-Pre Punkt 5, 2026-05-24) — paritet med
+   `.jp-card`. Ersätter tidigare inline-styles per design-reviewer M1+M2.
+   ------------------------------------------------------------------ */
+.jp-guest-resume__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.jp-guest-resume__title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+.jp-guest-resume__meta {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  font-size: 14px;
+  margin: 8px 0;
+}
+.jp-guest-resume__meta dt {
+  color: var(--jp-ink-2);
+}
+.jp-guest-resume__meta dd {
+  margin: 0;
+}
+.jp-guest-resume__skills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.jp-guest-applist__empty {
+  color: var(--jp-ink-2);
+  font-size: 14px;
+  margin: 8px 0 0;
+}
+[data-theme="dark"] .jp-demo-banner {
+  background: var(--jp-navy-700);
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+@media (max-width: 600px) {
+  .jp-demo-banner__inner {
+    padding: 10px 16px;
+    gap: 10px;
+  }
+}

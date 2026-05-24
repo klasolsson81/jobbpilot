@@ -6,6 +6,16 @@ vi.mock("@/lib/auth/actions", () => ({
   loginAction: vi.fn(),
 }));
 
+// F-Pre Punkt 5 (2026-05-24): LandingPage anropar nu `getServerSession()` för
+// att rendera kontextuell CTA (anonym vs inloggad). Mock returnerar `null`
+// (anonym besökare) så befintliga smoke-tester förblir grön; ett separat
+// test täcker isAuthenticated-grenen via LandingHeroSection direkt.
+vi.mock("@/lib/auth/session", () => ({
+  getServerSession: vi.fn().mockResolvedValue(null),
+  ROLES: { Admin: "Admin" },
+  SESSION_COOKIE_NAME: "__Host-jobbpilot_session",
+}));
+
 vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({ push: vi.fn() }),

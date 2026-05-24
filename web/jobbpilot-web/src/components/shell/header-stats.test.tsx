@@ -25,7 +25,7 @@ describe("HeaderStats (ADR 0064 — inloggad live-stats + delta)", () => {
     // sv-SE non-breaking-space → regex matchar både space och U+00A0
     expect(screen.getByText(/45[\s ]580/)).toBeInTheDocument();
     expect(screen.getByText("312")).toBeInTheDocument();
-    expect(screen.getByText("aktiva")).toBeInTheDocument();
+    expect(screen.getByText("aktiva annonser")).toBeInTheDocument();
     expect(screen.getByText("nya idag")).toBeInTheDocument();
   });
 

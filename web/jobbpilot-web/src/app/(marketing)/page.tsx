@@ -3,6 +3,7 @@ import { LandingHeroSection } from "@/components/landing/landing-hero-section";
 import { LandingFeatures } from "@/components/landing/landing-features";
 import { LandingFooter } from "@/components/landing/landing-footer";
 import { getLandingStats } from "@/components/landing/landing-stats";
+import { getServerSession } from "@/lib/auth/session";
 
 /**
  * Landing-routen (`/`) — v3-refactor (F6 Prompt 1, ADR 0056) + live-stats
@@ -27,12 +28,16 @@ import { getLandingStats } from "@/components/landing/landing-stats";
  *  - Glömt-lösenord: ingår i LoginForm (befintlig markup).
  */
 export default async function LandingPage() {
-  const stats = await getLandingStats();
+  // Parallell fetch: stats är publik (anonym), session är cookie-baserad — båda
+  // krävs för render-grenarna nedan. Independent → Promise.all (Klas-direktiv
+  // perf-disciplin). F-Pre Punkt 5 (CTO Beslut 2): inloggad-state styr CTA-
+  // texten + target ("Till översikt" vs "Utforska som gäst").
+  const [stats, user] = await Promise.all([getLandingStats(), getServerSession()]);
   return (
     <div className="flex min-h-screen flex-col bg-surface-primary text-text-primary">
       <LandingTopbar stats={stats} />
       <main className="flex-1">
-        <LandingHeroSection />
+        <LandingHeroSection isAuthenticated={user !== null} />
         <LandingFeatures />
       </main>
       <LandingFooter />
