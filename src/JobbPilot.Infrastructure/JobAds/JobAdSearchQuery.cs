@@ -26,7 +26,9 @@ namespace JobbPilot.Infrastructure.JobAds;
 /// FTS-integrationstester är regressions-grind.
 /// </para>
 /// </summary>
-internal sealed class JobAdSearchQuery(IAppDbContext db) : IJobAdSearchQuery
+internal sealed class JobAdSearchQuery(
+    IAppDbContext db,
+    IOccupationSynonymExpander synonymExpander) : IJobAdSearchQuery
 {
     // PostgreSQL text-search-config för svensk stemming. Måste matcha EXAKT
     // den config som search_vector-kolumnen genererades med (JobAdConfiguration
@@ -36,7 +38,7 @@ internal sealed class JobAdSearchQuery(IAppDbContext db) : IJobAdSearchQuery
     public async ValueTask<PagedResult<JobAdDto>> SearchAsync(
         JobAdSearchCriteria criteria, CancellationToken cancellationToken)
     {
-        var baseQuery = ApplyCriteria(db.JobAds.AsNoTracking(), criteria.Filter);
+        var baseQuery = ApplyCriteria(db.JobAds.AsNoTracking(), criteria.Filter, synonymExpander);
 
         // Separat count-query (CLAUDE.md §3.6). Filter appliceras före count så
         // totalen reflekterar filtrerad mängd, inte hela korpusen.
@@ -74,7 +76,7 @@ internal sealed class JobAdSearchQuery(IAppDbContext db) : IJobAdSearchQuery
         // Ren count — ingen sortering, paginering eller projektion. Samma
         // ApplyCriteria-väg som SearchAsync (SPOT). ADR 0060 Beslut 4 N+1
         // capped vid 20; q-FTS gör count-vägen snabb (ADR 0061 Beslut 3).
-        => await ApplyCriteria(db.JobAds.AsNoTracking(), criteria)
+        => await ApplyCriteria(db.JobAds.AsNoTracking(), criteria, synonymExpander)
             .CountAsync(cancellationToken);
 
     // F2-P9 (TD-70). ssyk/region-filter via Postgres STORED generated columns
@@ -99,7 +101,8 @@ internal sealed class JobAdSearchQuery(IAppDbContext db) : IJobAdSearchQuery
     // (ListJobAds, RunSavedSearch, ListRecentSearches CountAsync) ärver
     // Status=Active-disciplinen automatiskt (ADR 0039 Beslut 1).
     private static IQueryable<JobAd> ApplyCriteria(
-        IQueryable<JobAd> source, JobAdFilterCriteria criteria)
+        IQueryable<JobAd> source, JobAdFilterCriteria criteria,
+        IOccupationSynonymExpander synonymExpander)
     {
         // ADR 0032-amendment 2026-05-23 — slutanvändar-vyer ser bara Active.
         source = source.Where(j => j.Status == JobAdStatus.Active);
@@ -125,12 +128,34 @@ internal sealed class JobAdSearchQuery(IAppDbContext db) : IJobAdSearchQuery
             // string-op — culture är irrelevant. websearch_to_tsquery sköter
             // sin egen normalisering (lexem-tokenisering, robust mot user-input,
             // kastar aldrig på dålig syntax).
+            //
+            // STEG 6 Approach B (2026-05-24) — SSYK-expansion ovanpå FTS+title-LIKE.
+            // synonymExpander översätter fritext ("systemutvecklare") till JobTech
+            // occupation-concept_ids via konfigurerad mapping. OR-additiv: ökar
+            // recall utan att sänka precision för existing FTS-träffar. Q-fältet
+            // består — vi ENBART utvidgar matchnings-ytan med SSYK-träffar för
+            // annonser som har ssyk_concept_id satt. Backfill från Approach A ger
+            // ~88% av korpus med populerad ssyk_concept_id (CTO-rond Plan C-design,
+            // architect-rond 2026-05-24).
             var pattern = $"%{q.ToLowerInvariant()}%";
+            var expandedSsyks = synonymExpander.Expand(q);
+
 #pragma warning disable CA1304, CA1311
-            source = source.Where(j =>
-                EF.Property<NpgsqlTsVector>(j, "SearchVector")
-                    .Matches(EF.Functions.WebSearchToTsQuery(TextSearchConfig, q))
-                || EF.Functions.Like(j.Title.ToLower(), pattern));
+            if (expandedSsyks.Count > 0)
+            {
+                source = source.Where(j =>
+                    EF.Property<NpgsqlTsVector>(j, "SearchVector")
+                        .Matches(EF.Functions.WebSearchToTsQuery(TextSearchConfig, q))
+                    || EF.Functions.Like(j.Title.ToLower(), pattern)
+                    || expandedSsyks.Contains(EF.Property<string?>(j, "SsykConceptId")));
+            }
+            else
+            {
+                source = source.Where(j =>
+                    EF.Property<NpgsqlTsVector>(j, "SearchVector")
+                        .Matches(EF.Functions.WebSearchToTsQuery(TextSearchConfig, q))
+                    || EF.Functions.Like(j.Title.ToLower(), pattern));
+            }
 #pragma warning restore CA1304, CA1311
         }
 
