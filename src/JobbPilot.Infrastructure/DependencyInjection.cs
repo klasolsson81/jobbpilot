@@ -372,6 +372,18 @@ public static class DependencyInjection
             JobbPilot.Application.JobAds.Abstractions.IJobAdSearchQuery,
             JobAds.JobAdSearchQuery>();
 
+        // STEG 6 Approach B (2026-05-24) — fritext→SSYK-expansion för
+        // recall-lift på terms som "systemutvecklare". IOptions-binding från
+        // appsettings.json SearchSynonyms-sektion. DI i samma commit som
+        // port-impl (feedback_di_with_handlers_same_commit). Scoped paritet
+        // IJobAdSearchQuery (samma livscykel).
+        services.AddOptions<JobbPilot.Application.JobAds.Abstractions.SearchSynonymsOptions>()
+            .Bind(configuration.GetSection(
+                JobbPilot.Application.JobAds.Abstractions.SearchSynonymsOptions.SectionName));
+        services.AddScoped<
+            JobbPilot.Application.JobAds.Abstractions.IOccupationSynonymExpander,
+            JobAds.OccupationSynonymExpander>();
+
         // TD-13 (ADR 0049) — KMS-envelope fält-kryptering. Registrerad i
         // AddPersistence: per-användare-DEK + interceptor-paret (C3) lever på
         // AppDbContext-livscykeln; måste vara tillgänglig i både Api och
