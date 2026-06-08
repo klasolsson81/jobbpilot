@@ -1,23 +1,29 @@
 # Current work — JobbPilot
 
-**Status:** **GH-SÄKERHETSHÄRDNING — CodeQL CODE-SCANNING (OBSERVE-ONLY) + §11.3/TD-101 DOC-KORRIGERING 2026-06-07 (branch `chore/gh-security-hardening`, PR mot main, bas-HEAD `54b5da1`).** Liten, hög-värde, låg-risk hygien-PR. **Nästa steg:** Klas approve-spec-edit.sh för CLAUDE.md §11.3-korrigeringen (sista pending-itemet) → därefter PR-merge efter `ci` grönt.
+**Status:** **GH-SÄKERHETSHÄRDNINGS-BÅGE LEVERERAD 2026-06-07/08 (main `c062448`+, 5 PR:er #21–#25).** CodeQL code-scanning live (observe-only) + alla 8 SSRF-alarm åtgärdade + spec-/doc-korrigeringar + automerge-policy formaliserad + sista Dependabot-alarmet stängt. **GitHub Security: 9 → 0 alarm.** **Nästa steg:** ny uppgift (ingen pending).
 
-**Active now (denna session):**
+**Levererat (PR-kedja):**
 
-- **CodeQL code-scanning levererad (observe-only Fas 1):** `.github/workflows/codeql.yml` + `.github/codeql/codeql-config.yml`. Två språk: **C#/.NET 10** (`build-mode: manual` — återbrukar build.yml:s kända-gröna recept setup-dotnet@v5 + global.json + restore + build, för determinism + source-generator-täckning; Mediator.SourceGenerator emitterar auth-pipeline-kod endast vid kompilering, `build-mode:none` vore blind för den ytan) + **JS/TS/Next 16** (`build-mode: none`, språk-id `javascript-typescript`, paths-ignore `.next`/coverage/test-artefakter). Triggers: push main, PR main, veckovis cron, workflow_dispatch. codeql-action@v4. **Ligger MEDVETET utanför required `ci`-aggregatet** (`ci.needs: [backend, frontend, coverage]` orört) + `continue-on-error: true` → kan aldrig blockera merge (ADR 0045-ratchet-precedens). Flip→blockerande = framtida medvetet Klas-GO.
-- **CTO-dom (`af8997b2f5987e1ee`):** Variant C (`build-mode: manual`) > Variant A (none, täckningshål source-generators) > Variant B (autobuild, divergens/flakiness). **Ingen ny ADR** (ärver ADR 0045-ratchet-precedens; build-mode = workflow-impl-detalj). **CC gick direkt till impl utan separat Klas-GO** (entydigt motiverat, scope redan låst observe-only).
-- **Doc-korrigeringar (verklighet vs on-disk):** TD-101-blocket "loggar till Serilog/Seq" → "console via Microsoft.Extensions.Logging — ingen Serilog/Seq-sink wirad, se TD-104"; TD-104 punkt 3 markerad delvis adresserad. In-block-fix: `build.yml`-kommentar `latestPatch`→`latestFeature` (matchar global.json; code-reviewer-fynd).
-- **PENDING (Klas-GO krävs):** **CLAUDE.md §11.3** ("`seq` (local Serilog sink)") — spec-trinity-edit, klassificerar-blockad (memory `feedback_spec_edit_approve_classifier_block`). Verbatim-korrigering förberedd i STOPP-rapporten; kräver `bash .claude/hooks/approve-spec-edit.sh` (Klas kör, el. explicit GO att CC kör i Bypass). Läggs i SAMMA PR efter GO.
-- **Agenter:** senior-cto-advisor (`af8997b2f5987e1ee`, build-mode-dom), security-auditor (`a2e68a0122b279f3a`, **PASS** 0 Block/0 Major/1 Minor floating-pin observation), code-reviewer (`a88d1ad3529feaafa`, **APPROVED** 0/0/0). Rapporter i `docs/reviews/2026-06-07-gh-security-hardening-*.md`.
-- **Operativt:** lokala Api+Worker stoppades för att frigöra DLL-byggslås under pre-commit (parallell-build-lås, Förkrav 4) — **måste startas om** (`dotnet run --project src/JobbPilot.Api` + Worker efter API-build klar). Docker (postgres-dev 5435/redis-dev 6379/seq 5341) + FE 3000 opåverkade.
+- **#21 `chore(security)` CodeQL code-scanning (observe-only):** `.github/workflows/codeql.yml` + `codeql-config.yml`. C#/.NET 10 (`build-mode: manual`, återbrukar build.yml-receptet för source-generator-täckning — CTO `af8997b2f5987e1ee` Variant C) + JS/TS (`build-mode: none`). Utanför required `ci` + `continue-on-error` → kan ej blockera merge (ADR 0045-precedens). Triggers: push/PR main + veckovis cron + dispatch. Plus TD-101/TD-104-formulering + build.yml-kommentar (`latestPatch`→`latestFeature`). security-auditor PASS, code-reviewer APPROVED.
+- **#22 `docs(spec)` CLAUDE.md §11.3:** `seq (local Serilog sink)` → korrekt console-formulering (Klas-GO + `approve-spec-edit.sh`).
+- **#23 `docs(spec)` ADR 0065-amendment + §6.3/§9.1:** automerge-default för CC:s egna PR:er formaliserad (grindmekanism #4 manuell diff-granskning flyttad pre→post-merge; alla andra spärrar pre-merge).
+- **#24 `fix(web)` CodeQL SSRF-härdning:** 8 `js/request-forgery`-alarm + 3 syskon-call-sites (security-auditor `a847cc321367d4ab3`-fynd, in-block §9.6). Delad `src/lib/validation/guid.ts` (`GUID_REGEX` + `isValidId`) + 11 call-sites (allowlist-guard ELLER `parsed.data` + `encodeURIComponent`). CTO `a0958041fed7d09ab` Approach D (B+A; encode ensam ej erkänd CodeQL-sanitizer). 715 vitest gröna. **Verifierat: branch-ref 0 öppna → merge → main-scan 0 öppna.**
+- **#25 `chore(deps)` postcss-override:** `pnpm.overrides postcss@<8.5.10 → ^8.5.10` (next-transitiva 8.4.31→8.5.15). Stänger sista Dependabot-Moderate (XSS i CSS-stringify; build-time, runtime-risk ≈0). pnpm build grönt.
 
-**Commits denna session:**
+**Lärdom (sparad i minne):** auto-merge via GITHUB_TOKEN triggar INTE main-push-workflows → CodeQL-scan på main hoppas över för auto-mergade commits; alarm stänger ej automatiskt. Fix: `gh workflow run codeql.yml --ref main` (eller vänta cron). Se memory `project_automerge_suppresses_main_push_workflows`.
 
-| SHA | Typ | Beskrivning |
+**Automerge-policy aktiv (Klas-direktiv 2026-06-07):** CC sätter `automerge`-label på alla egna PR:er; granskning post-merge. Undantag: ej-åtgärdat agent-Blocker/Major, ogodkänd spec-edit → STOPP.
+
+**Commit-kedja (squash-merge-SHA på main):**
+
+| SHA | PR | Beskrivning |
 |---|---|---|
-| `f409e56` | ci(security) | CodeQL code-scanning observe-only (C# manual + JS/TS none) + build.yml-kommentarsfix |
-| `689adae` | docs(tech-debt) | Korrigera TD-101/TD-104 Serilog/Seq-formulering + agent-rapporter |
-| (denna) | docs(sessions) | current-work + session-log sync |
+| `5b1e8da` | #21 | CodeQL observe-only + TD/build.yml-doc |
+| `c858ea9` | #22 | CLAUDE.md §11.3 Serilog-korrigering |
+| `97ba34e` | #23 | ADR 0065-amendment automerge-policy |
+| `c062448` | #24 | CodeQL SSRF-härdning (11 call-sites + guid.ts) |
+| #25 | #25 | postcss-override (pending merge vid skrivning) |
+| (denna) | — | docs-sync |
 
 **Done last session:** lokal regressions-audit (VPS-portabilitets-lins) — lead-fix (stale node_modules/jest-worker), TD-104/105, drift-guard.
 
