@@ -1,8 +1,15 @@
 # Current work — JobbPilot
 
-**Status:** **PLATSBANKEN SÖK-PARITET — FAS E1b (TYPEAHEAD-SUGGEST FE-KONTRAKT) LEVERERAD 2026-06-10 (branch `feat/sok-paritet-fe-suggest-e1b`, PR mot main, bas-HEAD `13eb0af`).** Fas E LÅST design-riktning A "Papperskontoret" + varm papperston `#FAF9F6` (Klas-GO 2026-06-10). CTO splittade E1→E1a (design-grind, design-reviewer VETO + Klas-GO) + E1b (kontrakts-plumbing, code-reviewer-gated), E1b först. E1b migrerar `/suggest`-FE-konsumtionen `string[]` → `SuggestionDto[]` (`{kind, conceptId, label}`, Beslut 5a); `suggestionKindFromWire` mappar wire-heltal → namn (defensivt int|string-union, speglar `sortByFromWire`); `JobAdTypeahead` renderar `label` (chip-komposition = E2). Komponenten ej wirad live → noll UI-regression. 45 vitest gröna, pnpm build grön; code-reviewer 0 Block/0 Major/1 Minor (in-block), security-auditor APPROVED. **KLAS-STOPP — scope-omförhandling (CTO-flaggat): `?ssyk=`→`?occupationGroup=`-param-rename + recent-shim + picker-nivå-skifte är verifierat entanglade med E2:s yrkesgrupp-skifte (stale FE-taxonomy-DTO, delad `buildJobbHref`, live-picker matar occupation-name-ids) → CTO flyttar dem till E2; Klas-promptens E1-lista omförhandlas. Se STOPP-rapport.** Nästa (efter Klas-GO på scope): E1a design-grind (hero varm canvas + regel-1-fixar + microcopy + docs-drift).
+**Status:** **PLATSBANKEN SÖK-PARITET — FAS E1a (/jobb-HERO "PAPPERSKONTORET") BYGGD + design-reviewer APPROVED 2026-06-10 (branch `feat/sok-paritet-fe-hero-e1a`, PR mot main, bas-HEAD `86b61ae`). KLAS-GO PÅ RENDERAD UI + docs-drift-approve KVARSTÅR.** E1b (suggest-kontrakt) MERGAD `86b61ae` (#39). Klas bekräftade CTO Approach A (scope-omförhandling: param-rename + recent-shim + picker-nivå-skifte → E2; E1b=suggest-only). E1a skinnar om /jobb-heron navy-banner → varm papperston-canvas (`#FAF9F6`, ny `--jp-hero-canvas`-token /jobb-scoped); regel-1-fixar (drop-shadow→border, 40px-titel→28px H1; 12px redan compliant); navy-800 Sök-knapp (ADR 0052); ny `--jp-placeholder`-token (#626B78, WCAG AA båda teman) löste design-reviewer-VETO; microcopy (H1 "Lediga jobb", ingen Platsbanken-verbatim). design-reviewer VETO→åtgärdad→**APPROVED** (0 fynd). pnpm build grön. **KVARSTÅR: (1) Klas-GO på renderad UI (Vercel-preview) — Beslut 7 rad 104; (2) docs-drift `#0B5CAD`→navy-800 i design-tokens-skill = spec-edit, Klas kör `approve-spec-edit.sh` → committas in i E1a-PR.** Nästa fas: E2 (FE-taxonomy-DTO-utökning + picker-nivå-skifte + param-rename + recent-shim + Län→Kommun-kaskad + live-count + chip-komposition + TD-100-paritet) — Klas-GO.
 
-**Levererat denna session (Fas E1b-PR):**
+**Levererat denna session (Fas E1a-PR — pending Klas-GO):**
+
+- **/jobb-hero "Papperskontoret" (riktning A):** navy-banner → varm papperston-canvas. Ny `--jp-hero-canvas` (#FAF9F6 light, ärver `--jp-canvas` #0B1525 dark, /jobb-scoped — rör ej app-wide `--jp-canvas`; architect-dom). `.jp-pagehero` (inre sidor) orörd. Alla hero-barn flippade vit-på-navy → ink-på-papper via tokens. Sök-knapp navy-800 primary (ADR 0052). Dark: ljust sökfält + mörk text.
+- **Regel-1-fixar:** drop-shadow → border (papper); 40px-titel → 28px H1-token; 12px verifierat redan compliant (6px, oförändrat — ärligt rapporterat). Microcopy: H1 "Lediga jobb", label "Sök efter yrke, arbetsgivare eller ort", placeholder "t.ex. systemutvecklare Göteborg".
+- **Ny `--jp-placeholder`-token (#626B78):** WCAG AA ≥4.5:1 (#FFFFFF 5.39:1, #F0F4FB 4.89:1) → löste design-reviewer-VETO (2 Blockers placeholder-kontrast light+dark).
+- **Agent-domar:** nextjs-ui-engineer (bygge), dotnet-architect (token-arkitektur), design-reviewer VETO→APPROVED (`docs/reviews/2026-06-10-sok-paritet-e1a-design-review.md`). ADR 0067 impl-notat (Fas E1a) skrivet.
+
+**Levererat denna session (Fas E1b-PR — MERGAD #39):**
 
 - **Suggest-kontrakt migrerat (ADR 0067 Beslut 5a):** `lib/dto/job-ads.ts` — nytt `suggestionDtoSchema` (`kind`/`conceptId`/`label`) + `suggestionKindFromWire` (wire-heltal Title=0..OccupationGroup=4 → namn via `SUGGESTION_KIND_ORDER`; defensivt int|string-union). Verifierat on-disk: `SuggestionKind` är native C#-enum utan `JsonStringEnumConverter` → serialiseras som HELTAL (samma int-konvention som `JobAdSortBy` i recent-searches `sortByFromWire`).
 - **`JobAdTypeahead` konsumerar `SuggestionDto[]`:** renderar `item.label` (React-escapad text), `key=${kind}:${conceptId??label}`, `choose(item.label)` (behåller `onSelect(string)`-kontrakt). `kind`/`conceptId` parsas som kontraktsfält men chip-komposition är E2 (CTO-dom). Komponenten ej wirad live → noll UI-regression, visual-verify ej triggad.
@@ -33,19 +40,21 @@
 | `06b7840` | #36 | docs(design) — handoff-bundles + agent-roster-CTO-rapport |
 | `ed959c0` | #37 | Fas D1 — facet-counts + utökad typeahead-suggest |
 | `13eb0af` | #38 | Fas D2 — ISearchQueryParser residual-fritext |
-| (denna) | — | feat/sok-paritet-fe-suggest-e1b — typeahead-suggest FE-kontrakt SuggestionDto[] |
+| `86b61ae` | #39 | Fas E1b — typeahead-suggest FE-kontrakt SuggestionDto[] |
+| (denna) | — | feat/sok-paritet-fe-hero-e1a — /jobb-hero varm papperston-canvas (pending Klas-GO) |
 
 ---
 
 ## Pending operativt för Klas
 
-1. **Granska Fas E1b-PR post-merge** (automerge-label sätts av CC; `ci`-aggregatet bär kvaliteten + agent-reports inline). code-reviewer 0 Block/0 Major/1 Minor (in-block); security-auditor APPROVED. `JobAdTypeahead` ej wirad live → noll UI-regression.
-2. **KLAS-GO BEHÖVS — scope-omförhandling Fas E (CTO-flaggat, CLAUDE.md §9.6 punkt 5):** `?ssyk=`→`?occupationGroup=`-param-rename, `RecentJobSearchDto`-shim-borttagning och live-picker-nivå-skifte är verifierat entanglade med E2:s yrkesgrupp-skifte (stale FE-taxonomy-DTO modellerar occupation-name; delad `buildJobbHref`; live-picker matar occupation-name-ids → backend ignorerar `ssyk` = tyst no-op idag; renamet utan picker-skifte → Yrke-filter regresserar till noll träffar). CTO-dom Approach A: flytta alla tre till E2 som atomiskt block. Klas-promptens E1-lista (alla tre under E1) omförhandlas → **bekräfta E1b=suggest-only + flytt till E2, ELLER avvik (t.ex. tidigarelägg E2).** Se STOPP-rapport.
-3. **KLAS-STOPP — chip/residual-kombinationssemantik (ADR 0067 Beslut 5 mildrad Klas-STOPP):** kvarstår från D2. Innan E2 wirar chip+residual: bekräfta `(dim-predikat) AND (FTS ∨ title-LIKE ∨ synonym)` — Q smalnar additivt mot dimensionerna men breddar inom sig själv.
-4. **E1a design-grind (näst på tur, oberoende av scope-frågan):** hero navy→varm canvas `#FAF9F6` (ny `--jp-hero-canvas`-token, /jobb-scoped) + regel-1-fixar (drop-shadow/40px-titel/12px-radie) + egen microcopy + docs-drift `#0B5CAD`→navy-800 i design-tokens-skill (spec-edit → Klas kör `approve-spec-edit.sh`). design-reviewer VETO + Klas-GO på renderad UI.
-5. **NBomber facet-counts-gate (D1) körs i E2** (när endpoint finns). Default = parkerat (Väg B).
-6. **Re-ingest Klass 2** (`POST /api/v1/admin/job-ads/backfill-klass2`, ~2,5h) — blockerar B2-dims + Anställningsform/Omfattning-filter. Kör EJ utan Klas-GO.
-7. **CLAUDE.md §11.3-drift** (`make dev`/`pnpm dev:up` finns ej) — skapa-vs-stryk-beslut vid nästa spec-touch (kvarstår).
+1. **KLAS-GO PÅ RENDERAD UI — E1a /jobb-hero (Beslut 7 rad 104):** design-reviewer APPROVED (0 fynd), men Fas E kräver design-reviewer VETO **+ Klas-GO**. Granska Vercel-preview (light + dark) → ge GO så CC sätter automerge-label. Se STOPP-rapport för preview-URL.
+2. **DOCS-DRIFT SPEC-EDIT (E1a item 4, Klas-gated):** stale `#0B5CAD` → navy-800 (#0A2647) i `jobbpilot-design-tokens`-skill + referenser. Klassificeraren blockerar CC-self-approve → **Klas kör `approve-spec-edit.sh`** (el. permission-regel), sedan committar CC in i E1a-PR. Exakta filer/förekomster i STOPP-rapporten.
+3. **Granska Fas E1b post-merge** (#39 mergad `86b61ae`; CodeQL triggad på main). code-reviewer 0 Block/0 Major/1 Minor (in-block); security-auditor APPROVED.
+4. **Scope Fas E BEKRÄFTAD (Klas-GO 2026-06-10):** Approach A — E1b=suggest-only (mergad), param-rename + recent-shim + picker-nivå-skifte → E2.
+5. **KLAS-STOPP — chip/residual-kombinationssemantik (ADR 0067 Beslut 5):** kvarstår. Innan E2 wirar chip+residual: bekräfta `(dim-predikat) AND (FTS ∨ title-LIKE ∨ synonym)`.
+6. **NBomber facet-counts-gate (D1) körs i E2** (när endpoint finns). Default = parkerat (Väg B).
+7. **Re-ingest Klass 2** (`POST /api/v1/admin/job-ads/backfill-klass2`, ~2,5h) — blockerar B2-dims + Anställningsform/Omfattning-filter. Kör EJ utan Klas-GO.
+8. **CLAUDE.md §11.3-drift** (`make dev`/`pnpm dev:up` finns ej) — skapa-vs-stryk-beslut vid nästa spec-touch (kvarstår).
 
 ---
 

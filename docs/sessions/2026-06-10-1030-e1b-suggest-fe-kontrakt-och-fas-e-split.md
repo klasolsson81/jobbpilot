@@ -2,7 +2,7 @@
 session: Platsbanken sök-paritet Fas E — uppdelning + E1b suggest-kontrakt
 datum: 2026-06-10
 slug: e1b-suggest-fe-kontrakt-och-fas-e-split
-status: E1b levererad (PR mot main); E1a + scope-omförhandling pending Klas-GO
+status: E1b MERGAD (#39); scope Approach A bekräftad; E1a hero byggd + design-reviewer APPROVED, pending Klas rendered-GO + docs-drift-approve
 commits:
   - 5fee02c feat(jobads) E1b typeahead-suggest FE-kontrakt SuggestionDto[]
   - (docs-commit) ADR 0067 impl-note + current-work + session-log + reviews
@@ -63,15 +63,27 @@ kontrakts-migration + docs-drift) som första session, med förväntad sub-split
   (regression-risk). Approach A undviker falsk-klar mot TD-100.
 - **`JobAdTypeahead` ej wirad live:** migrationen är noll-regression.
 
+## E1a-leverans (samma session, efter Klas Approach-A-GO)
+
+- **Scope bekräftad:** Klas valde "Bekräfta CTO Approach A" (AskUserQuestion) → E1b=suggest-only
+  (mergad #39), param-rename + recent-shim + picker → E2.
+- **/jobb-hero "Papperskontoret":** navy-banner → varm papperston-canvas. Ny `--jp-hero-canvas`
+  (#FAF9F6, /jobb-scoped). Regel-1-fixar (drop-shadow→border, 40px→28px H1; 12px redan compliant).
+  Sök-knapp navy-800. Microcopy (H1 "Lediga jobb", ingen Platsbanken-verbatim). Dark: ljust sökfält.
+- **design-reviewer VETO→APPROVED:** 2 Blockers (placeholder-kontrast light 3.5:1 / dark 2.41:1)
+  åtgärdade via ny `--jp-placeholder`-token (#626B78, 5.39:1 / 4.89:1). Re-review 0 fynd.
+- **Pending:** Klas rendered-GO (Vercel-preview) + docs-drift spec-edit (Klas `approve-spec-edit.sh`).
+- **Detour:** visual-verify auth-mode kräver https (`__Host-`-cookie) → lokal auth-rendering blockerad;
+  rätt källa = Vercel-preview. Registrerade dev-test-kontot lokalt (för login-test) — harmlös dev-artefakt.
+
 ## Nästa session
 
-1. **Klas-GO på scope-omförhandling** (E1b=suggest-only, resten → E2) — eller avvik.
-2. **E1a design-grind** (oberoende av scope-frågan): hero varm canvas + regel-1-fixar
-   + microcopy + docs-drift spec-edit (Klas kör `approve-spec-edit.sh`).
-   design-reviewer VETO + Klas-GO.
-3. **E2** (efter scope-GO): FE-taxonomy-DTO-utökning + picker-nivå-skifte +
-   param-rename + recent-shim + Län→Kommun-kaskad + live-count + chip-komposition +
-   TD-100-paritet. Atomisk commit-batch.
+1. **Klas rendered-GO på E1a-hero** (Vercel-preview light+dark) → CC sätter automerge.
+2. **docs-drift spec-edit** (#0B5CAD→navy-800 i design-tokens-skill) efter Klas `approve-spec-edit.sh`
+   → committas in i E1a-PR.
+3. **E2:** FE-taxonomy-DTO-utökning + picker-nivå-skifte + param-rename + recent-shim +
+   Län→Kommun-kaskad + live-count + chip-komposition + TD-100-paritet. Atomisk commit-batch.
+   Kräver även chip/residual-semantik-bekräftelse + ev. NBomber-gate.
 
 ## Stack-status vid sessionsslut
 
