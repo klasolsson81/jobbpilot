@@ -72,7 +72,16 @@ export default async function CvListPage() {
             </p>
           </div>
           <div className="jp-pagehero__aside">
-            <Link href="/cv/ny" className="jp-btn jp-btn--primary">
+            {/* G2 design-reviewer M2: en-primary — ghost när empty-statens
+                CTA är skärmens primära handling. */}
+            <Link
+              href="/cv/ny"
+              className={
+                sorted.length === 0
+                  ? "jp-btn jp-btn--ghost"
+                  : "jp-btn jp-btn--primary"
+              }
+            >
               <Plus size={16} aria-hidden="true" />
               <span>Nytt CV</span>
             </Link>
@@ -82,7 +91,7 @@ export default async function CvListPage() {
 
       <div className="jp-container jp-page">
         {sorted.length === 0 ? (
-          <div className="jp-empty jp-empty--brand">
+          <div className="jp-empty">
             <div className="jp-empty__kicker">CV-varianter</div>
             <div className="jp-empty__title">Inga CV ännu</div>
             <p className="jp-empty__body">

@@ -77,7 +77,17 @@ export default async function AnsokningarPage() {
             </p>
           </div>
           <div className="jp-pagehero__aside">
-            <Link href="/ansokningar/ny" className="jp-btn jp-btn--primary">
+            {/* G2 design-reviewer M2: en-primary-regeln — när pipelinen är
+                tom är empty-statens CTA skärmens primära handling; asiden
+                växlar då till ghost. */}
+            <Link
+              href="/ansokningar/ny"
+              className={
+                total === 0
+                  ? "jp-btn jp-btn--ghost"
+                  : "jp-btn jp-btn--primary"
+              }
+            >
               <Plus size={16} aria-hidden="true" /> Ny ansökan
             </Link>
           </div>
@@ -86,12 +96,12 @@ export default async function AnsokningarPage() {
 
       <div className="jp-container jp-page">
         {total === 0 ? (
-          <div className="jp-empty jp-empty--brand">
+          <div className="jp-empty">
             <div className="jp-empty__kicker">Pipeline</div>
             <div className="jp-empty__title">Inga ansökningar ännu</div>
             <p className="jp-empty__body">
               Så fort du registrerar din första ansökan hamnar den här.
-              Spåra status från utkast till svar utan att tappa en enda råd.
+              Spåra status från utkast till svar utan att tappa en enda ansökan.
             </p>
             <div className="jp-empty__actions">
               <Link href="/ansokningar/ny" className="jp-btn jp-btn--primary">
