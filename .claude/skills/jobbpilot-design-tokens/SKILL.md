@@ -16,6 +16,13 @@ description: >
 > (`:root` + `[data-theme="dark"]` + `@theme`-blocken). Vid avvikelse mellan
 > denna skill och globals.css vinner globals.css alltid.
 >
+> **G2-not 2026-06-10 (ADR 0068 G2-notat):** display-rubriken (44px/800, 32px
+> mobil) följer F4-platta-komponenten var den används (/jobb-hero + pagehero på
+> alla inre sidor; landing-plattan 56px-clamp). Innehållsbredd-kanon app-wide =
+> **1136px** (header = platta = innehåll; `.jp-page` använder `padding-block`).
+> `.jp-empty--brand` har 0 konsumenter — dubbel-grön (två staplade gradient-
+> plattor på samma sida) är förbjuden.
+>
 > - Civic-utility aesthetic context → `jobbpilot-design-principles`
 > - Component-specific token usage → `jobbpilot-design-components`
 > - WCAG contrast compliance → `jobbpilot-design-a11y`

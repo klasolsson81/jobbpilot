@@ -84,7 +84,7 @@ Exakta tokens och hex-värden (light+dark), kontrast-tabell, density-system och 
 - **Primär:** Hanken Grotesk (`next/font/google`, variabel `--font-sans`) — weight 400, 500, 600
 - **Monospace:** JetBrains Mono (`next/font/google`, variabel `--font-mono`) — för IDs, SSYK-koder, datum, tid, versioner, mono caps-labels, pill-räknare. Aldrig brödtext/rubriker/knapptext.
 - **App-UI-roller (ADR 0038 — GOV.UK-läsbarhetsgolv):** body **16px/400** (golv — aldrig informationsbärande text < 16px), body-sm/small **14px** (min), lede **17px/400**, h3 **18px/600**, h2 **20px/600**, h1 **28px/600**
-- **Display (v2 landing):** 56px / 600 / line-height 1.05 / letter-spacing −0.025em — endast landing hero
+- **Display (banner-plattan, ADR 0068 G2):** 44px / 800 / line-height 1.1 / letter-spacing −0.025em (32px mobil) — följer F4-platta-komponenten var den används (/jobb-hero + pagehero på alla inre sidor). Landing-plattan: 56px-clamp / 700. Innehållsbredd-kanon app-wide = 1136px (header = platta = innehåll).
 - **Mono inline (data — datum, ID, räknare):** 13px/500, färg `text-secondary`/`text-primary` (aldrig `text-tertiary`)
 - **Mono caps (labels):** 11.5px / 500 / letter-spacing 0.08–0.16em / UPPERCASE, färg `text-secondary` — kickers, kolumnhuvuden (`UPPDATERAD · MAJ 2026`)
 - **`text-tertiary` är endast dekorativt** (≈2.6:1 — separatorer, inaktiva ikoner). Informationsbärande text alltid `text-secondary` (7.4:1) eller `text-primary`.
