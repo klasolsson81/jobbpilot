@@ -135,10 +135,10 @@ export default async function JobbPage({ searchParams }: PageProps) {
         <div className="jp-hero__inner">
           <div className="jp-hero__plate">
             <div>
-              <h1 className="jp-hero__title">
-                Lediga jobb.
-                <br />I lugn och ro.
-              </h1>
+              {/* G2 (Klas rendered-feedback 2026-06-10): enkel funktionell
+                  rubrik — "Lediga jobb./I lugn och ro." lät AI-aktigt.
+                  Inget utropstecken (civic-utility, CLAUDE.md §10.3). */}
+              <h1 className="jp-hero__title">Sök jobb</h1>
               <p className="jp-hero__lede">
                 Sök bland aktiva annonser från Platsbanken. Filtrera och
                 jämför utan att tappa en enda annons.

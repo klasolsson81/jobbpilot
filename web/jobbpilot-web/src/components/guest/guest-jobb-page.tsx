@@ -19,7 +19,7 @@ export function GuestJobbPage() {
         <div className="jp-hero__inner">
           <div className="jp-hero__plate">
             <div>
-              <h1 className="jp-hero__title">Sök bland aktiva annonser</h1>
+              <h1 className="jp-hero__title">Sök jobb</h1>
               <p className="jp-hero__lede">
                 Detta är exempelannonser. När du har konto kan du söka och
                 spara riktiga annonser från Platsbanken.

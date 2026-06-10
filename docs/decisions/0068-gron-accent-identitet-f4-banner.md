@@ -81,6 +81,16 @@ Identitetsbytet tas som egen fas **"G1"** (egen PR) FÖRE ADR 0067:s återståen
 - **Accent-migration i etapper** — avvisat: halvbytt accent ser trasig ut (handoff explicit).
 - **ADR 0052-amendment istället för ny ADR** — avvisat: hue-byte av hela interaktionssystemet + två principundantag rör tre tidigare ADRs → egen besluts-nod (Nygard 2011, supersedes-länkning).
 
+### Implementerings-notat 2026-06-10 (Fas G2) — banner-konsekvens efter Klas rendered-feedback
+
+**Källa:** Klas rendered-feedback på G1 (tre fynd) + design-reviewer G2-rond. Additivt notat; Beslut 2–3-substansen består men preciseras:
+
+- **H1 /jobb:** "Lediga jobb./I lugn och ro." → **"Sök jobb"** (Klas: AI-aktigt; enkel funktionell rubrik à la GOV.UK "Find a job". Inget utropstecken — §10.3 står över Klas-exemplets "!"). Guest-klonen följer.
+- **Innehållsbredd-kanon = 1136px:** `.jp-page`-shorthand skrev över `.jp-container`:s horisontella padding (kaskad-kollision) → innehåll blev 1200 och alignade inte med platta/header. Fix `padding-block`. EN innehållsbredd app-wide (header = platta = kort = 1136), empiriskt Playwright-verifierad.
+- **Beslut 3:s F4-rollout TIDIGARELAGD (Klas-direktiv):** `.jp-pagehero` (alla inre sidor) + `.jp-land-hero` (landing) är nu inramade plattor (wrapper = canvas + 24/32-inset; inner = 1136-platta, gradient, `--jp-r-md`, dark-hairline) — kant-till-kant-banden utgår överallt. **Display-undantaget (Beslut 2 p.2) följer platta-KOMPONENTEN var den används:** pagehero-titel 44/800 (32px mobil) = jobb-bannerns skala; konsekvent rubrik-typografi per Klas-krav.
+- **Dubbel-grön förbjuden (design-reviewer M2):** `.jp-empty--brand` neutraliserad på pagehero-sidor (/ansokningar, /cv → neutral `.jp-empty`) — dess rationale "när hela sidan annars vore vit" gäller inte när pagehero bär gradienten; två staplade färgband degraderar plattan till dekoration. Modifiern behålls definierad (0 konsumenter). **En-primary-regeln:** pagehero-asidens CTA växlar till ghost när empty-statens CTA är skärmens primära handling (total === 0).
+- Fokus-scoping flyttad till gradient-ELEMENTEN (`__inner`-plattorna), inte wrappers (latent vit-ring-på-canvas-fälla eliminerad).
+
 ## Implementation
 
 G1-PR: token-block + alias-flip + mekanisk rename + F4-banner (/jobb) + pagehero/empty-brand/landing-gradient + fokus-scoping + spec-filer + skills-sync. Referens-facit: `docs/handoff-banner/referens/F4-banner-referens.html` (komposition; neutraler/placeholder per CTO Beslut 1 + Klas-regel). Reviews: design-reviewer (med dessa dokumenterade undantag som granskningsbas), code-reviewer, security-auditor.
