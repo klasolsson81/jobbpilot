@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Briefcase, MapPin, X } from "lucide-react";
 import type { JobAdSortBy } from "@/lib/dto/job-ads";
@@ -8,6 +8,7 @@ import {
   buildJobbHref,
   DEFAULT_SORT_BY,
 } from "@/lib/job-ads/search-params";
+import { publishTotalCount } from "@/lib/job-ads/total-count-store";
 
 /**
  * Result-toolbar för /jobb (HANDOVER-v3.md §7.2, ADR 0055). En rad:
@@ -78,6 +79,13 @@ export function JobbResultsToolbar({
   // ur searchParam-propen (ADR 0042 Beslut D). Lokal state hålls för
   // chips/sort så UI:t inte hoppar innan RSC-omrendering landat.
   const qReady = q.trim().length >= 2;
+
+  // E2c (CTO VAL 2) — publicera list-svarets totalCount till hero-öns
+  // "Visa N annonser"-knapp (total-count-store; SPOT — talet ägs av
+  // PagedResult.TotalCount, aldrig en facett-summa).
+  useEffect(() => {
+    publishTotalCount(totalCount);
+  }, [totalCount]);
 
   const [occupationGroupState, setOccupationGroup] = useState<string[]>([
     ...occupationGroup,

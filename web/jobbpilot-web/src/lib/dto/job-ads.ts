@@ -180,3 +180,23 @@ export const jobAdFiltersSchema = z
     path: ["sortBy"],
   });
 export type JobAdFiltersValues = z.infer<typeof jobAdFiltersSchema>;
+
+// ── Fas E2c (ADR 0067 Beslut 4) — per-option facet-counts ──────────────────
+// Wire-form: rå dict concept-id → count (ingen Total — talet ägs av
+// list-svarets totalCount, SPOT; E2c-architect §1). Saknad nyckel = 0.
+export const FACET_DIMENSIONS = [
+  "OccupationGroup",
+  "Municipality",
+  "Region",
+] as const;
+export type FacetDimension = (typeof FACET_DIMENSIONS)[number];
+export const facetDimensionSchema = z.enum(FACET_DIMENSIONS);
+
+export const facetCountsSchema = z.record(
+  z.string(),
+  z.number().int().nonnegative(),
+);
+export type FacetCounts = z.infer<typeof facetCountsSchema>;
+
+// Samma debounce-klass som typeahead (≥300 ms, E2c-architect §5).
+export const FACET_COUNTS_DEBOUNCE_MS = 300;

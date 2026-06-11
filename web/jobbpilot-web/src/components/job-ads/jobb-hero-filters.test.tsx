@@ -219,6 +219,56 @@ describe("JobbHeroFilters — Yrke tvåkolumns", () => {
   });
 });
 
+describe("JobbHeroFilters — facet-counts + Visa N annonser (E2c)", () => {
+  it("renderar per-option-counts i kommun-rader + Hela länet när fetch svarar", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      const body = url.includes("dimension=Municipality")
+        ? { zHxw_uJZ_NNh: 12, AvNB_uwa_6n6: 340 }
+        : url.includes("dimension=Region")
+          ? { CifL_Rzy_Mku: 1500 }
+          : {};
+      return new Response(JSON.stringify(body), { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    try {
+      setup();
+      await user.click(screen.getByRole("button", { name: /^Ort/ }));
+
+      // Debounce 300 ms → vänta in counts-renderingen.
+      expect(await screen.findByText("(12)")).toBeInTheDocument();
+      expect(screen.getByText("(340)")).toBeInTheDocument();
+      // "Hela länet"-radens count = region-facetten för aktiva länet.
+      expect(screen.getByText(/1\s500/)).toBeInTheDocument();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("visar inga counts vid degradering (fetch saknas) — popovern användbar", async () => {
+    const user = userEvent.setup();
+    setup();
+    await user.click(screen.getByRole("button", { name: /^Ort/ }));
+
+    expect(screen.getByText("Solna")).toBeInTheDocument();
+    expect(screen.queryByText(/\(\d/)).toBeNull();
+  });
+
+  it("Visa annonser-knappen stänger popovern (totalCount opublicerad → utan tal)", async () => {
+    const user = userEvent.setup();
+    setup();
+    await user.click(screen.getByRole("button", { name: /^Ort/ }));
+
+    const btn = screen.getByRole("button", { name: "Visa annonser" });
+    await user.click(btn);
+    expect(screen.queryByRole("dialog", { name: "Län" })).toBeNull();
+    // Stängning är navigations-fri — inga router-pushes från knappen.
+    expect(pushMock).not.toHaveBeenCalled();
+  });
+});
+
 describe("JobbHeroFilters — degraderad taxonomi", () => {
   it("visar civil fallback-text när trädet saknas", async () => {
     const user = userEvent.setup();
