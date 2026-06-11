@@ -26,6 +26,7 @@ public static partial class RateLimitingExtensions
     public const string ListReadPolicy = "list-read";
     public const string SuggestPolicy = "suggest";
     public const string TaxonomyReadPolicy = "taxonomy-read";
+    public const string FacetCountsPolicy = "facet-counts";
     public const string LandingPublicReadPolicy = "landing-public-read";
 
     [LoggerMessage(2001, LogLevel.Warning,
@@ -208,6 +209,30 @@ public static partial class RateLimitingExtensions
                     {
                         PermitLimit = rateLimitOpts.TaxonomyRead.PermitLimit,
                         Window = TimeSpan.FromSeconds(rateLimitOpts.TaxonomyRead.WindowSeconds),
+                        QueueLimit = 0,
+                    });
+            });
+
+            // Partition: UserId (claim "sub"). Dedikerad facet-counts-policy
+            // (ADR 0067 Beslut 4 Fas E2c, senior-cto-advisor VAL 1 2026-06-11) —
+            // least common mechanism (Saltzer/Schroeder): facet-ytan är
+            // client-side debounce-burst (Ort-popovern ×2 parallella requests)
+            // och får inte dela budget med ListRead-RSC-refetcharna — delad
+            // budget hade strypt LISTAN av sin egen dekoration (bulkhead,
+            // Nygard). Auth-gated → anonym fångas av RequireAuthorization
+            // (NoLimiter bypass). Parametrar IOptions-bundna (§5.1).
+            // security-auditor BLOCKING verifierar tal (riktvärde 30/10s).
+            options.AddPolicy(FacetCountsPolicy, ctx =>
+            {
+                var userId = ctx.User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+                if (string.IsNullOrEmpty(userId))
+                    return RateLimitPartition.GetNoLimiter("anonymous-facet-counts");
+
+                return RateLimitPartition.GetFixedWindowLimiter(userId, _ =>
+                    new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = rateLimitOpts.FacetCounts.PermitLimit,
+                        Window = TimeSpan.FromSeconds(rateLimitOpts.FacetCounts.WindowSeconds),
                         QueueLimit = 0,
                     });
             });

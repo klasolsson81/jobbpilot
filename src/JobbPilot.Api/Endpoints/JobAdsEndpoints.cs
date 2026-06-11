@@ -1,7 +1,9 @@
 using System.Security.Cryptography;
 using System.Text.Json;
 using JobbPilot.Api.RateLimiting;
+using JobbPilot.Application.JobAds.Abstractions;
 using JobbPilot.Application.JobAds.Commands.CreateJobAd;
+using JobbPilot.Application.JobAds.Queries.GetFacetCounts;
 using JobbPilot.Application.JobAds.Queries.GetJobAd;
 using JobbPilot.Application.JobAds.Queries.GetTaxonomyTree;
 using JobbPilot.Application.JobAds.Queries.ListJobAds;
@@ -72,6 +74,37 @@ public static class JobAdsEndpoints
             return Results.Ok(result);
         })
         .RequireRateLimiting(RateLimitingExtensions.SuggestPolicy);
+
+        // ADR 0067 Beslut 4 (Fas E2c) — per-option facet-counts: concept-id →
+        // antal aktiva annonser för EN dimension, med den facetterade
+        // dimensionens listor exkluderade ur WHERE (ort-facetterna exkluderar
+        // HELA ort-dimensionen — CTO VAL 4). Rå dict (ingen Total — talet ägs
+        // av list-svarets PagedResult.TotalCount, SPOT). Egen FacetCountsPolicy
+        // (30/10s/user — least common mechanism; facet-burst får inte svälta
+        // list-RSC-refetcharna, CTO VAL 1 E2c). Cache-Control: private,
+        // no-store (dynamiskt per filter + korpus + auth). dimension binds
+        // case-insensitivt per namn; validatorn IsInEnum() stoppar numeriska
+        // out-of-range-värden (?dimension=7) med rent 400.
+        group.MapGet("/facet-counts", async (
+            IMediator mediator, HttpContext http,
+            FacetDimension dimension,
+            string[]? occupationGroup = null,
+            string[]? municipality = null,
+            string[]? region = null,
+            string? q = null,
+            CancellationToken ct = default) =>
+        {
+            http.Response.Headers.CacheControl = "private, no-store";
+            var result = await mediator.Send(
+                new GetFacetCountsQuery(
+                    dimension,
+                    OccupationGroup: occupationGroup,
+                    Municipality: municipality,
+                    Region: region,
+                    Q: q), ct);
+            return Results.Ok(result);
+        })
+        .RequireRateLimiting(RateLimitingExtensions.FacetCountsPolicy);
 
         // ADR 0043 — picker-träd (Län + Yrkesområde→Yrke). concept-id
         // försvinner ur UI (Anticorruption Layer). Statisk referensdata →

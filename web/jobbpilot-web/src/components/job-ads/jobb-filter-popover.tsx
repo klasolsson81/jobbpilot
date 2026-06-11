@@ -74,6 +74,17 @@ interface JobbFilterPopoverProps {
     onToggleGroup: (groupConceptId: string) => void;
     onClearColumn: (groupConceptId: string) => void;
   };
+  /**
+   * Fas E2c (ADR 0067 Beslut 4) — per-option-counts för höger-kolumnens
+   * item-rader (concept-id → count; saknad nyckel = 0). `null`/utelämnad =
+   * counts ej laddade/degraderade → inga tal visas (popovern fullt
+   * användbar — counts är en hint, aldrig en förutsättning).
+   */
+  counts?: Record<string, number> | null;
+  /** Count för "Hela länet"-raden (gruppens eget id i grupp-facetten). */
+  groupCounts?: Record<string, number> | null;
+  /** Footer-yta ("Visa N annonser"-knappen, CTO VAL 2 — föräldern äger). */
+  footer?: React.ReactNode;
 }
 
 // Position härleds ur triggerns ref INNE I en effect (refs får inte läsas
@@ -143,11 +154,14 @@ function CheckRow({
   checked,
   onToggle,
   isAll,
+  count,
 }: {
   label: string;
   checked: boolean;
   onToggle: () => void;
   isAll?: boolean;
+  /** Per-option-count (E2c) — undefined = counts ej laddade, inget tal. */
+  count?: number;
 }) {
   return (
     <div
@@ -167,6 +181,11 @@ function CheckRow({
         {checked && <Check size={14} aria-hidden="true" />}
       </span>
       {label}
+      {count !== undefined && (
+        <span className="jp-checkitem__count">
+          ({count.toLocaleString("sv-SE")})
+        </span>
+      )}
     </div>
   );
 }
@@ -185,6 +204,9 @@ export function JobbFilterPopover({
   emptyText,
   rightEmptyText,
   groupAxis,
+  counts,
+  groupCounts,
+  footer,
 }: JobbFilterPopoverProps) {
   const ref = useDismissable<HTMLDivElement>(open, onClose, triggerRef);
   const pos = usePopoverPosition(open, triggerRef);
@@ -360,6 +382,14 @@ export function JobbFilterPopover({
                 label={selectAllLabel}
                 checked={selectAllChecked}
                 isAll
+                // "Hela länet"-radens count = gruppens eget id i grupp-
+                // facetten (region). Enaxel-fallet (Yrke) har ingen
+                // grupp-count — summan vore semantiskt fel (CTO VAL 2-not).
+                count={
+                  groupAxis && activeGroup && groupCounts
+                    ? (groupCounts[activeGroup.conceptId] ?? 0)
+                    : undefined
+                }
                 onToggle={() => {
                   if (groupAxis && activeGroup) {
                     groupAxis.onToggleGroup(activeGroup.conceptId);
@@ -378,6 +408,9 @@ export function JobbFilterPopover({
                   key={it.conceptId}
                   label={it.label}
                   checked={selectedSet.has(it.conceptId)}
+                  // Saknad nyckel = 0 träffar (counts laddade); null/undefined
+                  // counts = inget tal alls (tyst degradering).
+                  count={counts ? (counts[it.conceptId] ?? 0) : undefined}
                   onToggle={() => toggle(selected, it.conceptId, onChange)}
                 />
               ))}
@@ -385,6 +418,7 @@ export function JobbFilterPopover({
           )}
         </div>
       </div>
+      {footer && <div className="jp-popover__foot">{footer}</div>}
     </div>
   );
 }

@@ -24,6 +24,11 @@ namespace JobbPilot.Api.IntegrationTests.JobAds;
 // KÄRNAN (ADR 0067 Beslut 4 facett-exkluderings-semantik): counten för dimension
 // X reflekterar alla ANDRA aktiva filter i criteria men INTE X självt (annars fel
 // siffror vs Platsbanken). NULL-shadow exkluderas → ingen null-nyckel.
+//
+// E2c (CTO VAL 4, 2026-06-11): ort är EN dimension i två granulariteter
+// (geo-union i ApplyCriteria sedan E2b) — ort-facetterna (Municipality/Region)
+// exkluderar HELA ort-dimensionen (båda listorna) ur WHERE. Se VAL 4-facts
+// längst ned.
 [Collection("Api")]
 public class JobAdFacetCountsTests(ApiFactory factory)
 {
@@ -240,6 +245,110 @@ public class JobAdFacetCountsTests(ApiFactory factory)
 
         counts[regA].ShouldBe(1);
         counts[regB].ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task FacetCountsAsync_MunicipalityFacet_ExcludesWholeOrtDimension_RegionFilterIgnored()
+    {
+        // CTO VAL 4: Municipality-facetten exkluderar HELA ort-dimensionen —
+        // ett aktivt Region-filter får INTE begränsa kommun-countsen (kommuner
+        // i andra län räknas också; annars vore "Solna (12)" fel mot unionen).
+        var ct = TestContext.Current.CancellationToken;
+        var muniInX = $"kn{Guid.NewGuid():N}"[..16];
+        var muniInY = $"kn{Guid.NewGuid():N}"[..16];
+        var regX = $"reg{Guid.NewGuid():N}"[..16];
+        var regY = $"reg{Guid.NewGuid():N}"[..16];
+
+        await SeedAsync("IX", null, muniInX, regX, ct);
+        await SeedAsync("IY", null, muniInY, regY, ct);
+
+        using var scope = _factory.Services.CreateScope();
+        var sut = CreateSut(scope);
+
+        var counts = await sut.FacetCountsAsync(
+            Criteria(region: [regX]), FacetDimension.Municipality, ct);
+
+        // Båda kommunerna räknas — region-filtret är exkluderat (ort-dimension).
+        counts[muniInX].ShouldBe(1);
+        counts[muniInY].ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task FacetCountsAsync_RegionFacet_ExcludesWholeOrtDimension_MunicipalityFilterIgnored()
+    {
+        // Spegelbild: Region-facetten exkluderar även Municipality-listan.
+        var ct = TestContext.Current.CancellationToken;
+        var muniA = $"kn{Guid.NewGuid():N}"[..16];
+        var regX = $"reg{Guid.NewGuid():N}"[..16];
+        var regY = $"reg{Guid.NewGuid():N}"[..16];
+
+        await SeedAsync("RX", null, muniA, regX, ct);
+        await SeedAsync("RY", null, null, regY, ct);
+
+        using var scope = _factory.Services.CreateScope();
+        var sut = CreateSut(scope);
+
+        var counts = await sut.FacetCountsAsync(
+            Criteria(municipality: [muniA]), FacetDimension.Region, ct);
+
+        counts[regX].ShouldBe(1);
+        counts[regY].ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task FacetCountsAsync_MunicipalityFacet_WithBothOrtListsActive_ExcludesBoth()
+    {
+        // Båda ort-listorna satta → båda exkluderade ur Municipality-facetten;
+        // andra-dimensions-filter (yrke) reflekteras fortfarande.
+        var ct = TestContext.Current.CancellationToken;
+        var grp = $"grp{Guid.NewGuid():N}"[..16];
+        var muniA = $"kn{Guid.NewGuid():N}"[..16];
+        var muniB = $"kn{Guid.NewGuid():N}"[..16];
+        var regX = $"reg{Guid.NewGuid():N}"[..16];
+
+        await SeedAsync("GA", grp, muniA, regX, ct);
+        await SeedAsync("GB", grp, muniB, null, ct);
+        await SeedAsync("FelYrke", $"grp{Guid.NewGuid():N}"[..16], muniB, null, ct);
+
+        using var scope = _factory.Services.CreateScope();
+        var sut = CreateSut(scope);
+
+        var counts = await sut.FacetCountsAsync(
+            Criteria(occupationGroup: [grp], municipality: [muniA], region: [regX]),
+            FacetDimension.Municipality, ct);
+
+        // muniB räknas trots att varken muniB eller dess (saknade) region är
+        // valda — ort-exkludering total; FelYrke räknas EJ (yrke-filtret kvar).
+        counts[muniA].ShouldBe(1);
+        counts[muniB].ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task FacetCountsAsync_OccupationGroupFacet_InheritsGeoUnionViaSpot()
+    {
+        // Regressionsvakt (E2b geo-union ärvd via ApplyCriteria-SPOT): yrke-
+        // facetten med BÅDA ort-listorna aktiva räknar annonser som matchar
+        // region-grenen ELLER kommun-grenen — inte AND-snittet.
+        var ct = TestContext.Current.CancellationToken;
+        var grpA = $"grp{Guid.NewGuid():N}"[..16];
+        var grpB = $"grp{Guid.NewGuid():N}"[..16];
+        var regX = $"reg{Guid.NewGuid():N}"[..16];
+        var muniInY = $"kn{Guid.NewGuid():N}"[..16];
+
+        await SeedAsync("ViaRegion", grpA, null, regX, ct);
+        await SeedAsync("ViaKommun", grpB, muniInY, $"reg{Guid.NewGuid():N}"[..16], ct);
+        await SeedAsync("UtanförOrt", grpA, $"kn{Guid.NewGuid():N}"[..16],
+            $"reg{Guid.NewGuid():N}"[..16], ct);
+
+        using var scope = _factory.Services.CreateScope();
+        var sut = CreateSut(scope);
+
+        var counts = await sut.FacetCountsAsync(
+            Criteria(municipality: [muniInY], region: [regX]),
+            FacetDimension.OccupationGroup, ct);
+
+        counts[grpA].ShouldBe(1); // ViaRegion (UtanförOrt exkluderad av unionen)
+        counts[grpB].ShouldBe(1); // ViaKommun
     }
 
     [Fact]

@@ -12,6 +12,8 @@ import {
   clearRegionColumn,
   type OrtSelection,
 } from "@/lib/job-ads/ort-selection";
+import { useFacetCounts } from "@/lib/hooks/use-facet-counts";
+import { useTotalCount } from "@/lib/job-ads/total-count-store";
 import {
   JobbFilterPopover,
   type PopoverGroup,
@@ -162,6 +164,49 @@ export function JobbHeroFilters({
 
   const ortCount = ort.region.length + ort.municipality.length;
 
+  // E2c (ADR 0067 Beslut 4, CTO VAL 2 = A) — per-option-counts hämtas
+  // debouncat när respektive popover är öppen (enabled-gated, ingen
+  // bakgrunds-poll). Ort-popovern behöver två dimensioner (kommun-rader +
+  // "Hela länet"-raden); Yrke en. Backend exkluderar den facetterade
+  // dimensionen själv (ort-facetterna HELA ort-dimensionen — VAL 4).
+  const facetFilter = {
+    occupationGroup,
+    municipality: ort.municipality,
+    region: ort.region,
+    q,
+  };
+  const municipalityCounts = useFacetCounts(
+    "Municipality",
+    facetFilter,
+    openPop === "ort",
+  );
+  const regionCounts = useFacetCounts("Region", facetFilter, openPop === "ort");
+  const occupationGroupCounts = useFacetCounts(
+    "OccupationGroup",
+    facetFilter,
+    openPop === "yrke",
+  );
+
+  // "Visa N annonser"-stängknappen (CTO VAL 2): N = list-svarets totalCount
+  // som toolbaren publicerar (SPOT — noll extra requests; ALDRIG en summa av
+  // facett-counts). null innan första list-svaret → "Visa annonser".
+  const totalCount = useTotalCount();
+  // Singular-böjning (design-reviewer Major 1 E2c) — samma grammatikregel
+  // som träffräknaren ("träff"/"träffar").
+  const showResultsLabel =
+    totalCount !== null
+      ? `Visa ${totalCount.toLocaleString("sv-SE")} ${totalCount === 1 ? "annons" : "annonser"}`
+      : "Visa annonser";
+  const showResultsFooter = (
+    <button
+      type="button"
+      className="jp-btn jp-btn--primary jp-btn--sm"
+      onClick={() => setOpenPop(null)}
+    >
+      {showResultsLabel}
+    </button>
+  );
+
   return (
     <div className="jp-hero__pills">
       <button
@@ -220,6 +265,9 @@ export function JobbHeroFilters({
           onToggleGroup: toggleRegion,
           onClearColumn: clearOrtColumn,
         }}
+        counts={municipalityCounts}
+        groupCounts={regionCounts}
+        footer={showResultsFooter}
         onClose={() => setOpenPop(null)}
         onClearAll={() => commitOrt({ region: [], municipality: [] })}
         triggerRef={ortBtnRef}
@@ -236,6 +284,8 @@ export function JobbHeroFilters({
         groups={occupationFieldGroups}
         selected={occupationGroup}
         onChange={changeOccupationGroup}
+        counts={occupationGroupCounts}
+        footer={showResultsFooter}
         onClose={() => setOpenPop(null)}
         onClearAll={() => changeOccupationGroup([])}
         triggerRef={yrkeBtnRef}
