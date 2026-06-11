@@ -191,6 +191,50 @@ describe("JobbHeroFilters — Ort tvåkolumns Län→Kommun (ADR 0067 Fas E2b)",
     expect(within(ortBtn).getByText("2")).toBeInTheDocument();
   });
 
+  it("extern URL-ändring (nya props) synkar öns val — E2g-buggen", async () => {
+    // Klas-buggen 2026-06-11: toolbar-chippens × rensade filtret men
+    // popovern visade länet markerat — öns gamla useState-kopia synkade
+    // aldrig. useOptimistic (CTO Variant A): props är sanningen.
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <JobbHeroFilters
+        taxonomy={taxonomy}
+        initialOccupationGroup={[]}
+        initialRegion={["CifL_Rzy_Mku"]}
+        initialMunicipality={[]}
+        q=""
+        sortBy="PublishedAtDesc"
+      />,
+    );
+    expect(
+      within(screen.getByRole("button", { name: /^Ort/ })).getByText("1"),
+    ).toBeInTheDocument();
+
+    // Extern ändring (chip-× / Rensa alla filter / recent-navigering) →
+    // RSC re-render med nya props.
+    rerender(
+      <JobbHeroFilters
+        taxonomy={taxonomy}
+        initialOccupationGroup={[]}
+        initialRegion={[]}
+        initialMunicipality={[]}
+        q=""
+        sortBy="PublishedAtDesc"
+      />,
+    );
+    expect(
+      within(screen.getByRole("button", { name: /^Ort/ })).queryByText("1"),
+    ).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: /^Ort/ }));
+    await user.click(screen.getByText("Stockholms län"));
+    const dialog = screen.getByRole("dialog", { name: "Län" });
+    const checked = within(dialog)
+      .getAllByRole("checkbox")
+      .filter((el) => el.getAttribute("aria-checked") === "true");
+    expect(checked.length).toBe(0);
+  });
+
   it("ESC stänger popovern", async () => {
     const user = userEvent.setup();
     setup();

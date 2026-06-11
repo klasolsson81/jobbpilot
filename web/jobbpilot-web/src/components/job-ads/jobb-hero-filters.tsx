@@ -1,6 +1,12 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import {
+  useMemo,
+  useOptimistic,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 import type { JobAdSortBy } from "@/lib/dto/job-ads";
@@ -54,6 +60,14 @@ interface JobbHeroFiltersProps {
 
 type OpenPop = "ort" | "yrke" | null;
 
+// Öns filterval-vy (E2g): bas = props (URL-sanningen), optimistiskt
+// overlay under pågående router.push-transition.
+interface FilterSelection {
+  occupationGroup: string[];
+  region: string[];
+  municipality: string[];
+}
+
 export function JobbHeroFilters({
   taxonomy,
   initialOccupationGroup,
@@ -66,13 +80,28 @@ export function JobbHeroFilters({
   const router = useRouter();
   const [, startTransition] = useTransition();
 
-  const [occupationGroup, setOccupationGroup] = useState<string[]>([
-    ...initialOccupationGroup,
-  ]);
-  const [ort, setOrt] = useState<OrtSelection>({
-    region: [...initialRegion],
-    municipality: [...initialMunicipality],
-  });
+  // E2g (CTO-dom 2026-06-11, Variant A — useOptimistic): URL:en (via props)
+  // är ENDA sanningen för valda filter; öns tidigare useState-kopior synkade
+  // aldrig vid EXTERNA URL-ändringar (toolbar-chippens ×, "Rensa alla
+  // filter", recent-search-navigering) eftersom ön medvetet aldrig remountas
+  // (utanför Suspense — F6 P4 B1). useOptimistic ger omedelbar egen-toggle-
+  // respons (overlay inuti router.push-transitionen) och faller garanterat
+  // tillbaka till färska props när RSC-navigeringen landat.
+  const base = useMemo<FilterSelection>(
+    () => ({
+      occupationGroup: [...initialOccupationGroup],
+      region: [...initialRegion],
+      municipality: [...initialMunicipality],
+    }),
+    [initialOccupationGroup, initialRegion, initialMunicipality],
+  );
+  const [selection, setOptimisticSelection] = useOptimistic(
+    base,
+    (_current, next: FilterSelection) => next,
+  );
+  const occupationGroup = selection.occupationGroup;
+  const ort: OrtSelection = selection;
+
   const [openPop, setOpenPop] = useState<OpenPop>(null);
 
   const ortBtnRef = useRef<HTMLButtonElement>(null);
@@ -116,14 +145,17 @@ export function JobbHeroFilters({
     return map;
   }, [taxonomy]);
 
-  function push(nextOccupationGroup: string[], nextOrt: OrtSelection) {
+  // Optimistiskt overlay + navigering i SAMMA transition (CTO-krav 1 —
+  // setOptimisticSelection utanför en transition kastas direkt av React).
+  function commit(next: FilterSelection) {
     startTransition(() => {
+      setOptimisticSelection(next);
       router.push(
         buildJobbHref({
           q,
-          occupationGroup: nextOccupationGroup,
-          region: nextOrt.region,
-          municipality: nextOrt.municipality,
+          occupationGroup: next.occupationGroup,
+          region: next.region,
+          municipality: next.municipality,
           sortBy,
           pageSize,
         }),
@@ -132,12 +164,14 @@ export function JobbHeroFilters({
   }
 
   function changeOccupationGroup(next: string[]) {
-    setOccupationGroup(next);
-    push(next, ort);
+    commit({ ...selection, occupationGroup: next });
   }
   function commitOrt(next: OrtSelection) {
-    setOrt(next);
-    push(occupationGroup, next);
+    commit({
+      occupationGroup: selection.occupationGroup,
+      region: [...next.region],
+      municipality: [...next.municipality],
+    });
   }
   // Defensiv list-väg (popoverns onChange-kontrakt) — i dual-axis-läget går
   // item-klick via toggleMunicipality nedan; denna nås aldrig vid runtime
