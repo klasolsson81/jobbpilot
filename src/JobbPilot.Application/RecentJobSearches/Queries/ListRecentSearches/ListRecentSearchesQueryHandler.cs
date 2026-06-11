@@ -14,8 +14,8 @@ namespace JobbPilot.Application.RecentJobSearches.Queries.ListRecentSearches;
 /// samma filter-SPOT som ListJobAds, q-FTS-accelererad). Fitness function
 /// (ADR 0045) övervakar p95 och triggar Hangfire-cache-evolution om budget bryts.
 ///
-/// <para>Label server-härleds (Q || occupationGroupLabels.First ||
-/// municipalityLabels.First || regionLabels.First || fallback) så FE inte
+/// <para>Label server-härleds (Q → yrkesgrupp med hel-områdes-kollaps /
+/// "+N till" → kommun → region → fallback; E2g 2026-06-11) så FE inte
 /// behöver konstruera presentation. Defensive fallback "Alla annonser" är dead
 /// code så länge SearchCriteria.Empty-invarianten håller, men behålls för
 /// robusthet.</para>
@@ -56,7 +56,8 @@ public sealed class ListRecentSearchesQueryHandler(
         // E2g (Klas-direktiv 2026-06-11): hel-områdes-kollaps i labeln kräver
         // fält→grupp-trädet. In-memory-snapshot (ADR 0043 — ingen extern hop);
         // hämtas EN gång per Handle (CTO-krav), och bara när någon rad har >1
-        // yrkesgrupp (enda fallet kollapsen kan slå in).
+        // yrkesgrupp (enda fallet kollapsen kan behövas — q-rader når aldrig
+        // grupp-grenen men extra-hämtningen är gratis mot in-memory-cachen).
         IReadOnlyList<TaxonomyOccupationFieldDto>? occupationFields = null;
         if (items.Any(r => r.OccupationGroup.Count > 1))
         {

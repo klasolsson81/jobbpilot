@@ -427,16 +427,16 @@ public class ListRecentSearchesQueryHandlerTests
     }
 
     [Fact]
-    public async Task Handle_FallsBackToPlusN_WhenTreeUnavailable()
+    public async Task Handle_FallsBackToPlusN_WhenTreeHasNoMatchingFields()
     {
-        // Taxonomi-drift/degradering (CTO-fallgrop): (i)-matchen faller
-        // gracefully till (iii) — aldrig krasch, aldrig hårdkodade antal.
+        // Taxonomi-drift/degradering (CTO-fallgrop): trädet finns men
+        // selektionen matchar inget fält (tomt fält-set = degraderad
+        // snapshot) → (i)-matchen faller gracefully till (iii). Aldrig
+        // krasch, aldrig hårdkodade antal. (Null-träd är kontrakts-omöjligt
+        // per ITaxonomyReadModel — code-reviewer Minor 3 E2g.)
         var db = TestAppDbContextFactory.Create();
         var seeker = await SeedSeekerAsync(db);
-#pragma warning disable CA2012
-        _taxonomy.GetTreeAsync(Arg.Any<CancellationToken>())
-            .Returns(ValueTask.FromResult<TaxonomyTreeDto>(null!));
-#pragma warning restore CA2012
+        StubTree(); // tomt fält-set
 
         db.RecentJobSearches.Add(GroupsRow(seeker.Id, ["grp_a", "grp_b"]));
         await db.SaveChangesAsync(CancellationToken.None);
@@ -445,6 +445,61 @@ public class ListRecentSearchesQueryHandlerTests
         var result = await handler.Handle(new ListRecentSearchesQuery(), CancellationToken.None);
 
         result.ShouldHaveSingleItem().Label.ShouldBe("Label-grp_a +1 till");
+    }
+
+    [Fact]
+    public async Task Handle_DerivesPlusNLabel_ForMultipleRegions()
+    {
+        // Region-grenen får samma +N-mönster (code-reviewer Minor 4 —
+        // WithMoreSuffix delas men grenen ska vara test-låst).
+        var db = TestAppDbContextFactory.Create();
+        var seeker = await SeedSeekerAsync(db);
+
+        var criteria = SearchCriteria.Create(
+            occupationGroup: null,
+            municipality: null,
+            region: ["reg_a", "reg_b"],
+            q: null,
+            sortBy: JobAdSortBy.PublishedAtDesc).Value;
+        db.RecentJobSearches.Add(RecentJobSearch.Capture(
+            seeker.Id, criteria, 0, FakeDateTimeProvider.Default.UtcNow));
+        await db.SaveChangesAsync(CancellationToken.None);
+
+        var handler = new ListRecentSearchesQueryHandler(db, _currentUser, _taxonomy, _search);
+        var result = await handler.Handle(new ListRecentSearchesQuery(), CancellationToken.None);
+
+        result.ShouldHaveSingleItem().Label.ShouldBe("Label-reg_a +1 till");
+    }
+
+    [Fact]
+    public async Task Handle_FetchesTreeExactlyOnce_AndOnlyWhenMultiGroupRowsExist()
+    {
+        // CTO-kravet (en gång per Handle) + gaten test-låsta
+        // (code-reviewer Minor 4 — gaten var obevakad).
+        var db = TestAppDbContextFactory.Create();
+        var seeker = await SeedSeekerAsync(db);
+        StubTree(Field("falt_x", "Fält X", "grp_a", "grp_b"));
+
+        db.RecentJobSearches.Add(GroupsRow(seeker.Id, ["grp_a", "grp_b"]));
+        db.RecentJobSearches.Add(GroupsRow(seeker.Id, ["grp_a"]));
+        await db.SaveChangesAsync(CancellationToken.None);
+
+        var handler = new ListRecentSearchesQueryHandler(db, _currentUser, _taxonomy, _search);
+        await handler.Handle(new ListRecentSearchesQuery(), CancellationToken.None);
+
+        await _taxonomy.Received(1).GetTreeAsync(Arg.Any<CancellationToken>());
+
+        // Enbart ≤1-grupps-rader → trädet hämtas INTE.
+        _taxonomy.ClearReceivedCalls();
+        var db2 = TestAppDbContextFactory.Create();
+        var seeker2 = await SeedSeekerAsync(db2);
+        db2.RecentJobSearches.Add(GroupsRow(seeker2.Id, ["grp_a"]));
+        await db2.SaveChangesAsync(CancellationToken.None);
+
+        var handler2 = new ListRecentSearchesQueryHandler(db2, _currentUser, _taxonomy, _search);
+        await handler2.Handle(new ListRecentSearchesQuery(), CancellationToken.None);
+
+        await _taxonomy.DidNotReceive().GetTreeAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
