@@ -71,6 +71,10 @@ export async function JobbResults({
   // Chip-labels hör ihop med resultatet — hämtas parallellt med listan.
   // Reverse-lookup-miss → chip faller till "Okänd kod (<id>)" i toolbaren
   // (ADR 0043 Beslut B graceful degradation).
+  // Cap-aritmetik (E2b-architect fråga 5): backend-resolve-capet är
+  // MaxConceptIds × 4 = 1600; teoretiskt max här = 400 yrkesgrupper +
+  // 21 län + 290 kommuner = 711 — täcker, men marginalen krymper om en
+  // fjärde dimension (employmentType, B2) någonsin chip-resolvas.
   const selectedConceptIds = [...occupationGroup, ...region, ...municipality];
   const [result, labelsResult] = await Promise.all([
     getJobAds({

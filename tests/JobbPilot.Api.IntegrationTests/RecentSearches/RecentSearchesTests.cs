@@ -15,8 +15,8 @@ namespace JobbPilot.Api.IntegrationTests.RecentSearches;
 //
 // C2 (ADR 0067, CTO-dom (d) + architect F5/F6): yrkesgrupp-only- och
 // kommun-only-sökningar capture:as nu (stänger C1:s LIVE-gap där guarden bara
-// räknade Q/Ssyk/Region). DTO:n är additiv: deprecated ssykList/ssykLabels är
-// ALLTID tomma; nya occupationGroupList/municipalityList + labels bär data.
+// räknade Q/Ssyk/Region). E2b: C2-shimmet (ssykList/ssykLabels) är borttaget
+// ur wire-formen — frånvaron vakthund-asserteras nedan (TryGetProperty).
 [Collection("Api")]
 public class RecentSearchesTests(ApiFactory factory)
 {
