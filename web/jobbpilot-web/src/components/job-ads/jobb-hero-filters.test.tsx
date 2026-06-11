@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, within, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { JobbHeroFilters } from "./jobb-hero-filters";
 import type { TaxonomyTree } from "@/lib/dto/taxonomy";
@@ -216,6 +216,98 @@ describe("JobbHeroFilters — Yrke tvåkolumns", () => {
     expect(pushMock).toHaveBeenCalledWith(
       "/jobb?occupationGroup=MVqp_eS8_kDZ&q=backend",
     );
+  });
+});
+
+describe("JobbHeroFilters — facet-counts + Visa N annonser (E2c)", () => {
+  it("renderar per-option-counts i kommun-rader + Hela länet när fetch svarar", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      const body = url.includes("dimension=Municipality")
+        ? { zHxw_uJZ_NNh: 12, AvNB_uwa_6n6: 340 }
+        : url.includes("dimension=Region")
+          ? { CifL_Rzy_Mku: 1500 }
+          : {};
+      return new Response(JSON.stringify(body), { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    try {
+      setup();
+      await user.click(screen.getByRole("button", { name: /^Ort/ }));
+
+      // Debounce 300 ms → vänta in counts-renderingen.
+      expect(await screen.findByText("(12)")).toBeInTheDocument();
+      expect(screen.getByText("(340)")).toBeInTheDocument();
+      // "Hela länet"-radens count = region-facetten för aktiva länet.
+      expect(screen.getByText(/1\s500/)).toBeInTheDocument();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("visar inga counts vid degradering (fetch saknas) — popovern användbar", async () => {
+    const user = userEvent.setup();
+    setup();
+    await user.click(screen.getByRole("button", { name: /^Ort/ }));
+
+    expect(screen.getByText("Solna")).toBeInTheDocument();
+    expect(screen.queryByText(/\(\d/)).toBeNull();
+  });
+
+  it("backend-fel (502) ger INGA '(0)'-rader — fel ≠ känd nolla (code-reviewer Major 1)", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn(
+      async () => new Response(JSON.stringify({}), { status: 502 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    try {
+      setup();
+      await user.click(screen.getByRole("button", { name: /^Ort/ }));
+
+      // Vänta in debounce + svar; därefter får INGA count-parenteser finnas
+      // ("(0)" vid backend-fel vore desinformation — tom dict är tvetydig).
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
+      expect(screen.getByText("Solna")).toBeInTheDocument();
+      expect(screen.queryByText(/\(\d/)).toBeNull();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("Visa-knappen singular-böjs vid totalCount 1 (design-reviewer Major 1)", async () => {
+    const user = userEvent.setup();
+    const { publishTotalCount, resetTotalCountForTest } = await import(
+      "@/lib/job-ads/total-count-store"
+    );
+    resetTotalCountForTest();
+    setup();
+    await user.click(screen.getByRole("button", { name: /^Ort/ }));
+
+    act(() => publishTotalCount(1));
+    expect(
+      screen.getByRole("button", { name: "Visa 1 annons" }),
+    ).toBeInTheDocument();
+
+    act(() => publishTotalCount(2));
+    expect(
+      screen.getByRole("button", { name: "Visa 2 annonser" }),
+    ).toBeInTheDocument();
+    resetTotalCountForTest();
+  });
+
+  it("Visa annonser-knappen stänger popovern (totalCount opublicerad → utan tal)", async () => {
+    const user = userEvent.setup();
+    setup();
+    await user.click(screen.getByRole("button", { name: /^Ort/ }));
+
+    const btn = screen.getByRole("button", { name: "Visa annonser" });
+    await user.click(btn);
+    expect(screen.queryByRole("dialog", { name: "Län" })).toBeNull();
+    // Stängning är navigations-fri — inga router-pushes från knappen.
+    expect(pushMock).not.toHaveBeenCalled();
   });
 });
 

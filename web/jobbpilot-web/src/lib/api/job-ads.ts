@@ -5,10 +5,13 @@ import {
   jobAdDtoSchema,
   listJobAdsResultSchema,
   suggestJobAdTermsResultSchema,
+  facetCountsSchema,
   type JobAdDto,
   type ListJobAdsResult,
   type SuggestJobAdTermsResult,
   type JobAdSortBy,
+  type FacetDimension,
+  type FacetCounts,
 } from "@/lib/dto/job-ads";
 import { responseToResult, type ApiResult } from "@/lib/dto/_helpers";
 
@@ -144,6 +147,53 @@ export async function suggestJobAdTerms(
       res,
       suggestJobAdTermsResultSchema,
       "GET /api/v1/job-ads/suggest"
+    );
+  } catch {
+    return { kind: "error" };
+  }
+}
+
+export interface FacetCountsFilter {
+  occupationGroup?: ReadonlyArray<string>;
+  municipality?: ReadonlyArray<string>;
+  region?: ReadonlyArray<string>;
+  q?: string;
+}
+
+/**
+ * ADR 0067 Beslut 4 (Fas E2c) — per-option facet-counts för EN dimension
+ * givet aktuellt filterval. Konsumerar `GET /api/v1/job-ads/facet-counts`
+ * (auth-gated, egen FacetCountsPolicy 30/10s). Backend exkluderar den
+ * facetterade dimensionen ur WHERE (ort-facetterna exkluderar HELA
+ * ort-dimensionen — CTO VAL 4). Svar: rå dict concept-id → count.
+ *
+ * Anropas av route-handlern (`/api/jobb/facet-counts`) som popover-
+ * klienten pollar debouncat (≥300 ms). 429 → `rateLimited` (klienten
+ * degraderar tyst — counts försvinner, popovern förblir användbar).
+ */
+export async function getFacetCounts(
+  dimension: FacetDimension,
+  filter: FacetCountsFilter
+): Promise<ApiResult<FacetCounts>> {
+  const sessionId = await getSessionId();
+  if (!sessionId) return { kind: "unauthorized" };
+
+  const params = new URLSearchParams({ dimension });
+  for (const v of filter.occupationGroup ?? [])
+    params.append("occupationGroup", v);
+  for (const v of filter.municipality ?? []) params.append("municipality", v);
+  for (const v of filter.region ?? []) params.append("region", v);
+  if (filter.q) params.set("q", filter.q);
+
+  try {
+    const res = await fetch(
+      `${env.BACKEND_URL}/api/v1/job-ads/facet-counts?${params.toString()}`,
+      { headers: authHeaders(sessionId), cache: "no-store" }
+    );
+    return await responseToResult(
+      res,
+      facetCountsSchema,
+      "GET /api/v1/job-ads/facet-counts"
     );
   } catch {
     return { kind: "error" };

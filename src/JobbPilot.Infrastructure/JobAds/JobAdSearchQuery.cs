@@ -120,15 +120,22 @@ internal sealed class JobAdSearchQuery(
             nameof(dimension), dimension, "Unknown FacetDimension — enum out of sync with ApplyCriteria."),
     };
 
-    // Klonar filter-SPOT:en med den facetterade dimensionens lista tömd (record
+    // Klonar filter-SPOT:en med den facetterade DIMENSIONENS listor tömda (record
     // with-expression; tom lista = inget filter). Detta är exkluderings-mekaniken
     // (ADR 0067 Beslut 4) — counten för X ska inte filtreras av X.
+    //
+    // CTO VAL 4 (E2b 2026-06-11, ADR 0067 impl-notat E2b): ort är EN dimension
+    // i två granulariteter (län ⊃ kommun, geo-union i ApplyCriteria) —
+    // ort-facetterna (Municipality/Region) exkluderar därför HELA
+    // ort-dimensionen (båda listorna) ur WHERE. Att exkludera bara den egna
+    // listan vore att behandla region som främmande dimension i facetten men
+    // samma dimension i WHERE (Evans kap. 2 — samma begrepp, två sanningar).
     private static JobAdFilterCriteria ExcludeDimension(
         JobAdFilterCriteria criteria, FacetDimension dimension) => dimension switch
         {
             FacetDimension.OccupationGroup => criteria with { OccupationGroup = [] },
-            FacetDimension.Municipality => criteria with { Municipality = [] },
-            FacetDimension.Region => criteria with { Region = [] },
+            FacetDimension.Municipality or FacetDimension.Region =>
+                criteria with { Municipality = [], Region = [] },
             _ => throw new ArgumentOutOfRangeException(
                 nameof(dimension), dimension, "Unknown FacetDimension — enum out of sync with ApplyCriteria."),
         };

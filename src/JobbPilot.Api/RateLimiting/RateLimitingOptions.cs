@@ -116,6 +116,26 @@ public sealed class RateLimitingOptions
     };
 
     /// <summary>
+    /// GET /job-ads/facet-counts (per-option facet-counts, ADR 0067 Beslut 4,
+    /// Fas E2c) — partitionerat per UserId (claim "sub"). Egen policy (ej
+    /// ListRead-återanvändning) — least common mechanism (Saltzer/Schroeder):
+    /// facet-profilen är client-side debounce-burst (Ort-popovern gör 2
+    /// parallella requests, 20-40 req/min under aktiv filtrering) medan
+    /// ListRead bär RSC-list-refetcharna (live-commit gör varje toggle till
+    /// en router.push) — delad budget hade svält LISTAN av sin egen
+    /// dekoration (bulkhead, Nygard). 30/10s ≈ 3 req/s ger ×4-9 headroom
+    /// över profilen och kapar script-flod inom sekunder (symmetri med
+    /// Suggest — samma debouncade ≥300ms klientprofil). senior-cto-advisor
+    /// VAL 1 2026-06-11 (E2c) — riktvärde, security-auditor verifierar/
+    /// justerar (BLOCKING).
+    /// </summary>
+    public PolicyOptions FacetCounts { get; init; } = new()
+    {
+        PermitLimit = 30,
+        WindowSeconds = 10,
+    };
+
+    /// <summary>
     /// GET /api/v1/landing/stats (publik anonym landing-stats, ADR 0064) —
     /// partitionerat per IP. Egen policy (least common mechanism,
     /// Saltzer/Schroeder): publik anonym DoS-yta får inte dela skyddsbudget
