@@ -42,6 +42,7 @@ interface JobbResultsProps {
   sortBy: JobAdSortBy;
   occupationGroup: string[];
   region: string[];
+  municipality: string[];
   q: string;
   since: string;
   /** Råa searchParams — endast för att bygga paginerings-href. */
@@ -51,6 +52,7 @@ interface JobbResultsProps {
     sortBy?: string;
     occupationGroup?: string | string[];
     region?: string | string[];
+    municipality?: string | string[];
     q?: string;
   };
 }
@@ -61,6 +63,7 @@ export async function JobbResults({
   sortBy,
   occupationGroup,
   region,
+  municipality,
   q,
   since,
   rawParams,
@@ -68,9 +71,18 @@ export async function JobbResults({
   // Chip-labels hör ihop med resultatet — hämtas parallellt med listan.
   // Reverse-lookup-miss → chip faller till "Okänd kod (<id>)" i toolbaren
   // (ADR 0043 Beslut B graceful degradation).
-  const selectedConceptIds = [...occupationGroup, ...region];
+  const selectedConceptIds = [...occupationGroup, ...region, ...municipality];
   const [result, labelsResult] = await Promise.all([
-    getJobAds({ page, pageSize, sortBy, occupationGroup, region, q, since }),
+    getJobAds({
+      page,
+      pageSize,
+      sortBy,
+      occupationGroup,
+      region,
+      municipality,
+      q,
+      since,
+    }),
     resolveTaxonomyLabels(selectedConceptIds),
   ]);
 
@@ -103,6 +115,7 @@ export async function JobbResults({
             totalCount={result.data.totalCount}
             occupationGroup={occupationGroup}
             region={region}
+            municipality={municipality}
             resolvedLabels={resolvedLabels}
             q={q}
             sortBy={sortBy}
@@ -186,6 +199,11 @@ function buildPageHref(
   for (const v of toStringList(params.occupationGroup))
     url.append("occupationGroup", v);
   for (const v of toStringList(params.region)) url.append("region", v);
+  // E2b — utan denna rad tappar sida-2-klicket kommun-filtret (samma
+  // felklass som F3 B-FIX; buildPageHref är en ANDRA URL-builder vid
+  // sidan av buildJobbHref — architect-dom fråga 4.1).
+  for (const v of toStringList(params.municipality))
+    url.append("municipality", v);
   if (params.q) url.set("q", params.q);
   const qs = url.toString();
   return qs.length > 0 ? `/jobb?${qs}` : "/jobb";
