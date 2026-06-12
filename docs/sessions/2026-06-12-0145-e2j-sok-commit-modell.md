@@ -67,6 +67,7 @@ INLINE + Klas-produktval.
 - **Popover-klick bär INTE commit=1:** medvetet — CTO:s commit-punkt-lista
   exkluderade popover; inkrementell komposition = live (som typing). Data-
   minimerings-konservativt. Bekräftat av security + code-review; flaggat för Klas.
+- **CI-fångad regression — `commit=1` → `commit=true`:** efter merge-poll såg jag att backend/coverage CI failade — 6 `RecentSearchesTests` röda. Rotorsak: ASP.NET Core minimal-API:s `bool`-binding (`bool.TryParse`) tar `"true"`/`"false"` men INTE `"1"` → `?commit=1` fick list-queryn att 400:a (i appen hade Sök/Enter brutit resultaten, inte bara tappat capturen). Fixat till `commit=true` i `withCommitFlag`/`buildQuery`/`page`/no-JS-input. **Lärdom: kör integrationstesterna lokalt** (`...IntegrationTests.exe -filter "/*/*/RecentSearchesTests/*"`), inte bara unit/vitest — unit-testen använde behaviorn direkt (bool true) och FE-testen asserterade URL-strängen, så ingen fångade binding-gapet. Verifierat 8/8 grönt lokalt mot Testcontainers efter fix. (fix-commit `47d60f1`.)
 - **Strip via separat ö (ej commit()-vägen):** CTO band "strip via commit()-vägen";
   jag löste samma invariant (ingen falsk text-resync) renare via skip-guarden
   (`sameUrlState(base, lastCommitted)`) + en fristående `StripCommitParam`-ö (SoC).
