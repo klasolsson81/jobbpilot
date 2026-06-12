@@ -3,6 +3,7 @@ import {
   buildJobbHref,
   withCommitFlag,
   COMMIT_PARAM,
+  COMMIT_VALUE,
   type JobbUrlState,
 } from "./search-params";
 
@@ -15,13 +16,15 @@ const empty: JobbUrlState = {
 };
 
 describe("withCommitFlag (E2j commit-intent-signal)", () => {
-  it("adderar ?commit=1 på en href utan query", () => {
-    expect(withCommitFlag("/jobb")).toBe(`/jobb?${COMMIT_PARAM}=1`);
+  it("adderar ?commit=true på en href utan query", () => {
+    // Värdet är "true", inte "1" — ASP.NET bool-binding tar inte "1".
+    expect(withCommitFlag("/jobb")).toBe(`/jobb?${COMMIT_PARAM}=${COMMIT_VALUE}`);
+    expect(COMMIT_VALUE).toBe("true");
   });
 
-  it("adderar &commit=1 på en href som redan har query", () => {
+  it("adderar &commit=true på en href som redan har query", () => {
     expect(withCommitFlag("/jobb?q=volvo")).toBe(
-      `/jobb?q=volvo&${COMMIT_PARAM}=1`,
+      `/jobb?q=volvo&${COMMIT_PARAM}=${COMMIT_VALUE}`,
     );
   });
 

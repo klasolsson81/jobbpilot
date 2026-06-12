@@ -47,7 +47,7 @@ public class RecentSearchesTests(ApiFactory factory)
 
         // Trigga auto-capture genom att söka /api/v1/job-ads med kriterier.
         var searchResponse = await _client.GetAsync(
-            "/api/v1/job-ads?q=backend&commit=1&page=1&pageSize=20", ct);
+            "/api/v1/job-ads?q=backend&commit=true&page=1&pageSize=20", ct);
         searchResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
 
         var listResponse = await _client.GetAsync("/api/v1/me/recent-searches", ct);
@@ -93,7 +93,7 @@ public class RecentSearchesTests(ApiFactory factory)
 
         var group = $"grp{Guid.NewGuid():N}"[..16];
         var searchResponse = await _client.GetAsync(
-            $"/api/v1/job-ads?occupationGroup={group}&commit=1&page=1&pageSize=20", ct);
+            $"/api/v1/job-ads?occupationGroup={group}&commit=true&page=1&pageSize=20", ct);
         searchResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
 
         var listResponse = await _client.GetAsync("/api/v1/me/recent-searches", ct);
@@ -121,7 +121,7 @@ public class RecentSearchesTests(ApiFactory factory)
 
         var municipality = $"kn{Guid.NewGuid():N}"[..16];
         var searchResponse = await _client.GetAsync(
-            $"/api/v1/job-ads?municipality={municipality}&commit=1&page=1&pageSize=20", ct);
+            $"/api/v1/job-ads?municipality={municipality}&commit=true&page=1&pageSize=20", ct);
         searchResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
 
         var listResponse = await _client.GetAsync("/api/v1/me/recent-searches", ct);
@@ -143,9 +143,9 @@ public class RecentSearchesTests(ApiFactory factory)
         var ct = TestContext.Current.CancellationToken;
         await AuthenticateAsync(ct);
 
-        await _client.GetAsync("/api/v1/job-ads?q=devops&commit=1&page=1&pageSize=20", ct);
-        await _client.GetAsync("/api/v1/job-ads?q=devops&commit=1&page=1&pageSize=20", ct);
-        await _client.GetAsync("/api/v1/job-ads?q=devops&commit=1&page=1&pageSize=20", ct);
+        await _client.GetAsync("/api/v1/job-ads?q=devops&commit=true&page=1&pageSize=20", ct);
+        await _client.GetAsync("/api/v1/job-ads?q=devops&commit=true&page=1&pageSize=20", ct);
+        await _client.GetAsync("/api/v1/job-ads?q=devops&commit=true&page=1&pageSize=20", ct);
 
         var listResponse = await _client.GetAsync("/api/v1/me/recent-searches", ct);
         var items = await listResponse.Content.ReadFromJsonAsync<JsonElement>(ct);
@@ -159,7 +159,7 @@ public class RecentSearchesTests(ApiFactory factory)
         var ct = TestContext.Current.CancellationToken;
         await AuthenticateAsync(ct);
 
-        await _client.GetAsync("/api/v1/job-ads?q=qa&commit=1&page=1&pageSize=20", ct);
+        await _client.GetAsync("/api/v1/job-ads?q=qa&commit=true&page=1&pageSize=20", ct);
 
         var listResponse = await _client.GetAsync("/api/v1/me/recent-searches", ct);
         var items = await listResponse.Content.ReadFromJsonAsync<JsonElement>(ct);
@@ -181,7 +181,7 @@ public class RecentSearchesTests(ApiFactory factory)
 
         // User A skapar en RecentJobSearch
         await AuthenticateAsync(ct);
-        await _client.GetAsync("/api/v1/job-ads?q=sales&commit=1&page=1&pageSize=20", ct);
+        await _client.GetAsync("/api/v1/job-ads?q=sales&commit=true&page=1&pageSize=20", ct);
         var listResponse = await _client.GetAsync("/api/v1/me/recent-searches", ct);
         var items = await listResponse.Content.ReadFromJsonAsync<JsonElement>(ct);
         var aId = items[0].GetProperty("id").GetString()!;

@@ -72,7 +72,7 @@ export default async function JobbPage({ searchParams }: PageProps) {
   const q = emptyToUndefined(params.q);
   // E2j — commit-intent gatar backend-auto-capture. Strippas ur URL:en efter
   // mount av <StripCommitParam> (delningsbar länk re-capturerar inte).
-  const commit = params.commit === "1";
+  const commit = params.commit === "true";
 
   const since = newWindowSince();
 

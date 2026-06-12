@@ -56,9 +56,9 @@ describe("JobbResultsToolbar — träffar + chips + sort", () => {
       screen.getByRole("button", { name: "Ta bort filter Stockholms län" }),
     );
     // region bort, occupationGroup + q bevarade. E2j: toolbar-handling =
-    // avsiktlig sökning → commit-intent (?commit=1, Klas-val 2026-06-12).
+    // avsiktlig sökning → commit-intent (?commit=true, Klas-val 2026-06-12).
     expect(pushMock).toHaveBeenCalledWith(
-      "/jobb?occupationGroup=MVqp_eS8_kDZ&q=backend&commit=1",
+      "/jobb?occupationGroup=MVqp_eS8_kDZ&q=backend&commit=true",
     );
   });
 
@@ -81,7 +81,7 @@ describe("JobbResultsToolbar — träffar + chips + sort", () => {
       screen.getByRole("button", { name: "Ta bort filter Solna" }),
     );
     // municipality bort, region bevarad.
-    expect(pushMock).toHaveBeenCalledWith("/jobb?region=CifL_Rzy_Mku&commit=1");
+    expect(pushMock).toHaveBeenCalledWith("/jobb?region=CifL_Rzy_Mku&commit=true");
   });
 
   it("fallback-label för okänd conceptId", () => {
@@ -120,7 +120,7 @@ describe("JobbResultsToolbar — träffar + chips + sort", () => {
     await user.click(
       screen.getByRole("button", { name: "Ta bort sökordet volvo" }),
     );
-    expect(pushMock).toHaveBeenCalledWith("/jobb?q=lastbil&commit=1");
+    expect(pushMock).toHaveBeenCalledWith("/jobb?q=lastbil&commit=true");
   });
 
   it("Rensa sökord och filter nollar ALLT inkl. q (E2i Klas-beslut — ersätter E2e-domen)", async () => {
@@ -139,7 +139,7 @@ describe("JobbResultsToolbar — träffar + chips + sort", () => {
     await user.click(
       screen.getByRole("button", { name: "Rensa sökord och filter" }),
     );
-    expect(pushMock).toHaveBeenCalledWith("/jobb?commit=1");
+    expect(pushMock).toHaveBeenCalledWith("/jobb?commit=true");
   });
 
   it("Rensa-länken bevarar icke-default sortBy (E2e, code-reviewer Minor 1)", async () => {
@@ -158,7 +158,7 @@ describe("JobbResultsToolbar — träffar + chips + sort", () => {
     await user.click(
       screen.getByRole("button", { name: "Rensa sökord och filter" }),
     );
-    expect(pushMock).toHaveBeenCalledWith("/jobb?sortBy=ExpiresAtAsc&commit=1");
+    expect(pushMock).toHaveBeenCalledWith("/jobb?sortBy=ExpiresAtAsc&commit=true");
   });
 
   it("Rensa-länken visas inte utan aktiva chips (E2e)", () => {
@@ -253,7 +253,7 @@ describe("JobbResultsToolbar — träffar + chips + sort", () => {
       "Relevans",
     );
     expect(pushMock).toHaveBeenCalledWith(
-      "/jobb?occupationGroup=MVqp_eS8_kDZ&q=data&sortBy=Relevance&commit=1",
+      "/jobb?occupationGroup=MVqp_eS8_kDZ&q=data&sortBy=Relevance&commit=true",
     );
   });
 });

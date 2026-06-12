@@ -55,8 +55,9 @@ function buildQuery(query: ListJobAdsQuery): string {
   for (const v of query.municipality ?? []) params.append("municipality", v);
   if (query.q) params.set("q", query.q);
   if (query.since) params.set("since", query.since);
-  // E2j — commit-intent gatar backend-auto-capture (ADR 0060 amend).
-  if (query.commit) params.set("commit", "1");
+  // E2j — commit-intent gatar backend-auto-capture (ADR 0060 amend). Värdet
+  // är "true" (ASP.NET bool-binding tar inte "1" — skulle 400:a list-queryn).
+  if (query.commit) params.set("commit", "true");
   return params.toString();
 }
 

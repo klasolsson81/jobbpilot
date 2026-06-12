@@ -444,8 +444,9 @@ export function JobbHeroSearch({
       {/* E2j — no-JS-submit ÄR per definition en commit (användaren tryckte
           Sök) → statiskt commit=1 så backend auto-capturerar. Vid hydration
           interceptas submit (onSubmit preventDefault) och router-vägen bär
-          commit som transient suffix istället — denna åker då aldrig. */}
-      <input type="hidden" name="commit" value="1" />
+          commit som transient suffix istället — denna åker då aldrig.
+          Värde "true" (ASP.NET bool-binding tar inte "1"). */}
+      <input type="hidden" name="commit" value="true" />
     </form>
   );
 }

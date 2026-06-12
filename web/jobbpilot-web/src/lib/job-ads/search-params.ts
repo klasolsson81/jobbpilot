@@ -41,11 +41,18 @@ export const DEFAULT_SORT_BY: JobAdSortBy = "PublishedAtDesc";
  */
 export const COMMIT_PARAM = "commit";
 
-/** Adderar commit-intent-suffixet på en redan byggd href (utanför state). */
+/**
+ * Adderar commit-intent-suffixet på en redan byggd href (utanför state).
+ * Värdet är `true` (inte `1`) — ASP.NET Core minimal-API:s `bool`-binding
+ * använder `bool.TryParse`, som tolkar "true"/"false" men INTE "1"/"0";
+ * `?commit=1` skulle 400:a list-queryn. Backend-paramen är `bool commit`.
+ */
+export const COMMIT_VALUE = "true";
+
 export function withCommitFlag(href: string): string {
   return href.includes("?")
-    ? `${href}&${COMMIT_PARAM}=1`
-    : `${href}?${COMMIT_PARAM}=1`;
+    ? `${href}&${COMMIT_PARAM}=${COMMIT_VALUE}`
+    : `${href}?${COMMIT_PARAM}=${COMMIT_VALUE}`;
 }
 
 export function buildJobbHref(state: JobbUrlState): string {
