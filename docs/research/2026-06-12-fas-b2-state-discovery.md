@@ -85,3 +85,28 @@ SELECT id, statename, createdat FROM hangfire.job ORDER BY createdat DESC LIMIT 
 ```
 
 **Efter populering:** query-wiringen (JobAdFilterCriteria + ApplyCriteria + ListJobAdsQuery/validator + `?employmentType=`/`?worktimeExtent=`-bindning + SearchCriteria-VO-expansion + FacetDimension-append) byggs i en efterföljande PR mot sann data, med test-writer FÖRST + Testcontainers-integrationstester (ADR 0067 Beslut 6/7-sekvens).
+
+---
+
+## Empiriskt fynd 2026-06-12 — data redan ~79% populerad; re-ingest i praktiken utförd
+
+Backfill-jobbet kördes (`POST /backfill-klass2`, jobId 1587, Succeeded ~4,5 min) och DB-läget mättes. **Premissen "kolumnerna är 100% NULL tills re-ingest" är empiriskt falsk.** Den dagliga snapshot-cron:en (`sync-platsbanken-snapshot`) har re-ingestat med den nya `JobTechHit`-POCO:n sedan B2 mergades 2026-06-08 → Klass 2-kolumnerna fylldes på organiskt.
+
+**Populering bland `Active`-annonser (det sök-ytan visar):**
+
+| Mått | Active | Andel |
+|---|--:|--:|
+| Totalt sökbara | 43 340 | — |
+| `employment_type_concept_id` populerad | 34 041 | 79 % |
+| `worktime_extent_concept_id` populerad | 31 150 | 72 % |
+| Purgad `raw_payload` (NULL) | 9 299 | 21 % |
+
+(Hela tabellen, alla statusar: 37 744 har båda nycklarna i payload, 3 177 saknar dem genuint i JobTech-källan, 12 086 har purgad payload. Siffrorna fluktuerar live — snapshot-re-ingest + payload-purge kör kontinuerligt.)
+
+**Tolkning:**
+
+- **De ~21% NULL bland aktiva annonser beror på `raw_payload`-purge** (ADR 0032 retention, `PurgeStaleRawPayloadsJob`), inte på saknad B2-mekanik. När payloaden är NULL kan ingen STORED-kolumn beräknas.
+- **Detta är paritet med övriga taxonomi-dimensioner, inte en B2-regression.** Alla STORED-kolumner (`ssyk_concept_id`, `region_concept_id`, `occupation_group_concept_id`, `municipality_concept_id`, `employment_type_concept_id`, `worktime_extent_concept_id`) beräknas från samma `raw_payload` — purge nullar dem alla lika (verifierat i `JobAdConfiguration.cs`). Purge-vs-filtrerbarhet är en redan accepterad systemegenskap.
+- **Re-ingesten är i praktiken redan utförd** (organiskt via cron + topp-up via backfill 1587). ~79% aktiv-populering räcker för att Klass 2-filtret ska returnera meningsfulla träffar på paritet med övriga dimensioner.
+
+**Reviderad konsekvens för CTO-sekvensen:** CTO-domen "re-ingest först" vilade på "100% NULL"-premissen. Empiriskt är datan redan där → sekvensvillkoret (data före wiring) är uppfyllt. **Query-wiringen kan byggas mot sann data i nästa PR utan ytterligare re-ingest-väntan.** Den enda kvarvarande operativa noten: purge-cykeln betyder att en andel aktiva annonser alltid saknar payload (delad egenskap med alla filter) — query-wiringen ska inte anta 100% populering (ingen "0 träffar = bug"-tolkning för annonser med purgad payload).
