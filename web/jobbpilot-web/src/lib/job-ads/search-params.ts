@@ -29,6 +29,32 @@ export interface JobbUrlState {
 
 export const DEFAULT_SORT_BY: JobAdSortBy = "PublishedAtDesc";
 
+/**
+ * Fas E2j (ADR 0060 amendment 2026-06-12) — commit-intent-signalen.
+ * `commit` är en TRANSIENT signal-param, INTE ett tillstånd: den ingår
+ * ALDRIG i `JobbUrlState`, `sameUrlState`, `buildJobbHref` eller
+ * `serializeSearchText` (annars bryts spegel-fältets own-roundtrip-detektor
+ * + förorenar delningsbara URL:er). Den adderas endast som suffix på
+ * commit-punkternas navigering (Enter/Sök/förslags-val/toolbar) och strippas
+ * efter mount. Backend (`ICapturesRecentSearch.Commit`) gatar auto-capturen
+ * på den.
+ */
+export const COMMIT_PARAM = "commit";
+
+/**
+ * Adderar commit-intent-suffixet på en redan byggd href (utanför state).
+ * Värdet är `true` (inte `1`) — ASP.NET Core minimal-API:s `bool`-binding
+ * använder `bool.TryParse`, som tolkar "true"/"false" men INTE "1"/"0";
+ * `?commit=1` skulle 400:a list-queryn. Backend-paramen är `bool commit`.
+ */
+export const COMMIT_VALUE = "true";
+
+export function withCommitFlag(href: string): string {
+  return href.includes("?")
+    ? `${href}&${COMMIT_PARAM}=${COMMIT_VALUE}`
+    : `${href}?${COMMIT_PARAM}=${COMMIT_VALUE}`;
+}
+
 export function buildJobbHref(state: JobbUrlState): string {
   const params = new URLSearchParams();
   for (const v of state.occupationGroup)
