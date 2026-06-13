@@ -1,13 +1,14 @@
-<!-- SYNK-KÄLLA: src/components/brand/brand-mark-svg.tsx (BrandMarkSvg).
+<!-- SYNK-KÄLLA: src/components/brand/brand-mark-svg.tsx (BrandMarkSvg "Sigillet").
      Detta är file-convention-mirror för Next.js auto-favicon-pickup
      (modern browsers prefererar SVG-favicon över .ico).
      Vid geometri-ändring: uppdatera BrandMarkSvg först, mirror-paste hit.
-     CTO M1-triage 2026-05-25 Variant B. -->
+     Favicon saknar CSS-kontext → literala färger (grön #15603F / guld #E8C77B / papper). -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Jobbliggaren">
   <title>Jobbliggaren</title>
-  <polygon points="50,8 56,30 50,47 44,30" fill="var(--jp-brand-primary, #0A2647)" />
-  <polygon points="92,50 70,56 53,50 70,44" fill="var(--jp-brand-primary, #0A2647)" />
-  <polygon points="50,92 44,70 50,53 56,70" fill="var(--jp-brand-primary, #0A2647)" />
-  <polygon points="8,50 30,44 47,50 30,56" fill="var(--jp-brand-primary, #0A2647)" />
-  <circle cx="50" cy="50" r="5" fill="var(--jp-brand-accent, #FFCD00)" />
+  <circle cx="50" cy="50" r="45" fill="#15603F" />
+  <circle cx="50" cy="50" r="37" fill="none" stroke="#FFFFFF" stroke-width="2.4" />
+  <rect x="36" y="39.5" width="24" height="4.5" rx="2" fill="#FFFFFF" />
+  <rect x="33" y="47.5" width="30" height="5.5" rx="2.5" fill="#E8C77B" />
+  <rect x="36" y="56.5" width="18" height="4.5" rx="2" fill="#FFFFFF" />
+  <path d="M56.5,50.6 L59,52.8 L64,47.6" fill="none" stroke="#15603F" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
 </svg>
