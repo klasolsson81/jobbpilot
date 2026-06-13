@@ -25,7 +25,13 @@ export default function TwitterImage() {
           gap: "64px",
         }}
       >
-        <BrandMarkSvg width={240} height={240} primaryFill="#0A2647" accentFill="#FFCD00" />
+        <BrandMarkSvg
+          width={240}
+          height={240}
+          primaryFill="#15603F"
+          accentFill="#E8C77B"
+          paperFill="#FFFFFF"
+        />
         <div
           style={{
             display: "flex",
@@ -38,7 +44,7 @@ export default function TwitterImage() {
             style={{
               fontSize: "112px",
               fontWeight: 700,
-              color: "#0A2647",
+              color: "#0C1A2E",
               letterSpacing: "-0.025em",
               lineHeight: 1,
             }}
@@ -49,7 +55,7 @@ export default function TwitterImage() {
             style={{
               fontSize: "32px",
               fontWeight: 500,
-              color: "#133F73",
+              color: "#455366",
               lineHeight: 1.3,
             }}
           >

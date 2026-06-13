@@ -1,13 +1,23 @@
-// SSOT för Jobbliggaren brand-mark-geometri (4-point compass-star + center accent).
+// SSOT för Jobbliggaren brand-mark-geometri — "Sigillet": fyllt register-sigill
+// (slät grön skiva + tunn inre ring + tre liggar-rader, mittersta guldmarkerad med
+// en bock = loggad post). Ersätter den tidigare 4-uddiga kompassen (logo-översyn
+// 2026-06-13; ADR 0068-amendment — kompassens navy+guldprick utgår).
 // Konsumeras av brand-logo.tsx, apple-icon.tsx, opengraph-image.tsx, twitter-image.tsx.
-// `app/icon.svg` är file-convention-mirror (Next.js auto-favicon) — synka manuellt
-// vid geometri-justering. CTO M1-triage 2026-05-25 Variant B.
+// `app/icon.svg` är file-convention-mirror (Next.js auto-favicon) —
+// synka manuellt vid geometri-justering.
+//
+// Tre färgroller (utökar tidigare 2-fill-kontrakt → 3):
+//   primaryFill  grön skiva + bock   (--jp-mark-primary → --jp-accent-800 #15603F)
+//   accentFill   guld mittrad        (--jp-mark-accent  → --jp-gold #E8C77B, ADR 0068)
+//   paperFill    inre ring + rader   (--jp-mark-paper   → #FFFFFF, tema-stabilt; EJ --jp-surface)
+// Mono-fallback: sätt accent = paper (raderna läses som urtag), primary = bläck.
 
 export interface BrandMarkSvgProps {
   width: number;
   height: number;
   primaryFill: string;
   accentFill: string;
+  paperFill: string;
   className?: string;
   ariaLabel?: string;
   ariaHidden?: boolean;
@@ -18,6 +28,7 @@ export function BrandMarkSvg({
   height,
   primaryFill,
   accentFill,
+  paperFill,
   className,
   ariaLabel,
   ariaHidden,
@@ -33,11 +44,19 @@ export function BrandMarkSvg({
       aria-hidden={ariaHidden}
       className={className}
     >
-      <polygon points="50,8 56,30 50,47 44,30" fill={primaryFill} />
-      <polygon points="92,50 70,56 53,50 70,44" fill={primaryFill} />
-      <polygon points="50,92 44,70 50,53 56,70" fill={primaryFill} />
-      <polygon points="8,50 30,44 47,50 30,56" fill={primaryFill} />
-      <circle cx="50" cy="50" r="5" fill={accentFill} />
+      <circle cx="50" cy="50" r="45" fill={primaryFill} />
+      <circle cx="50" cy="50" r="37" fill="none" stroke={paperFill} strokeWidth="2.4" />
+      <rect x="36" y="39.5" width="24" height="4.5" rx="2" fill={paperFill} />
+      <rect x="33" y="47.5" width="30" height="5.5" rx="2.5" fill={accentFill} />
+      <rect x="36" y="56.5" width="18" height="4.5" rx="2" fill={paperFill} />
+      <path
+        d="M56.5,50.6 L59,52.8 L64,47.6"
+        fill="none"
+        stroke={primaryFill}
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }

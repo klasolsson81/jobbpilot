@@ -33,9 +33,10 @@ describe("BrandLogo", () => {
     expect(svg!.getAttribute("width")).toBe("32");
   });
 
-  it("innehåller 4 compass-diamonds + 1 center-dot", () => {
+  it("innehåller sigill-geometri (2 circles + 3 rects + 1 path)", () => {
     const { container } = render(<BrandLogo variant="mark" />);
-    expect(container.querySelectorAll("polygon").length).toBe(4);
-    expect(container.querySelectorAll("circle").length).toBe(1);
+    expect(container.querySelectorAll("circle").length).toBe(2);
+    expect(container.querySelectorAll("rect").length).toBe(3);
+    expect(container.querySelectorAll("path").length).toBe(1);
   });
 });
