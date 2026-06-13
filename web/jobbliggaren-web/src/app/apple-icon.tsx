@@ -3,7 +3,8 @@ import { BrandMarkSvg } from "@/components/brand/brand-mark-svg";
 
 // Next.js 16 file convention: dynamiskt genererad apple-touch-icon för iOS home screen.
 // Storlek per Apple HIG: 180×180. Renderas server-side via ImageResponse (satori).
-// Geometri från BrandMarkSvg SSOT (CTO M1-triage 2026-05-25 Variant B).
+// Geometri från BrandMarkSvg SSOT (sigillet, logo-översyn 2026-06-13): grön skiva
+// (fyllt → robust i satori) på vit yta, vit ring/rader + guld mittrad.
 
 export const size = { width: 180, height: 180 };
 export const contentType = "image/png";
@@ -19,10 +20,16 @@ export default function AppleIcon() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#0A2647",
+          background: "#FFFFFF",
         }}
       >
-        <BrandMarkSvg width={130} height={130} primaryFill="#FFFFFF" accentFill="#FFCD00" />
+        <BrandMarkSvg
+          width={140}
+          height={140}
+          primaryFill="#15603F"
+          accentFill="#E8C77B"
+          paperFill="#FFFFFF"
+        />
       </div>
     ),
     { ...size }

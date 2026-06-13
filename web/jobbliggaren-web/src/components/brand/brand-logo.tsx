@@ -1,7 +1,7 @@
-// F-Pre Punkt 6 — Jobbliggaren brand-mark (CTO 2026-05-24 Beslut 4 + Klas-val C4 2026-05-25).
-// Ren RSC + inline SVG via BrandMarkSvg (CTO M1-triage 2026-05-25 Variant B).
-// Ärver primary-fill från CSS-vars (.jp-brand color → currentColor) + accent från
-// --jp-brand-accent. Funkar i båda RSC- och client-island-kontexter.
+// Jobbliggaren brand-mark — "Sigillet" (logo-översyn 2026-06-13, ersätter kompassen).
+// Ren RSC + inline SVG via BrandMarkSvg. Marken är tre-färgad (grön skiva + guld + papper)
+// och kan därför inte ärva en enda currentColor som den gamla kompassen — fyllen sätts
+// explicit via mark-tokens (--jp-mark-*). Wordmarken ärver .jp-brand color (ink).
 
 import { BrandMarkSvg } from "./brand-mark-svg";
 
@@ -10,7 +10,7 @@ type BrandLogoVariant = "full" | "mark";
 export interface BrandLogoProps {
   /**
    * `full` (default) renderar mark + wordmark "Jobbliggaren".
-   * `mark` renderar bara compass-stjärnan (för minimala kontexter).
+   * `mark` renderar bara sigillet (för minimala kontexter).
    */
   variant?: BrandLogoVariant;
   /**
@@ -26,8 +26,9 @@ export function BrandLogo({ variant = "full", markSize = 32 }: BrandLogoProps) {
         className="jp-brand__mark"
         width={markSize}
         height={markSize}
-        primaryFill="currentColor"
-        accentFill="var(--jp-brand-accent)"
+        primaryFill="var(--jp-mark-primary)"
+        accentFill="var(--jp-mark-accent)"
+        paperFill="var(--jp-mark-paper)"
         ariaHidden={variant === "full" ? true : undefined}
         ariaLabel={variant === "mark" ? "Jobbliggaren" : undefined}
       />

@@ -1,9 +1,8 @@
 import type { MetadataRoute } from "next";
 
-// Next.js 16 file convention: Web App Manifest. Klas-STOPP A val G + design-reviewer
-// 2026-05-25-rekommendation: G1 navy splash (brand-igenkänning > sektor-konvention).
-// Background_color vit (matchar landing-light), theme_color navy (matchar landing-hero
-// + OG-image). Klas kan flippa till "#FFFFFF" om Android-status-bar-mörkning oönskad.
+// Next.js 16 file convention: Web App Manifest. Background_color vit (matchar
+// landing-light). theme_color = granskogsgrön #15603F (matchar grön-accent-identiteten
+// ADR 0068 + sigill-logon, logo-översyn 2026-06-13) — ersätter tidigare navy.
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Jobbliggaren",
@@ -12,7 +11,7 @@ export default function manifest(): MetadataRoute.Manifest {
     start_url: "/",
     display: "standalone",
     background_color: "#FFFFFF",
-    theme_color: "#0A2647",
+    theme_color: "#15603F",
     lang: "sv",
     icons: [
       {

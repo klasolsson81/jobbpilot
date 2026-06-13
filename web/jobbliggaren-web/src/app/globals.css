@@ -20,10 +20,9 @@
    egen F-städ-fas efter grep-verifierad nollkonsumtion.
    ──────────────────────────────────────────────────────────── */
 :root {
-  /* Brand — djup navy (v3-kanon). G1 (ADR 0068): navy är LOGO-ONLY —
-     kompassen i BrandLogo förblir blå (+ gulprick --jp-brand-accent).
-     Som interaktionsfärg är navy ersatt av accent-rampen nedan; rampen
-     behålls här tills logo-översynen och städas i egen fas. */
+  /* Brand — djup navy (v3-kanon). Var LOGO-ONLY för den gamla kompassen; logo-översynen
+     2026-06-13 ersatte kompassen med sigillet (grön skiva + guld), så navy-rampen är nu
+     helt utan konsument och städas i egen F-städ-fas (ADR 0068-amendment). */
   --jp-navy-900: #08213F;
   --jp-navy-800: #0A2647;
   --jp-navy-700: #133F73;
@@ -48,7 +47,13 @@
   --jp-accent-300: #74C29A;
   --jp-accent-100: #D3E7DC;
   --jp-accent-50:  #E9F2ED;
-  --jp-gold: #E8C77B;              /* signatur — INGEN konsument ännu (logo-översyn separat) */
+  --jp-gold: #E8C77B;              /* signatur (guld) — konsumeras av sigillet via --jp-mark-accent */
+  /* Brand-mark "Sigillet" (logo-översyn 2026-06-13, ersätter kompassen). Tre färgroller,
+     tema-stabila: marken sitter på sin egen gröna skiva (ej sid-ytan), så paper = fast
+     papper-vitt, INTE --jp-surface (som skiftar i dark). ADR 0068-amendment. */
+  --jp-mark-primary: var(--jp-accent-800);  /* grön skiva + bock (#15603F, EJ dark-skiftad) */
+  --jp-mark-accent:  var(--jp-gold);         /* guld mittrad (#E8C77B) */
+  --jp-mark-paper:   #FFFFFF;                /* inre ring + rader — fast papper, EJ --jp-surface */
 
   /* Surfaces (v3-kanon) */
   --jp-surface:    #FFFFFF;   /* kort, popovers, modal */
@@ -151,8 +156,7 @@
   --jp-text-tertiary:     var(--jp-ink-3);
   --jp-text-inverse:      var(--jp-ink-inverse);
   /* G1 alias-flip (ADR 0068): brand-aliasen pekar på accent-rampen så
-     Tailwind-@theme-bryggan + shadcn följer gratis. --jp-brand-accent
-     (#FFCD00, kompass-prick) RÖRS EJ. */
+     Tailwind-@theme-bryggan + shadcn följer gratis. */
   --jp-brand-50:  var(--jp-accent-50);
   --jp-brand-100: var(--jp-accent-100);
   --jp-brand-300: var(--jp-accent-300);
@@ -160,7 +164,8 @@
   --jp-brand-600: var(--jp-accent-800);   /* primary = accent-800 (fill-kontrakt, EJ dark-skiftad) */
   --jp-brand-700: var(--jp-accent-700);   /* länk/hover */
   --jp-brand-900: var(--jp-accent-900);
-  --jp-brand-accent: #FFCD00;           /* compass-center-dot (Klas-val C4 2026-05-25) */
+  /* --jp-brand-accent (#FFCD00, kompass-prick) utgår — sigillet använder --jp-mark-accent
+     (= --jp-gold). Logo-översyn 2026-06-13. */
   --jp-success-50:  var(--jp-success-bg);
   --jp-success-500: var(--jp-success);
   --jp-success-600: var(--jp-success);
@@ -608,12 +613,10 @@ a:not(.jp-btn):hover { color: var(--jp-accent-600); }
   align-items: center;
   gap: 10px;
   text-decoration: none;
-  /* F-Pre Punkt 6 (CTO Beslut 2-rev): navy-700 → currentColor på <BrandLogo>-SVG;
-     dark-mode flippar automatiskt via befintlig navy-700-token-skift (ADR 0052).
-     G1-UNDANTAG: logon förblir NAVY (kompassen byter inte färg, ADR 0068) —
-     enda kvarvarande navy-konsumenten utöver scoped-pins/dark-ramp-defs.
+  /* Logo-översyn 2026-06-13 (ADR 0068-amendment): sigillet sätter sina egna fyll via
+     --jp-mark-* (ej currentColor). .jp-brand color driver nu bara wordmarken → ink.
      Override för scoped-vit-header se [data-theme="dark"] .jp-land-top .jp-brand nedan. */
-  color: var(--jp-navy-700);
+  color: var(--jp-ink-1);
 }
 .jp-brand:focus-visible {
   /* design-reviewer m2 2026-05-25: WCAG 2.4.7 paritet med .jp-btn-focus-stil.
@@ -2880,10 +2883,10 @@ a:not(.jp-btn):hover { color: var(--jp-accent-600); }
   color: #0C1A2E;
 }
 [data-theme="dark"] .jp-land-top .jp-brand {
-  /* design-reviewer M2 2026-05-25: scoped-vit-topbar i dark får INTE skifta brand
-     till ljusare navy-700 (#4F8AD0, 3.2:1 mot vit = WCAG-borderline). Lås till
-     light-värdet (#133F73, ~10:1) eftersom topbar är vit-på-vit oavsett tema. */
-  color: #133F73;
+  /* scoped-vit-topbar är vit-på-vit oavsett tema → wordmarken måste vara mörk även i
+     dark (ink-1 skiftar annars till ljust och blir osynligt). Lås till ink-1 light-värde
+     (#0C1A2E, ~16:1 mot vit). Logo-översyn 2026-06-13. */
+  color: #0C1A2E;
 }
 .jp-land-top__inner {
   max-width: 1200px;
