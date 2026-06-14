@@ -14,6 +14,7 @@ namespace Jobbliggaren.Application.Common;
 ///
 /// Pipeline-flöde (yttersta först, innerst sist):
 /// <list type="number">
+/// <item><see cref="LoggingScopeBehavior{TMessage,TResponse}"/> — TD-104/STEG 6: structured-field log scope (CorrelationId/UserId/OperationType), yttersta så all nedströms-loggning ärver scopet</item>
 /// <item><see cref="LoggingBehavior{TMessage,TResponse}"/></item>
 /// <item><see cref="ValidationBehavior{TMessage,TResponse}"/></item>
 /// <item><see cref="AuthorizationBehavior{TMessage,TResponse}"/></item>
@@ -26,6 +27,9 @@ public static class MediatorPipelineBehaviors
 {
     public static readonly Type[] InOrder =
     [
+        // TD-104 / STEG 6 — yttersta: öppnar logg-scope (CorrelationId/UserId/OperationType)
+        // så LoggingBehavior + alla nedströms-behaviors/handlers ärver de strukturerade fälten.
+        typeof(LoggingScopeBehavior<,>),
         typeof(LoggingBehavior<,>),
         typeof(ValidationBehavior<,>),
         typeof(AuthorizationBehavior<,>),

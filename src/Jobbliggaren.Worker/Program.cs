@@ -6,6 +6,7 @@ using Jobbliggaren.Application.Common.Abstractions;
 using Jobbliggaren.Application.Common.Auditing;
 using Jobbliggaren.Application.Common.Behaviors;
 using Jobbliggaren.Infrastructure;
+using Jobbliggaren.Infrastructure.Logging;
 using Jobbliggaren.Worker.Auditing;
 using Jobbliggaren.Worker.Hosting;
 using Mediator;
@@ -16,6 +17,10 @@ using Microsoft.Extensions.Hosting;
 var builder = Host.CreateApplicationBuilder(args);
 
 builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: false);
+
+// TD-104 / STEG 6 — persistent strukturerad logg-sink (MEL → Seq, config-gated på
+// Seq:ServerUrl). Delad extension med Api så sink-konfig inte driftar mellan hosts.
+builder.Logging.AddJobbliggarenLogging(builder.Configuration);
 
 // DI-validerings-policy (ADR 0023 amendment 2026-06-06, senior-cto-advisor).
 // Host.CreateApplicationBuilder sätter ValidateOnBuild=true i Development.

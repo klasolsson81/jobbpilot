@@ -20,6 +20,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Http.Resilience;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -39,12 +40,13 @@ public static class DependencyInjection
     /// </summary>
     public static IServiceCollection AddInfrastructure(
         this IServiceCollection services,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IHostEnvironment environment)
     {
         services.AddPersistence(configuration);
         services.AddIdentityAndSessions(configuration);
         services.AddHttpAuditing();
-        services.AddInvitationsAndEmail(configuration);
+        services.AddInvitationsAndEmail(configuration, environment);
         services.AddJobSources(configuration);
         services.AddLandingStats();
         return services;
@@ -259,8 +261,8 @@ public static class DependencyInjection
         // SECURITY-NOTE (security-auditor 2026-05-12 Min-2): api-key skickas via
         // DefaultRequestHeaders.TryAddWithoutValidation. Microsoft.Extensions.Http
         // EventSource-tracing kan teoretiskt logga request-headers vid aktiverad
-        // diagnostik — vi aktiverar den inte i prod (Serilog enrichers strippar
-        // headers redan). JobTech-api-key ger högre rate-limit på publikt
+        // diagnostik — vi aktiverar den inte i prod (Microsoft.Extensions.Http
+        // EventSource är default av). JobTech-api-key ger högre rate-limit på publikt
         // data — låg blast-radius om läckt.
         if (!string.IsNullOrWhiteSpace(options.ApiKey))
             client.DefaultRequestHeaders.TryAddWithoutValidation("api-key", options.ApiKey);
@@ -276,7 +278,8 @@ public static class DependencyInjection
     /// </summary>
     public static IServiceCollection AddInvitationsAndEmail(
         this IServiceCollection services,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IHostEnvironment environment)
     {
         services.Configure<InvitationTokenOptions>(
             configuration.GetSection(InvitationTokenOptions.SectionName));
@@ -295,15 +298,26 @@ public static class DependencyInjection
         services.AddSingleton<IInvitationTokenGenerator, InvitationTokenGenerator>();
         services.AddSingleton<IFeatureFlags, OptionsFeatureFlags>();
 
-        // ADR 0066 — AWS SES borttaget (Hetzner-deploy använder inte SES;
-        // transaktionell mejlväg är genuin TD för Hetzner-fasen). Console-
-        // sendern (loggar till Serilog/Seq) är default och enda providern för
-        // lokal dev/MVP. Switch-mekanismen behålls för framtida provider
-        // (SMTP/HTTP-API) — okänt värde fail-stoppas.
+        // ADR 0066 — AWS SES borttaget; transaktionell mejlväg är genuin TD för Hetzner-
+        // fasen (TD-101). ConsoleEmailSender skriver mottagar-email + plaintext invitation-
+        // token till ILogger — dev-providern. TD-104/STEG 6: med en PERSISTENT logg-sink
+        // (Seq) blir den loggraden durabel lagring av PII + en live-credential
+        // (security-auditor Major #1). Mitigering: ConsoleEmailSender registreras BARA i
+        // Development/Test; i andra miljöer faller "Console" tillbaka på NullEmailSender
+        // (no-op, ingen PII loggas) tills en riktig provider wiras (TD-101). Switch-
+        // mekanismen behålls för den framtida providern — okänt värde fail-stoppas.
         var emailProvider = configuration[$"{EmailOptions.SectionName}:Provider"] ?? "Console";
         if (string.Equals(emailProvider, "Console", StringComparison.OrdinalIgnoreCase))
         {
-            services.AddSingleton<IEmailSender, ConsoleEmailSender>();
+            // Dev/Test allow-list speglar Hangfire-schema-grindens mönster (Worker/Program.cs).
+            if (environment.IsDevelopment() || environment.IsEnvironment("Test"))
+            {
+                services.AddSingleton<IEmailSender, ConsoleEmailSender>();
+            }
+            else
+            {
+                services.AddSingleton<IEmailSender, NullEmailSender>();
+            }
         }
         else
         {

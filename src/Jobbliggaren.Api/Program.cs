@@ -14,6 +14,7 @@ using Jobbliggaren.Domain.Common;
 using Jobbliggaren.Infrastructure;
 using Jobbliggaren.Infrastructure.Auth;
 using Jobbliggaren.Infrastructure.Auth.Sessions;
+using Jobbliggaren.Infrastructure.Logging;
 using Jobbliggaren.Infrastructure.Persistence;
 using Mediator;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -25,9 +26,13 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: false);
 
+// TD-104 / STEG 6 — persistent strukturerad logg-sink (MEL → Seq, config-gated på
+// Seq:ServerUrl). Delad extension med Worker så sink-konfig inte driftar mellan hosts.
+builder.Logging.AddJobbliggarenLogging(builder.Configuration);
+
 builder.Services.AddOpenApi();
 builder.Services.AddApplication();
-builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddInfrastructure(builder.Configuration, builder.Environment);
 builder.Services.AddMediator(options =>
 {
     options.ServiceLifetime = ServiceLifetime.Scoped;

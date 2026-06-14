@@ -21,9 +21,9 @@ namespace Jobbliggaren.Infrastructure.Identity;
 /// Observability (TD-61 korrigering 2026-05-11 efter CTO Alt A): bootstrap-
 /// aktivitet observeras via strukturerad logg — Admin-role-add emit:ar
 /// EventId=2 ("Admin-rollen tilldelad till user {UserId} vid bootstrap.")
-/// via <see cref="LogAdminAssigned"/> till ILogger, som routas till Seq
-/// (dev) eller CloudWatch Logs (staging/prod) via Serilog-konfigurationen
-/// i <c>Jobbliggaren.Api</c>. Seedern populerar INTE <c>audit_log</c>-tabellen
+/// via <see cref="LogAdminAssigned"/> till ILogger, som routas till den
+/// persistenta Seq-sinken (MEL → Seq, config-gated på Seq:ServerUrl; TD-104).
+/// Seedern populerar INTE <c>audit_log</c>-tabellen
 /// — admin-vyn (<c>GetAuditLogEntriesQueryHandler</c>) läser AuditLogEntries
 /// skrivna av <c>AuditBehavior</c> via Mediator-commands markerade med
 /// <c>IAuditableCommand</c> (ADR 0022). Bootstrap är en

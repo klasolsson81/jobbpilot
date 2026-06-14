@@ -26,7 +26,7 @@ namespace Jobbliggaren.Application.JobAds.Jobs.PurgeRawPayloads;
 /// Audit-wire av <c>RawPayloadPurgedDomainEvent</c> defereras till TD-73
 /// right-to-erasure-batch (gemensam audit-wire via <c>ISystemEventAuditor</c>
 /// per senior-cto-advisor 2026-05-13 punkt 5). Interim: count + cutoff
-/// loggas strukturerat via Serilog → CloudWatch.
+/// loggas strukturerat via ILogger (MEL → Seq-sink, TD-104).
 /// </para>
 /// </summary>
 public sealed partial class PurgeStaleRawPayloadsJob(

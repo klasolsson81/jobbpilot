@@ -2,9 +2,10 @@ namespace Jobbliggaren.Application.Common.Abstractions;
 
 /// <summary>
 /// Email-utskick för transactional flows (invitations, waitlist).
-/// Impl: ConsoleEmailSender (Infrastructure) — loggar till Serilog/Seq för
-/// lokal dev/MVP. Transaktionell mejlväg (SMTP/HTTP-API) är TD för Hetzner-
-/// fasen (ADR 0066 — AWS SES borttaget). Templates på svenska per
+/// Impl: ConsoleEmailSender (Infrastructure) — loggar via ILogger (MEL → Seq-sink,
+/// TD-104) för lokal dev/MVP; Dev/Test-only (security-auditor Major #1, STEG 6),
+/// NullEmailSender i andra miljöer. Transaktionell mejlväg (SMTP/HTTP-API) är TD för
+/// Hetzner-fasen (TD-101, ADR 0066 — AWS SES borttaget). Templates på svenska per
 /// civic-utility-design.
 /// </summary>
 public interface IEmailSender
