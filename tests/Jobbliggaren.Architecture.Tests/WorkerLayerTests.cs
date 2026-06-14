@@ -79,6 +79,9 @@ public class WorkerLayerTests
         // IAdminRequest, parallell med HTTP-lager-policy RequireRole("Admin")).
         var expected = new[]
         {
+            // TD-104 / STEG 6 tillagd 2026-06-14 — yttersta: structured-field log scope
+            // (CorrelationId/UserId/OperationType) så LoggingBehavior + nedströms ärver fälten.
+            typeof(LoggingScopeBehavior<,>),
             typeof(LoggingBehavior<,>),
             typeof(ValidationBehavior<,>),
             typeof(AuthorizationBehavior<,>),

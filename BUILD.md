@@ -24,7 +24,8 @@
 | Mapping | — (manuell) | — | Ingen mapping-bibliotek; explicit DTO-mappning per CLAUDE.md §5 (AutoMapper/Mapster avvisade över domängränsen) |
 | Background jobs | Hangfire | 1.8.x | Postgres-storage |
 | Smart enum | Ardalis.SmartEnum | 8.x | State machines i domänen |
-| Logging | Microsoft.Extensions.Logging (console) | 10.x | `Microsoft.Extensions.Logging.Console` → stdout/Seq lokalt; persistent strukturerad sink (Serilog/Seq) planerad för Hetzner-fasen (TD-104) |
+| Logging | Microsoft.Extensions.Logging | 10.x | `Microsoft.Extensions.Logging.Console` → stdout + persistent strukturerad sink via Seq (TD-104, STEG 6) |
+| Log sink | Seq.Extensions.Logging | 9.0.0 | MEL-provider → Seq (datalust); config-gated på `Seq:ServerUrl`; net9-asset .NET 10-kompatibel (MEL `>= 9` unifieras uppåt); dev lokal Seq, prod Seq self-hosted EU (TD-104, ADR 0050) |
 | Observability | OpenTelemetry | 1.15+ | Traces + metrics |
 | PDF parsing | PdfPig | 0.1.14+ | Text extraction |
 | DOCX parsing | DocumentFormat.OpenXml | 3.x | Microsoft-underhåll |
@@ -126,7 +127,7 @@
 | Frontend | `pnpm dev` (localhost:3000) | Next.js `next start` co-tenant container på CAX31 (bakom Caddy) |
 | DNS / CDN / proxy | — | Cloudflare gratis-tier "Full (strict)" framför Caddy-origin på CAX31 |
 | Backup | — | Nattlig klient-side-krypterad `pg_dump` → Hetzner-EU Storage Box (TD-107) |
-| Logging / monitoring | console (MEL) | Persistent strukturerad sink (Serilog/Seq) — TD-104 |
+| Logging / monitoring | console (MEL) + Seq (`Seq.Extensions.Logging`) | Persistent strukturerad sink via Seq self-hosted EU — TD-104 |
 | Errors | — | Sentry (EU) planerat |
 | CI | GitHub Actions (build + test + coverage, inga moln-anrop) | oförändrat |
 | IaC | `infra/terraform/` bevarad som reversibilitets-mekanik (ADR 0066 Beslut 1) | retireras via egen ADR vid Hetzner-cutover |
@@ -1238,8 +1239,8 @@ permanent infra aktiveras; listan nedan speglar **beslutad** uppsättning, ADR 0
 
 ### 14.1 Logging
 
-- `Microsoft.Extensions.Logging` (console) — strukturerad loggning till stdout
-- Sinks: console nu (stdout/Seq lokalt); persistent strukturerad sink (Serilog/Seq) planerad för Hetzner-fasen (TD-104)
+- `Microsoft.Extensions.Logging` — strukturerad loggning; console (stdout) + Seq-sink
+- Sinks: console (stdout) + persistent strukturerad **Seq**-sink via `Seq.Extensions.Logging` (MEL-provider, config-gated på `Seq:ServerUrl`); dev lokal Seq (`localhost:5341`), prod Seq self-hosted EU (TD-104, ADR 0050)
 - Log levels:
   - `Trace`/`Debug`: dev only
   - `Information`: normala request-flows (start/slut av handlers)

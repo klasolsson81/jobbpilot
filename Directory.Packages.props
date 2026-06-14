@@ -75,7 +75,7 @@
     <!-- Jobbliggaren.Migrate — DDL-init console-app (STEG 14b). Behöver Npgsql direkt
          (Application använder bara DbSet<T>-abstraktionen via EF Core). AWSSDK.SecretsManager
          används av Migrate för att hämta master-creds + skriva final connection-strings.
-         Microsoft.Extensions.Logging.Console för stdout → CloudWatch. -->
+         Microsoft.Extensions.Logging.Console för stdout (+ Seq-sink, TD-104). -->
     <!-- Npgsql 10.0.2 minimum: matchar transitiv-krav från Npgsql.EntityFrameworkCore.PostgreSQL 10.0.1
          (kräver Npgsql >= 10.0.2). Direkt-referens från Jobbliggaren.Migrate. -->
     <PackageVersion Include="Npgsql" Version="10.0.3" />
@@ -92,6 +92,13 @@
          eliminera Warning-as-Error vid build. -->
     <PackageVersion Include="AWSSDK.Core" Version="4.0.6.1" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Console" Version="10.0.9" />
+    <!-- TD-104 / Pre-4 STEG 6 — persistent strukturerad logg-sink (senior-cto-advisor
+         Variant B: MEL → Seq, additivt på befintlig MEL-pipeline; Serilog avvisat YAGNI).
+         9.0.0 = senaste stabila (net8/net9/netstandard2.0-asset). .NET 10-kompatibel:
+         net9-assetet konsumeras forward-compat, och dep MEL/MEL.Configuration `>= 9.0.0`
+         unifieras UPPÅT till 10.x som redan finns i projektet (ingen downgrade/NU1605).
+         Web-verifierad 2026-06-14 (nuget.org). Config-gated via Seq:ServerUrl. -->
+    <PackageVersion Include="Seq.Extensions.Logging" Version="9.0.0" />
     <!-- Transitiv CVE-pinning. Hangfire (och NetArchTest.Rules) drar in Newtonsoft.Json 11.0.1
          vilket är sårbar mot CVE-2024-21907 (GHSA-5crp-9r3c-p9vr — DoS via StackOverflow vid
          djupt nestade JSON). Vi använder inte Newtonsoft direkt — pinningen sker bara via

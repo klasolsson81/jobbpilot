@@ -17,6 +17,10 @@
     <PackageReference Include="Refit" />
     <PackageReference Include="Refit.HttpClientFactory" />
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
+    <!-- TD-104 / STEG 6 — Seq logg-sink-provider (MEL → Seq). HTTP-agnostiskt paket
+         (ingen ASP.NET-koppling) → säkert i Infrastructure som Worker refererar utan
+         att bryta WorkerLayerTests ASP.NET-fri-invariant (ADR 0023). -->
+    <PackageReference Include="Seq.Extensions.Logging" />
   </ItemGroup>
 
   <PropertyGroup>
